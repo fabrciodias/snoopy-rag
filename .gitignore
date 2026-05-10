@@ -1,4 +1,4 @@
 data/raw_pdfs/*
 data/markdown/*
 .venv/
-__pycache__
+src/__pycache__
