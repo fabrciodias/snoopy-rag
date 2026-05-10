@@ -2,4 +2,4 @@ data/raw_pdfs/*
 data/markdown/*
 .venv/
 credentials.json
-__pycache__/
+__pycache/
