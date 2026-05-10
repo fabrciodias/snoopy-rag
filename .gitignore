@@ -3,3 +3,6 @@ data/markdown/*
 .venv/
 credentials.json
 __pycache/
+src/__pycache__
+*.pdf
+data/markdown/*.md
