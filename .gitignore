@@ -1,2 +1,3 @@
 data/raw_pdfs/*
 data/markdown/*
+.venv/

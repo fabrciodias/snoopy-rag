@@ -1,0 +1,26 @@
+import re
+from collections import Counter
+
+def to_markdown(raw_text):
+    if not raw_text:
+        return ""
+    
+    text = re.sub(r'\.{4,}', ' ', raw_text)
+    paragraphs = text.split('\n\n')
+    block_counts = Counter(p.strip() for p in paragraphs if len(p.strip()) > 15)
+    repetitive_blocks = {p for p, count in block_counts.items() if count > 3}
+
+    clean_paragraphs = []
+
+    for p in paragraphs:
+        if p.strip() in repetitive_blocks:
+            continue 
+        clean_paragraphs.append(p.strip())
+
+    text = '\n\n'.join(clean_paragraphs)
+    text = re.sub(r'(?m)^\s*\d+\s*$', '', text)
+    titulo = r'(?m)^\s*([A-ZÇÃÕÁÉÍÓÚÂÊÔ0-9 \.\-:\/]{4,150})\s*$'
+    text = re.sub(titulo, r'## \1', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text.strip()
