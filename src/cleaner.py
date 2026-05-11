@@ -20,7 +20,7 @@ def to_markdown(raw_text):
     text = '\n\n'.join(clean_paragraphs)
     text = re.sub(r'(?m)^\s*\d+\s*$', '', text)
     titulo = r'(?m)^\s*([A-ZÇÃÕÁÉÍÓÚÂÊÔ0-9 \.\-:\/]{4,150})\s*$'
-    text = re.sub(titulo, r'## \1', text)
+    text = re.sub(titulo, r'\n\n## \1\n\n', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
 
     return text.strip()
