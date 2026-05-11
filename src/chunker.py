@@ -52,6 +52,7 @@ if __name__ == '__main__':
         metadata = get_metadata(texto)
 
         if metadata:
+            metadata["link_drive"] = "https://drive.com/file/d/exemplo_de_link/view"
             print("Realizando o chunking...")
             final_chunks = semantic_chunking(texto, metadata)  
 
