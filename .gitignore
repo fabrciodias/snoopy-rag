@@ -8,3 +8,4 @@ src/__pycache__
 data/markdown/*.md
 data/*.json
 data/chroma_db/
+data/documents/

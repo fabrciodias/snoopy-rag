@@ -1,6 +1,7 @@
 import fitz
 import os
 import re
+import shutil
 
 def extract_pdf_data(file_path):
     metadata = {}
@@ -38,32 +39,40 @@ if __name__ == '__main__':
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     raw_pdfs = os.path.join(base_dir, 'data', 'raw_pdfs')
-    md_dir = os.path.join(base_dir, 'data', 'markdown')
+    docs_dir = os.path.join(base_dir, 'data', 'documents')
 
-    os.makedirs(md_dir, exist_ok=True)
+    os.makedirs(docs_dir, exist_ok=True)
     print(f"Iniciando extração. Buscando em: \{raw_pdfs}\n")
 
     for filename in os.listdir(raw_pdfs):
         if not filename.lower().endswith('.pdf'):
             continue
 
-        pdf_path = os.path.join(raw_pdfs, filename)
-        md_filename = filename[:-4] + '.md'
-        md_path = os.path.join(md_dir, md_filename)
+        src_path = os.path.join(raw_pdfs, filename)
+        folder_name = filename[:-4].strip()
+        doc_folder = os.path.join(docs_dir, folder_name)
+
+        pdf_path = os.path.join(doc_folder, 'source.pdf')
+        md_path = os.path.join(doc_folder, 'semantic.md')
 
         if os.path.exists(md_path):
-            print(f"Pulando extração: {filename} (já existe o .md correspondente)")
+            print(f"Pulando: '{folder_name}' já existe")
             continue
-        print(f"Lendo PDF: {filename}...")
-        metadata, raw_text = extract_pdf_data(pdf_path)
+        print(f"Criando: {folder_name}...")
+        os.makedirs(doc_folder, exist_ok=True)
+        
+        shutil.copy2(src_path, pdf_path)
+        print("Lendo e extraindo texto bruto...")
+        metadata, raw_text = extract_pdf_data(src_path)
 
         if raw_text:
             print("Limpando e formatando para Markdown semântico...")
             semantic_md = to_markdown(raw_text)
+
             with open(md_path, 'w', encoding='utf-8') as f:
                 f.write(f"# {metadata.get('title', 'Documento sem título')}\n\n")
                 f.write(semantic_md)
-            print(f"Salvo como: {md_filename}")
+            print("Extração concluída")
         else:
-            print(f"A extração falhou ou o PDF {filename} está em branco.")
-    print("\nProcesso de extração finalizado.")
+            print("A extração falhou. O PDF pode estar corrompido ou ser apenas imagens")
+    print("\nProcesso de extração e estruturação finalizado.")
