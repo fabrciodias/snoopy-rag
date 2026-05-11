@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 
 def generate_hash(file_path):
-    hasher = hashlib.md5
+    hasher = hashlib.md5()
     try:
         with open(file_path, 'rb') as f:
             buf = f.read()

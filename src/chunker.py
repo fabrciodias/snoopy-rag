@@ -1,6 +1,5 @@
 import os
 import json
-from tagger import get_metadata
 
 def semantic_chunking(markdown_text, doc_metadata, max_len=1500):
     paragraphs = markdown_text.split('\n\n')
@@ -40,49 +39,42 @@ def semantic_chunking(markdown_text, doc_metadata, max_len=1500):
 
 if __name__ == '__main__':
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    md_dir = os.path.join(base_dir, 'data', 'markdown')
+    docs_dir = os.path.join(base_dir, 'data', 'documents')
     output_file = os.path.join(base_dir, 'data', 'chunks.json')
-    map_path = os.path.join(base_dir, 'data', 'drive_links.json')
     
-    links_map = {}
-    if os.path.exists(map_path):
-        with open(map_path, 'r', encoding='utf-8') as f:
-            links_map = json.load(f)
-
-    if not os.path.exists(md_dir):
-        print(f"[ERRO] Diretório não encontrado: {md_dir}")
+    if not os.path.exists(docs_dir):
+        print(f"[ERRO] Diretório não encontrado: {docs_dir}")
         exit()
 
     final_chunks = []
-    print(f"Iniciando processamento no diretório: {md_dir}\n")
+    print(f"Iniciando processamento em: {docs_dir}\n")
 
-    for filename in os.listdir(md_dir):
-        if not filename.endswith('.md'):
+    for folder_name in os.listdir(docs_dir):
+        doc_folder = os.path.join(docs_dir, folder_name)
+        if not os.path.isdir(doc_folder):
             continue
 
-        md_file = os.path.join(md_dir, filename)
-        origin_name = filename.replace('.md', '.pdf')
-        print(f"Processando: {filename}")
+        md_file = os.path.join(doc_folder, 'semantic.md')
+        meta_file = os.path.join(doc_folder, 'metadata.json')
+        if not os.path.exists(md_file) or not os.path.exists(meta_file):
+            print(f"Aviso: Arquivos faltando em '{folder_name}'. Pulando.")
+            continue
+        print(f"Processando '{folder_name}'")
 
         with open(md_file, 'r', encoding='utf-8') as f:
             text = f.read()
-        print("Buscando registro de documento (Gemini Tagger)...")
-        metadata = get_metadata(text)
+        with open(meta_file, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        print("Realizando chunking...")
 
-        if metadata:
-            metadata["link_drive"] = links_map.get(origin_name, "Link não disponível no Drive")
-            print("Realizando o chunking semântico...")
-            doc_chunks = semantic_chunking(text, metadata)
-            
-            final_chunks.extend(doc_chunks)
-            print(f"{len(doc_chunks)} blocos gerados e adicionados à fila.")
-        else:
-            print("Falha ao gerar metadados. Pulando arquivo.")
+        doc_chunks = semantic_chunking(text, metadata)
+        final_chunks.extend(doc_chunks)
+        print(f"{len(doc_chunks)} blocos gerados e adicionados à fila.")
     print("\n" + "="*50)
     if final_chunks:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(final_chunks, f, indent=4, ensure_ascii=False)
-        print(f"[SUCESSO] {len(final_chunks)} chunks consolidadas.")
+        print(f"[SUCESSO] {len(final_chunks)} chunks consolidado no arquivo mestre.")
         print(f"Arquivo salvo em: {output_file}")
-    else:
+    else:    
         print("Nenhum chunk gerado. A pasta markdown estava vazia ou deu erro no Tagger.")

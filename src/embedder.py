@@ -34,7 +34,7 @@ def run_embedder():
     for chunk in chunks:
         text_chunk = chunk['text']
         metadata_chunk = chunk['metadata']
-        seal = f"{metadata_chunk.get('titulo_original', 'Doc')}_{text_chunk}"
+        seal = f"{metadata_chunk.get('hash_md5', 'nohash')}_{text_chunk}"
         chunk_id = hashlib.md5(seal.encode('utf-8')).hexdigest()
         result = collection.get(ids=[chunk_id])
 
