@@ -7,3 +7,4 @@ src/__pycache__
 *.pdf
 data/markdown/*.md
 data/*.json
+data/chroma_db/
