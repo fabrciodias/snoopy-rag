@@ -6,3 +6,6 @@ credentials.json
 src/__pycache__
 .venv/
 *.pdf
+data/*.json
+data/chroma_db/
+data/documents/
