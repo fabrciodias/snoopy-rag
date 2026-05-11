@@ -2,6 +2,7 @@ import os
 import json
 import chromadb 
 from google import genai
+from google.genai import types
 
 def init_search():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,31 +36,55 @@ def init_search():
         print("Pesquisando...")
 
         try:
-            response = client.models.embed_content(
+            response_emb = client.models.embed_content(
                 model='gemini-embedding-001',
                 contents=search
             )
-            vetor_search = response.embeddings[0].values
+            vetor_search = response_emb.embeddings[0].values
             result = collection.query(
                 query_embeddings=[vetor_search],
                 n_results=3
             )
 
-            print("\nPRINCIPAIS RESULTADOS DA BUSCA:")
-            print("-" * 50)
-
+            context = ""
+            used_fonts = []
             for i in range(len(result['documents'][0])):
                 text = result['documents'][0][i]
                 metadata = result['metadatas'][0][i]
-                distance = result['distances'][0][i]
+                context += f"TRECHO {i+1} \n{text}\n"
+                font = f"Título: {metadata.get('titulo_original')} | Seção: {metadata.get('secao')} | Link: {metadata.get('link_drive')}"
+                
+                if font not in used_fonts:
+                    used_fonts.append(font)
+            print("Lendo referências e gerando resposta (Gemini Flash)...")
 
-                print(f"RESULTADO {i+1} (Distância: {distance:.4f})")
-                print(f"Título: {metadata.get('titulo_original')}")
-                print(f"Seção: {metadata.get('secao')}")
-                print(f"Link Drive: {metadata.get('link_drive')}")
-                print("\nTRECHO ENCONTRADO:")
-                print(text)
-                print("-" * 50)
+            prompt_rag = f"""
+            Você é um assistente acadêmico de um grupo de pesquisa chamado GEPAFOR.
+            Responda à pergunta do usuário utilizando ESTRITAMENTE as informações fornecidas nos trechos de contexto abaixo.
+            Se a resposta não estiver nos trechos, diga claramente: "Não encontrei informações suficientes nos documentos indexados para responder a esta pergunta."
+            Não invente informações.
+            
+            PERGUNTA DO USUÁRIO: {search}
+            
+            CONTEXTOS RECUPERADOS:
+            {context}
+            """
+            llm_response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt_rag,
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                )
+            )
+            print("\n" + "="*50)
+            print("RESPOSTA DO SNOOPY-RAG")
+            print("="*50)
+            print(llm_response.text)
+            print("\n" + "-"*50)
+            print("FONTES CONSULTADAS:")
+            for f in used_fonts:
+                print(f"- {f}")
+            print("-" * 50)
 
         except Exception as e:
             print(f"Erro ao processar a busca: {e}")

@@ -20,10 +20,10 @@ def run_embedder():
     db_path = os.path.join(base_dir, 'data', 'chroma_db')
     chroma_client = chromadb.PersistentClient(path=db_path)
     collection = chroma_client.get_or_create_collection(name="docs")
-    chunks_path = os.path.join(base_dir, 'data', 'chunks_teste.json')
+    chunks_path = os.path.join(base_dir, 'data', 'chunks.json')
 
     if not os.path.exists(chunks_path):
-        print("[ERRO] Arquivo chunks_teste.json não encontrado.")
+        print("[ERRO] Arquivo chunks.json não encontrado.")
         return
     with open(chunks_path, 'r', encoding='utf-8') as f:
         chunks = json.load(f)
