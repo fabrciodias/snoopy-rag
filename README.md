@@ -62,7 +62,6 @@ Com o ambiente virtual ativo (indicado por `(.venv)` no terminal), instale as bi
 
 ```
 pip install -r requirements.txt
-
 ```
 *(As dependências incluem: `PyMuPDF`, `google-genai`, `chromadb`, `flashrank`, `google-api-python-client`)*.
 
@@ -101,17 +100,13 @@ O sistema requer integração com o ecossistema Google. Siga estes passos rigoro
 Com o ambiente virtual **ativo** e credenciais configuradas, a utilização divide-se em dois processos:
 
 **Para sincronizar documentos e atualizar a base de conhecimento:**
-
 ```
 python src/watcher.py
-
 ```
 
 **Para iniciar a interface de busca e consulta:**
-
 ```
 python src/search.py
-
 ```
 
 ## 6. Código Aberto e Contribuições
