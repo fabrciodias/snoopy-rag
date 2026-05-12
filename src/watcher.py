@@ -26,8 +26,6 @@ def run_pipeline():
             result = subprocess.run(
                 [vev_python, script_path],
                 check=True,
-                capture_output=True,
-                text=True
             )
             print("Concluído")
 

@@ -20,33 +20,37 @@ def run_embedder():
     db_path = os.path.join(base_dir, 'data', 'chroma_db')
     chroma_client = chromadb.PersistentClient(path=db_path)
     collection = chroma_client.get_or_create_collection(name="docs")
-    chunks_path = os.path.join(base_dir, 'data', 'chunks.json')
+    chunks_path = os.path.join(base_dir, 'data', 'chunks.jsonl')
 
     if not os.path.exists(chunks_path):
-        print("[ERRO] Arquivo chunks.json não encontrado.")
+        print("[ERRO] Arquivo chunks.jsonl não encontrado.")
         return
-    with open(chunks_path, 'r', encoding='utf-8') as f:
-        chunks = json.load(f)
-
-    print("\n[CACHE] Verificando blocos já existentes...")
+    print("\n[CACHE] Verificando blocos já existentes (leitura em streaming)...")
     to_process = []
+    total_chunks = 0
 
-    for chunk in chunks:
-        text_chunk = chunk['text']
-        metadata_chunk = chunk['metadata']
-        seal = f"{metadata_chunk.get('hash_md5', 'nohash')}_{text_chunk}"
-        chunk_id = hashlib.md5(seal.encode('utf-8')).hexdigest()
-        result = collection.get(ids=[chunk_id])
+    with open(chunks_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if not line.strip():
+                continue
+            chunk = json.loads(line)
+            total_chunks += 1
 
-        if len(result['ids']) == 0:
-            chunk['hash_id'] = chunk_id
-            to_process.append(chunk)
-    print(f"[CACHE] Dos {len(chunks)} blocos, {len(to_process)} são novos e serão vetorizados.")
+            text_chunk = chunk['text']
+            metadata_chunk = chunk['metadata']
+            seal = f"{metadata_chunk.get('hash_md5', 'nohash')}_{text_chunk}"
+            chunk_id = hashlib.md5(seal.encode('utf-8')).hexdigest()
+            result = collection.get(ids=[chunk_id])
 
+            if len(result['ids']) == 0:
+                chunk['hash_id'] = chunk_id
+                to_process.append(chunk)
+
+    print(f"[CACHE] Dos {total_chunks} blocos, {len(to_process)} são novos e serão vetorizados.")
     if not to_process:
-        print("Todas as chunks já foram processadas. Nenhuma requisição gasta. Encerrando.")
+        print("Todas as chunks já foram processadas. Nenhuma nova requisição. Encerrando.")
         return
-    print(f"\nIniciando a vetorização de {len(chunks)} chunks com o Gemini...")
+    print(f"\nIniciando a vetorização de {len(to_process)} chunks com o Gemini...")
 
     documents = []
     metadatas = []
@@ -73,7 +77,7 @@ def run_embedder():
                 ids.append(chunk_id)
                 embeddings.append(emb.values)
 
-            print(f"Lote processado: Chunks {i+1} até {min(i+batch_size, len(chunks))} vetorizadas.")
+            print(f"Lote processado: Chunks {i+1} até {min(i+batch_size, len(to_process))} vetorizadas.")
             time.sleep(4)
 
         except Exception as e:

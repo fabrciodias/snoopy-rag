@@ -8,11 +8,18 @@ from flashrank import Ranker, RerankRequest
 
 def decompose_query(query, client):
     prompt = f"""
-    Você é um roteador de buscas acadêmicas. Analise a pergunta do usuário. 
-    Se for uma pergunta complexa com vários temas, quebre-a em sub-perguntas simples e diretas, focadas em um único conceito cada.
-    Se a pergunta for simples e direta, retorne-a como o único item da lista.
+    Você é um roteador de buscas acadêmicas especializado em precisão de autores.
+    Analise a pergunta do usuário e identifique se ele menciona um AUTOR ou OBRA específica (ex: Kaplan, Osmar, Admee).
     
-    REGRA OBRIGATÓRIA: Retorne APENAS um array JSON contendo as strings das perguntas.
+    TAREFA:
+    1. Quebre a pergunta em sub-buscas conceituais.
+    2. Se houver um AUTOR/OBRA na pergunta, você DEVE incluir o nome dele em TODAS as sub-buscas.
+    
+    EXEMPLO DE ROTEAMENTO:
+    - Pergunta: "O que Kaplan diz sobre CEC e IEM?"
+    - Sub-buscas: ["Kaplan estratégias CEC", "Kaplan definição de IEM", "Kaplan relação CEC e IEM"]
+    
+    REGRA OBRIGATÓRIA: Retorne APENAS um array JSON de strings.
     
     Pergunta do Usuário: {query}
     """
@@ -107,7 +114,7 @@ def init_search():
 
                 re_rank = RerankRequest(query=search, passages=passages)
                 re_results = ranker.rerank(re_rank)
-                results = re_results[:3]
+                results = re_results[:5]
                
                 for i, doc in enumerate(results):
                     text_content = doc['text']
@@ -131,6 +138,7 @@ def init_search():
             prompt_rag = f"""
             Você é um assistente acadêmico de um grupo de pesquisa.
             Responda à pergunta do usuário utilizando ESTRITAMENTE as informações fornecidas nos trechos de contexto abaixo.
+            REGRA DE CITAÇÃO: Toda vez que você usar uma informação de um trecho, você deve obrigatoriamente colocar a referência logo após a frase. Exemplo: "A regulação é essencial para o ensino [TRECHO 2]."
             Se a resposta não estiver nos trechos, diga claramente: "Não encontrei informações suficientes nos documentos indexados para responder a esta pergunta."
             Não invente informações.
             
