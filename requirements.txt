@@ -3,3 +3,4 @@ google-genai
 chromadb
 google-api-python-client
 google-auth
+flashrank

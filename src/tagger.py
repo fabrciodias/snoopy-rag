@@ -93,14 +93,23 @@ if __name__ == '__main__':
         if not semantic_data:
             print("Falha na esxtração. Pulando...")
             continue
-        pdf_name = folder_name + ".pdf"
+
+        link_drive = "Link não encontrado"
+        origin_file = folder_name + ".pdf"
+        for map_name, map_url in links_map.items():
+            if map_name.lower().endswith('.pdf'):
+                clean_name = map_name[:-4].strip()
+                if clean_name == folder_name:
+                    link_drive = map_url
+                    origin_file = map_name
+                    break
 
         final_metadata = {
            "id_documento": str(uuid.uuid4()),
-            "arquivo_origem": pdf_name,
+            "arquivo_origem": origin_file,
             "data_ingestao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "hash_md5": generate_hash(pdf_path),
-            "link_drive": links_map.get(pdf_name, "Link não encontrado"),
+            "link_drive": link_drive,
             "status": "indexado",
             **semantic_data 
         }

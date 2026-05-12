@@ -1,11 +1,9 @@
 data/raw_pdfs/*
 data/chroma_db/
 data/documents/
+data/models
 data/*.json
 credentials.json
 src/__pycache__
 .venv/
 *.pdf
-data/*.json
-data/chroma_db/
-data/documents/
