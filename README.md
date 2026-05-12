@@ -34,11 +34,31 @@ No terminal, execute os seguintes comandos:
 git clone https://github.com/fabrciodias/snoopy-rag.git
 cd snoopy-rag
 python3 -m venv .venv
+
+```
+**Ativando o ambiente virtual:**
+
+* **Linux / macOS:**
+```
 source .venv/bin/activate
+
+```
+
+* **Windows (Prompt de Comando - CMD):**
+```
+.venv\Scripts\activate.bat
+
+```
+
+* **Windows (PowerShell):**
+```
+.\.venv\Scripts\Activate.ps1
+
 ```
 
 ### Passo 2: Instalar Dependências
 
+Com o ambiente virtual ativo no terminal, instale as bibliotecas necessárias:
 ```
 pip install -r requirements.txt
 
@@ -76,19 +96,19 @@ O sistema requer integração com o ecossistema Google. Siga estes passos rigoro
 
 ## 5. Utilização
 
-Com o ambiente e credenciais configurados, a utilização divide-se em dois processos:
+Com o ambiente virtual **ativo** e as credenciais configuradas, a operação do sistema divide-se em dois processos independentes.
+
+*(Dica: certifique-se de que a tag `(.venv)` aparece no início da linha do seu terminal. Caso contrário, repita o processo de ativação do Passo 1).*
 
 **Para sincronizar documentos e atualizar a base de conhecimento:**
-
 ```
-python3 src/watcher.py
+python src/watcher.py
 
 ```
 
 **Para iniciar a interface de busca e consulta:**
-
 ```
-python3 src/search.py
+python src/search.py
 
 ```
 
