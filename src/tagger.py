@@ -1,20 +1,8 @@
 import json
 import os
-import uuid
-import hashlib
 from datetime import datetime
 from google import genai
 from google.genai import types
-
-def generate_hash(file_path):
-    hasher = hashlib.md5()
-    try:
-        with open(file_path, 'rb') as f:
-            buf = f.read()
-            hasher.update(buf)
-        return hasher.hexdigest()
-    except Exception:
-        return "hash_error"
 
 def get_metadata(markdown_text, client):
     prompt = """
@@ -54,7 +42,7 @@ if __name__ == '__main__':
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     docs_dir = os.path.join(base_dir, 'data', 'documents')
     cred_path = os.path.join(base_dir, 'credentials.json')
-    map_path = os.path.join(base_dir, 'data', 'drive_links.json')
+    state_path = os.path.join(base_dir, 'data', 'drive_state.json')
     
     try:
         with open(cred_path, 'r') as f:
@@ -64,10 +52,10 @@ if __name__ == '__main__':
         print(f"[ERRO FATAL] credenciais: {e}")
         exit()
 
-    links_map = {}
-    if os.path.exists(map_path):
-        with open(map_path, 'r', encoding='utf-8') as f:
-            links_map = json.load(f)
+    state_data = {}
+    if os.path.exists(state_path):
+        with open(state_path, 'r', encoding='utf-8') as f:
+            state_data = json.load(f)
     print(f"Iniciando cofre de Metadados em: {docs_dir}\n")
 
     for folder_name in os.listdir(docs_dir):
@@ -75,7 +63,6 @@ if __name__ == '__main__':
         if not os.path.isdir(doc_folder):
             continue
         md_path = os.path.join(doc_folder, 'semantic.md')
-        pdf_path = os.path.join(doc_folder, 'source.pdf')
         meta_path = os.path.join(doc_folder, 'metadata.json')
 
         if os.path.exists(meta_path):
@@ -96,19 +83,22 @@ if __name__ == '__main__':
 
         link_drive = "Link não encontrado"
         origin_file = folder_name + ".pdf"
-        for map_name, map_url in links_map.items():
-            if map_name.lower().endswith('.pdf'):
-                clean_name = map_name[:-4].strip()
-                if clean_name == folder_name:
-                    link_drive = map_url
-                    origin_file = map_name
-                    break
+        doc_id = folder_name
+
+        for file_id, info in state_data.items():
+            filename = info.get('name', '')
+            clean_name = filename[:-4].strip() if filename.lower().endswith('.pdf') else filename
+
+            if clean_name == folder_name:
+                link_drive = info.get('webViewLink', 'Link não encontrado')
+                origin_file = filename
+                doc_id = file_id
+                break
 
         final_metadata = {
-           "id_documento": str(uuid.uuid4()),
+           "id_documento": doc_id,
             "arquivo_origem": origin_file,
             "data_ingestao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "hash_md5": generate_hash(pdf_path),
             "link_drive": link_drive,
             "status": "indexado",
             **semantic_data 
