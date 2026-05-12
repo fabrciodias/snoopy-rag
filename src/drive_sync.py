@@ -11,7 +11,13 @@ def sync_drive():
     download_dir = os.path.join(base_dir, 'data', 'raw_pdfs')
 
     os.makedirs(download_dir, exist_ok=True)
-    FOLDER_ID = '1iFnzxDp1pcri4cQSmZFGgE1hSg8lZ4Cc'
+    try:
+        with open(cred_path, 'r', encoding='utf-8') as f:
+            creds_data = json.load(f)
+            FOLDER_ID = creds_data.get('folder_id')
+    except Exception as e:
+        print(f"[ERROR] Falha ao ler o credentials.json: {e}")
+        return
     SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
     try:
