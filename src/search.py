@@ -8,18 +8,20 @@ from flashrank import Ranker, RerankRequest
 
 def decompose_query(query, client):
     prompt = f"""
-    Você é um roteador de buscas acadêmicas especializado em precisão de autores.
-    Analise a pergunta do usuário e identifique se ele menciona um AUTOR ou OBRA específica (ex: Kaplan, Osmar, Admee).
+    Você é um roteador de buscas acadêmicas de alta precisão.
+    Sua função é analisar a pergunta do usuário e quebrá-la em micro-buscas focadas e independentes.
     
-    TAREFA:
-    1. Quebre a pergunta em sub-buscas conceituais.
-    2. Se houver um AUTOR/OBRA na pergunta, você DEVE incluir o nome dele em TODAS as sub-buscas.
+    REGRA CRÍTICA DE AUTORIA: Se a pergunta citar múltiplos autores, obras ou conceitos, VOCÊ DEVE mapear qual conceito pertence a qual autor. 
+    - Inclua o nome do autor APENAS na sub-busca correspondente à sua respectiva teoria. 
+    - NÃO misture autores na mesma linha (ex: "AutorA AutorB conceito"), a menos que a pergunta peça explicitamente uma conexão ou comparação.
+    - Crie linhas de busca independentes para cada núcleo conceitual.
     
-    EXEMPLO DE ROTEAMENTO:
-    - Pergunta: "O que Kaplan diz sobre CEC e IEM?"
-    - Sub-buscas: ["Kaplan estratégias CEC", "Kaplan definição de IEM", "Kaplan relação CEC e IEM"]
+    Exemplo de Roteamento Inteligente:
+    - Pergunta: "O que [Autor A] diz sobre [Conceito X] e como [Autor B] aborda [Conceito Y]?"
+    - Sub-buscas esperadas: 
+      ["[Autor A] [Conceito X]", "[Autor B] [Conceito Y]", "conexão [Conceito X] e [Conceito Y]"]
     
-    REGRA OBRIGATÓRIA: Retorne APENAS um array JSON de strings.
+    REGRA OBRIGATÓRIA: Retorne APENAS um array JSON de strings, sem formatação markdown ou texto extra.
     
     Pergunta do Usuário: {query}
     """

@@ -29,15 +29,36 @@ Para mitigar o problema de alucinação em modelos generativos, o sistema adota 
 *(Nota: O diretório `/data`, que armazena os PDFs e o banco vetorial, não é incluído no repositório; ele será criado automaticamente na primeira execução do sistema).*
 
 ### Passo 1: Clonar o Repositório e Preparar o Ambiente
-No terminal, execute os seguintes comandos:
+No terminal, execute os comandos abaixo para clonar o projeto e criar o ambiente virtual:
+
 ```
 git clone https://github.com/fabrciodias/snoopy-rag.git
 cd snoopy-rag
-python3 -m venv .venv
-source .venv/bin/activate
+
 ```
 
+**Criando e ativando o ambiente virtual:**
+
+* **Linux / macOS:**
+```
+python3 -m venv .venv
+source .venv/bin/activate
+
+```
+
+
+* **Windows (Prompt de Comando - CMD ou PowerShell):**
+```
+python -m venv .venv
+.\.venv\Scripts\activate
+
+```
+
+*(Nota: Se o PowerShell no Windows retornar um erro vermelho dizendo que a execução de scripts está desabilitada, rode o comando `Set-ExecutionPolicy Unrestricted -Scope CurrentUser`, confirme com 'S' ou 'Y', e tente ativar novamente).*
+
 ### Passo 2: Instalar Dependências
+
+Com o ambiente virtual ativo (indicado por `(.venv)` no terminal), instale as bibliotecas necessárias:
 
 ```
 pip install -r requirements.txt
@@ -54,7 +75,7 @@ O sistema requer integração com o ecossistema Google. Siga estes passos rigoro
 3. **Google AI Studio (Gemini):** Gere uma chave de API no [Google AI Studio](https://aistudio.google.com/).
 4. **Edição do arquivo de credenciais:** Abra o seu `credentials.json` e adicione manualmente os campos `api_key` e `folder_id` no início do arquivo:
 
-```
+```json
 {
   "api_key": "SUA_CHAVE_GEMINI_AQUI",
   "folder_id": "ID_DA_SUA_PASTA_DO_DRIVE_AQUI",
@@ -65,6 +86,7 @@ O sistema requer integração com o ecossistema Google. Siga estes passos rigoro
   "client_email": "seu-bot@seu-projeto.iam.gserviceaccount.com",
   ...
 }
+
 ```
 
 ### Passo 4: Permissões no Google Drive
@@ -76,19 +98,19 @@ O sistema requer integração com o ecossistema Google. Siga estes passos rigoro
 
 ## 5. Utilização
 
-Com o ambiente e credenciais configurados, a utilização divide-se em dois processos:
+Com o ambiente virtual **ativo** e credenciais configuradas, a utilização divide-se em dois processos:
 
 **Para sincronizar documentos e atualizar a base de conhecimento:**
 
 ```
-python3 src/watcher.py
+python src/watcher.py
 
 ```
 
 **Para iniciar a interface de busca e consulta:**
 
 ```
-python3 src/search.py
+python src/search.py
 
 ```
 
