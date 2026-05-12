@@ -1,35 +1,39 @@
 # Snoopy-RAG: Sistema de Busca Semântica Documental
 
-O **Snoopy-RAG** é uma infraestrutura local de Recuperação Aumentada por Geração (RAG) desenvolvida para indexar e consultar coleções de artigos, teses e livros. O foco do projeto é o rigor acadêmico, garantindo consultas rápidas e a rastreabilidade estrita das informações geradas por meio de citações.
+O **Snoopy-RAG** é uma infraestrutura local de Recuperação Aumentada por Geração (RAG) desenvolvida para indexar e consultar coleções de artigos, teses e livros. O projeto foca no rigor acadêmico, garante consultas rápidas e rastreia estritamente as informações geradas através de citações diretas.
 
-## 1. Arquitetura e Otimização de Hardware
+## 1. Arquitetura Efêmera e Otimização
 
-O sistema foi desenvolvido sob restrições severas de hardware, sendo validado em um equipamento de 2011 (4GB de RAM DDR3, sem placa de vídeo dedicada, ambiente Ubuntu 22.04). 
+O sistema roda sob restrições severas de hardware, validado em um servidor de 2011 (4GB de RAM DDR3, sem GPU, Ubuntu 22.04).
 
-Para evitar o esgotamento de memória (Out of Memory - OOM), a arquitetura do projeto é orientada a disco em vez de RAM. O processamento de dados ocorre via *streaming* (leitura e gravação linha a linha em arquivos `.jsonl`), e o pipeline de ingestão é executado em subprocessos isolados. Isso garante que a memória seja completamente liberada ao final de cada etapa do processamento documental.
+Para evitar travamentos por falta de memória (OOM), o Snoopy-RAG processa dados em *streaming* e executa cada etapa do pipeline em subprocessos isolados. Na versão atual, a arquitetura tornou-se **efêmera e isolada**:
+
+* **Efêmera (Limpeza do Disco):** O sistema deleta os PDFs originais do disco imediatamente após a extração do conhecimento (Markdown), poupando armazenamento físico.
+* **Isolada (Folder-Tenancy):** O banco de dados cria coleções independentes para cada pasta do Drive, permitindo gerenciar múltiplos acervos sem misturar contextos.
 
 ## 2. Pipeline de Processamento (Módulos)
 
-O sistema opera de forma linear, com scripts de responsabilidade única:
+O sistema opera de forma linear com scripts de responsabilidade única:
 
-* **`drive_sync.py`**: Módulo de coleta. Realiza a sincronização autônoma e incremental com o Google Drive via Conta de Serviço.
-* **`extractor.py` & `cleaner.py`**: Módulos de formatação. Extraem o texto bruto dos PDFs e utilizam heurísticas determinísticas para normalizar o conteúdo em Markdown semântico.
-* **`tagger.py`**: Módulo de indexação. Utiliza LLM (temperatura 0.1) para extrair metadados precisos e gera um Hash MD5 único para o controle de integridade do documento.
-* **`chunker.py`**: Realiza o fatiamento (chunking) semântico baseado na estrutura de seções do texto. Salva os blocos em formato de *streaming* (`.jsonl`) para baixo consumo de RAM.
-* **`embedder.py`**: Módulo de vetorização. Implementa um **Cache Vetorial por Hash** local para evitar a re-vetorização de blocos já existentes no banco ChromaDB.
-* **`search.py`**: Motor de busca. Utiliza *Decomposição Multi-Query Ancorada* para evitar desvios semânticos, realiza o re-ranqueamento com **FlashRank** e gera respostas com fundamentação teórica.
-* **`watcher.py`**: O orquestrador. Executa o pipeline de ingestão sequencialmente em subprocessos isolados.
+* **`drive_sync.py`**: Gerencia a coleta. Sincroniza arquivos do Google Drive e controla o estado local (`drive_state.json`), detectando atualizações de versão automaticamente.
+* **`extractor.py` & `cleaner.py**`: Extraem o texto do PDF, normalizam o conteúdo em Markdown semântico usando heurísticas e excluem o arquivo original do HD.
+* **`tagger.py`**: Extrai metadados precisos com IA (Gemini). Atrela os dados ao ID imutável do Drive, o que previne duplicação de vetores no banco de dados.
+* **`chunker.py`**: Fatie o texto semanticamente com base nas seções. Grava os resultados em streaming (`.jsonl`).
+* **`embedder.py`**: Cria o banco vetorial isolado para a pasta específica no ChromaDB. Consulta o cache local e vetoriza apenas os blocos inéditos.
+* **`search.py`**: Motor de busca e API. Recebe a pergunta via linha de comando, isola os logs de processamento e devolve uma resposta estruturada e limpa em formato JSON. Usa decomposição de perguntas e re-ranqueamento com FlashRank.
+* **`watcher.py`**: O orquestrador. Executa o pipeline de ingestão de ponta a ponta.
 
 ## 3. Rastreabilidade e Citações
 
-Para mitigar o problema de alucinação em modelos generativos, o sistema adota engenharia de prompt restritiva. Toda afirmação ou conceito gerado na resposta final inclui obrigatoriamente a referência direta ao bloco de texto correspondente (exemplo: `[TRECHO 3]`). O modelo é instruído a admitir a ausência de informações caso a resposta não esteja nos documentos vetorizados.
+Para impedir alucinações, o sistema usa engenharia de prompt restritiva. Toda afirmação gerada na resposta inclui obrigatoriamente a referência direta ao bloco de texto correspondente (exemplo: `[TRECHO 3]`). A IA admite imediatamente a ausência de informações caso a resposta não exista nos documentos indexados.
 
 ## 4. Instalação e Configuração
 
-*(Nota: O diretório `/data`, que armazena os PDFs e o banco vetorial, não é incluído no repositório; ele será criado automaticamente na primeira execução do sistema).*
+*(Nota: O script criará o diretório `/data` automaticamente na primeira execução para armazenar as bases).*
 
-### Passo 1: Clonar o Repositório e Preparar o Ambiente
-No terminal, execute os comandos abaixo para clonar o projeto e criar o ambiente virtual:
+### Passo 1: Clonar e Preparar o Ambiente
+
+No terminal, clone o projeto e crie o ambiente virtual:
 
 ```
 git clone https://github.com/fabrciodias/snoopy-rag.git
@@ -40,75 +44,79 @@ cd snoopy-rag
 **Criando e ativando o ambiente virtual:**
 
 * **Linux / macOS:**
+
 ```
 python3 -m venv .venv
 source .venv/bin/activate
 
 ```
 
+* **Windows (Prompt de Comando ou PowerShell):**
 
-* **Windows (Prompt de Comando - CMD ou PowerShell):**
 ```
 python -m venv .venv
 .\.venv\Scripts\activate
 
 ```
 
-*(Nota: Se o PowerShell no Windows retornar um erro vermelho dizendo que a execução de scripts está desabilitada, rode o comando `Set-ExecutionPolicy Unrestricted -Scope CurrentUser`, confirme com 'S' ou 'Y', e tente ativar novamente).*
+*(Nota: No PowerShell, se houver erro de permissão, rode `Set-ExecutionPolicy Unrestricted -Scope CurrentUser`, confirme e tente novamente).*
 
 ### Passo 2: Instalar Dependências
 
-Com o ambiente virtual ativo (indicado por `(.venv)` no terminal), instale as bibliotecas necessárias:
+Com o ambiente ativo `(.venv)`, instale os pacotes:
 
 ```
 pip install -r requirements.txt
+
 ```
-*(As dependências incluem: `PyMuPDF`, `google-genai`, `chromadb`, `flashrank`, `google-api-python-client`)*.
 
-### Passo 3: Configuração das APIs (Google Cloud e Gemini)
+### Passo 3: Configuração das APIs (Google)
 
-O sistema requer integração com o ecossistema Google. Siga estes passos rigorosamente:
+O ecossistema depende das ferramentas do Google:
 
-1. **Google Cloud (Drive):** Acesse o [Google Cloud Console](https://console.cloud.google.com/), crie um projeto e gere uma **Conta de Serviço (Service Account)**.
-2. **Chave JSON:** Dentro da Conta de Serviço, crie uma chave no formato JSON, faça o download e renomeie o arquivo para `credentials.json`, colocando-o na raiz do projeto.
-3. **Google AI Studio (Gemini):** Gere uma chave de API no [Google AI Studio](https://aistudio.google.com/).
-4. **Edição do arquivo de credenciais:** Abra o seu `credentials.json` e adicione manualmente os campos `api_key` e `folder_id` no início do arquivo:
+1. Acesse o [Google Cloud Console](https://console.cloud.google.com/), crie um projeto e gere uma **Conta de Serviço**.
+2. Crie uma chave JSON para esta conta, faça o download, renomeie para `credentials.json` e coloque na raiz do projeto.
+3. Gere uma chave de API no [Google AI Studio](https://aistudio.google.com/).
+4. Abra o `credentials.json` e adicione manualmente `api_key`, `folder_id` e `folder_name` no topo do arquivo:
 
-```json
+```
 {
   "api_key": "SUA_CHAVE_GEMINI_AQUI",
   "folder_id": "ID_DA_SUA_PASTA_DO_DRIVE_AQUI",
+  "folder_name": "NOME_DO_SEU_ACERVO_AQUI",
   "type": "service_account",
   "project_id": "...",
   "private_key_id": "...",
   "private_key": "...",
-  "client_email": "seu-bot@seu-projeto.iam.gserviceaccount.com",
-  ...
+  "client_email": "seu-bot@seu-projeto.iam.gserviceaccount.com"
 }
 
 ```
 
 ### Passo 4: Permissões no Google Drive
 
-1. Vá até a pasta no Google Drive que contém os PDFs acadêmicos.
-2. Compartilhe a pasta com o endereço de e-mail do seu bot (o `client_email` presente no seu `credentials.json`).
-3. Atribua a permissão de **Leitor** (Viewer) ao bot para que ele possa baixar os arquivos.
-4. O ID da pasta pode ser extraído da URL (exemplo: `drive.google.com/drive/folders/ID_DA_PASTA?hl=pt-br`). Certifique-se de que este ID está correto no seu `credentials.json`.
+1. Abra a pasta do seu acervo no Google Drive.
+2. Compartilhe a pasta como **Leitor** com o e-mail do seu bot (o `client_email` do JSON).
+3. Copie o ID da pasta na URL (exemplo: `drive.google.com/drive/folders/ID_DA_PASTA`) e cole no seu `credentials.json`.
 
-## 5. Utilização
+## 5. Uso
 
-Com o ambiente virtual **ativo** e credenciais configuradas, a utilização divide-se em dois processos:
+Sempre execute os comandos com o ambiente virtual ativo.
 
-**Para sincronizar documentos e atualizar a base de conhecimento:**
+**Para processar PDFs, atualizar a base e alimentar o banco vetorial:**
+
 ```
 python src/watcher.py
+
 ```
 
-**Para iniciar a interface de busca e consulta:**
+**Para consultar o acervo (O script devolve a resposta em formato JSON):**
+
 ```
-python src/search.py
+python src/search.py "O que diz o autor sobre este conceito?"
+
 ```
 
 ## 6. Código Aberto e Contribuições
 
-Este é um projeto *open-source* com arquitetura documentada para facilitar modificações. O código pode ser clonado e adaptado livremente. Sinta-se à vontade para realizar *forks*, alterar a estrutura dos prompts ou customizar heurísticas de limpeza. Pull Requests com otimizações são bem-vindos.
+Este projeto possui arquitetura transparente e pragmática. Clone, modifique e adapte livremente. Crie *forks*, ajuste heurísticas ou otimize o pipeline. Pull Requests são bem-vindos.
