@@ -2,6 +2,7 @@ import os
 import json
 import chromadb
 import time
+import re
 import hashlib
 from google import genai
 
@@ -12,14 +13,20 @@ def run_embedder():
         with open(cred_path, 'r') as f:
             creds = json.load(f)
             api_key = creds.get('api_key')
+            folder_id = creds.get('folder_id')
     except Exception as e:
         print(f"[ERRO] Falha ao ler credentials.json: {e}")
+        return
+    if not folder_id:
+        print("[ERRO] 'folder_id' não encontrado no credentials.json")
         return
     
     client = genai.Client(api_key=api_key)
     db_path = os.path.join(base_dir, 'data', 'chroma_db')
     chroma_client = chromadb.PersistentClient(path=db_path)
-    collection = chroma_client.get_or_create_collection(name="docs")
+
+    safe_name = "pasta_" + re.sub(f'[^a-z0-9_]', '', folder_id.lower())
+    collection = chroma_client.get_or_create_collection(name=safe_name)
     chunks_path = os.path.join(base_dir, 'data', 'chunks.jsonl')
 
     if not os.path.exists(chunks_path):
@@ -35,18 +42,18 @@ def run_embedder():
                 continue
             chunk = json.loads(line)
             total_chunks += 1
+            chunk_hash = chunk.get('hash_id')
 
-            text_chunk = chunk['text']
-            metadata_chunk = chunk['metadata']
-            seal = f"{metadata_chunk.get('hash_md5', 'nohash')}_{text_chunk}"
-            chunk_id = hashlib.md5(seal.encode('utf-8')).hexdigest()
-            result = collection.get(ids=[chunk_id])
+            if not chunk_hash:
+                text_to_hash = chunk['text'] + chunk['metadata'].get('id_documento', '')
+                chunk_hash = hashlib.md5(text_to_hash.encode('utf-8')).hexdigest()
+                chunk['hash_id'] = chunk_hash
 
-            if len(result['ids']) == 0:
-                chunk['hash_id'] = chunk_id
+            result = collection.get(ids=[chunk_hash])
+            if not result['ids']:
                 to_process.append(chunk)
-
     print(f"[CACHE] Dos {total_chunks} blocos, {len(to_process)} são novos e serão vetorizados.")
+
     if not to_process:
         print("Todas as chunks já foram processadas. Nenhuma nova requisição. Encerrando.")
         return
@@ -78,7 +85,7 @@ def run_embedder():
                 embeddings.append(emb.values)
 
             print(f"Lote processado: Chunks {i+1} até {min(i+batch_size, len(to_process))} vetorizadas.")
-            time.sleep(4)
+            time.sleep(1)
 
         except Exception as e:
             print(f"Erro no lote {i}: {e}")

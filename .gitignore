@@ -1,3 +1,4 @@
+data/flashrank_cache
 data/raw_pdfs/*
 data/chroma_db/
 data/documents/
