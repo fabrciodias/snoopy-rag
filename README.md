@@ -41,19 +41,16 @@ python3 -m venv .venv
 * **Linux / macOS:**
 ```
 source .venv/bin/activate
-
 ```
 
 * **Windows (Prompt de Comando - CMD):**
 ```
 .venv\Scripts\activate.bat
-
 ```
 
 * **Windows (PowerShell):**
 ```
 .\.venv\Scripts\Activate.ps1
-
 ```
 
 ### Passo 2: Instalar Dependências
@@ -61,7 +58,6 @@ source .venv/bin/activate
 Com o ambiente virtual ativo no terminal, instale as bibliotecas necessárias:
 ```
 pip install -r requirements.txt
-
 ```
 *(As dependências incluem: `PyMuPDF`, `google-genai`, `chromadb`, `flashrank`, `google-api-python-client`)*.
 
@@ -103,13 +99,11 @@ Com o ambiente virtual **ativo** e as credenciais configuradas, a operação do 
 **Para sincronizar documentos e atualizar a base de conhecimento:**
 ```
 python src/watcher.py
-
 ```
 
 **Para iniciar a interface de busca e consulta:**
 ```
 python src/search.py
-
 ```
 
 ## 6. Código Aberto e Contribuições
