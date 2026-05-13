@@ -24,17 +24,6 @@ O sistema opera de forma linear com arquivos de responsabilidade única:
 * **`watcher.py`**: O orquestrador da ingestão documental de ponta a ponta.
 * **`server.js`**: Servidor Express que recebe requisições web, aciona o cache ou o `search.py` e serve o Front-end.
 * **`/ui`**: Diretório contendo a interface web em Vanilla HTML/CSS/JS.
-* ## Estrutura do Projeto
-
-```text
-snoopy-rag/
-├── src/
-├── ui/
-├── data/
-├── chroma_db/
-├── credentials.json
-└── ...
-```
 
 ## 3. Rastreabilidade e Citações
 
