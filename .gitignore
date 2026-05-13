@@ -7,6 +7,9 @@ data/*.json
 data/*.jsonl
 credentials.json
 src/__pycache__
+node_modules
+package-lock.json
+package.json
 .venv/
 *.pdf
 

@@ -83,7 +83,6 @@ def init_search(search):
     log("="*50)
     log("Carregando motor de Reranking (FlashRank)...")
     log(f"Documentos disponíveis: {file_count} arquivos(s) (Acervo: {folder_name}).")
-    log("Digite 'sair' a qualquer momento para encerrar.\n")
 
     queries = decompose_query(search, client)
     all_results = []
@@ -132,8 +131,8 @@ def init_search(search):
             "secao": res['meta'].get('secao', 'Geral'),
             "link": res['meta'].get('link_drive', 'Link indisponível')
         }
-        if font_data not in used_fonts:
-            used_fonts.append(font_data)
+        used_fonts.append(font_data)
+        
     log(f"Lendo {len(top_results)} referências e gerando resposta...")
 
     prompt_rag = f"""

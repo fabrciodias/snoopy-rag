@@ -2,84 +2,93 @@
 
 O **Snoopy-RAG** é uma infraestrutura local de Recuperação Aumentada por Geração (RAG) desenvolvida para indexar e consultar coleções de artigos, teses e livros. O projeto foca no rigor acadêmico, garante consultas rápidas e rastreia estritamente as informações geradas através de citações diretas.
 
-## 1. Arquitetura Efêmera e Otimização
+## 1. Arquitetura Híbrida e Otimização
 
-O sistema roda sob restrições severas de hardware, validado em um servidor de 2011 (4GB de RAM DDR3, sem GPU, Ubuntu 22.04).
+O sistema roda sob restrições severas de hardware, validado em um servidor de 2011 (4GB de RAM DDR3, sem GPU, Ubuntu 22.04). A arquitetura foi dividida em microsserviços para maximizar a eficiência e evitar travamentos por falta de memória (OOM):
 
-Para evitar travamentos por falta de memória (OOM), o Snoopy-RAG processa dados em *streaming* e executa cada etapa do pipeline em subprocessos isolados. Na versão atual, a arquitetura tornou-se **efêmera e isolada**:
-
-* **Efêmera (Limpeza do Disco):** O sistema deleta os PDFs originais do disco imediatamente após a extração do conhecimento (Markdown), poupando armazenamento físico.
-* **Isolada (Folder-Tenancy):** O banco de dados cria coleções independentes para cada pasta do Drive, permitindo gerenciar múltiplos acervos sem misturar contextos.
+* **Motor Semântico (Python):** Processa dados em *streaming* e atua de forma **efêmera**. Deleta os PDFs originais do disco após a extração e encerra seus processos imediatamente após cada resposta.
+* **Isolamento (Folder-Tenancy):** O banco vetorial cria instâncias independentes para cada pasta do Google Drive, impedindo a contaminação de contexto entre acervos distintos.
+* **Middleware (Node.js):** Atua como roteador seguro entre o navegador e o motor Python. Implementa um **cache semântico** baseado em hash MD5 da pergunta, anulando a latência e o custo de requisições repetidas na API.
+* **Interface (Minimalismo Investigativo):** Front-end focado estritamente na leitura acadêmica, isolando a síntese gerada das provas documentais extraídas.
 
 ## 2. Pipeline de Processamento (Módulos)
 
-O sistema opera de forma linear com scripts de responsabilidade única:
+O sistema opera de forma linear com arquivos de responsabilidade única:
 
-* **`drive_sync.py`**: Gerencia a coleta. Sincroniza arquivos do Google Drive e controla o estado local (`drive_state.json`), detectando atualizações de versão automaticamente.
-* **`extractor.py` & `cleaner.py**`: Extraem o texto do PDF, normalizam o conteúdo em Markdown semântico usando heurísticas e excluem o arquivo original do HD.
-* **`tagger.py`**: Extrai metadados precisos com IA (Gemini). Atrela os dados ao ID imutável do Drive, o que previne duplicação de vetores no banco de dados.
+* **`drive_sync.py`**: Gerencia a coleta. Sincroniza arquivos do Drive e controla o estado local (`drive_state.json`).
+* **`extractor.py` & `cleaner.py`**: Extraem o texto do PDF, normalizam em Markdown semântico e excluem o arquivo original do HD.
+* **`tagger.py`**: Extrai metadados precisos com IA (Gemini).
 * **`chunker.py`**: Fatie o texto semanticamente com base nas seções. Grava os resultados em streaming (`.jsonl`).
-* **`embedder.py`**: Cria o banco vetorial isolado para a pasta específica no ChromaDB. Consulta o cache local e vetoriza apenas os blocos inéditos.
-* **`search.py`**: Motor de busca e API. Recebe a pergunta via linha de comando, isola os logs de processamento e devolve uma resposta estruturada e limpa em formato JSON. Usa decomposição de perguntas e re-ranqueamento com FlashRank.
-* **`watcher.py`**: O orquestrador. Executa o pipeline de ingestão de ponta a ponta.
+* **`embedder.py`**: Cria o banco vetorial isolado para a pasta específica no ChromaDB.
+* **`search.py`**: Motor de busca executado como subprocesso. Isola logs no `stderr` e devolve um JSON contendo a resposta gerada e os metadados das fontes.
+* **`watcher.py`**: O orquestrador da ingestão documental de ponta a ponta.
+* **`server.js`**: Servidor Express que recebe requisições web, aciona o cache ou o `search.py` e serve o Front-end.
+* **`/ui`**: Diretório contendo a interface web em Vanilla HTML/CSS/JS.
 
 ## 3. Rastreabilidade e Citações
 
-Para impedir alucinações, o sistema usa engenharia de prompt restritiva. Toda afirmação gerada na resposta inclui obrigatoriamente a referência direta ao bloco de texto correspondente (exemplo: `[TRECHO 3]`). A IA admite imediatamente a ausência de informações caso a resposta não exista nos documentos indexados.
+Para impedir alucinações, o sistema usa engenharia de prompt restritiva. Toda afirmação gerada inclui obrigatoriamente a referência direta ao bloco de texto correspondente (exemplo: `[TRECHO 3]`). 
+
+O mapeamento das fontes é **exato (1:1)**. O sistema não desduplica documentos, garantindo que cada trecho referenciado na resposta possua um card correspondente no painel de evidências da interface web, com link direto à página/seção correta do arquivo original no Google Drive.
 
 ## 4. Instalação e Configuração
 
-*(Nota: O script criará o diretório `/data` automaticamente na primeira execução para armazenar as bases).*
+*(Nota: O script criará o diretório `/data` automaticamente na primeira execução).*
+
+### Pré-requisitos
+* Python 3.10+
+* Node.js v20+
 
 ### Passo 1: Clonar e Preparar o Ambiente
 
-No terminal, clone o projeto e crie o ambiente virtual:
-
-```
+```bash
 git clone https://github.com/fabrciodias/snoopy-rag.git
 cd snoopy-rag
 
 ```
 
-**Criando e ativando o ambiente virtual:**
+**Criando e ativando o ambiente virtual (Python):**
 
 * **Linux / macOS:**
 
-```
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 
 ```
 
-* **Windows (Prompt de Comando ou PowerShell):**
+* **Windows:**
 
-```
+```bash
 python -m venv .venv
 .\.venv\Scripts\activate
 
 ```
 
-*(Nota: No PowerShell, se houver erro de permissão, rode `Set-ExecutionPolicy Unrestricted -Scope CurrentUser`, confirme e tente novamente).*
-
 ### Passo 2: Instalar Dependências
 
-Com o ambiente ativo `(.venv)`, instale os pacotes:
+Com o ambiente Python ativo `(.venv)`, instale as bibliotecas do motor semântico:
 
-```
+```bash
 pip install -r requirements.txt
 
 ```
 
-### Passo 3: Configuração das APIs (Google)
+No escopo global da pasta, instale a biblioteca do middleware Node.js:
 
-O ecossistema depende das ferramentas do Google:
+```bash
+npm install express
+
+```
+
+### Passo 3: Configuração das APIs (Google)
 
 1. Acesse o [Google Cloud Console](https://console.cloud.google.com/), crie um projeto e gere uma **Conta de Serviço**.
 2. Crie uma chave JSON para esta conta, faça o download, renomeie para `credentials.json` e coloque na raiz do projeto.
 3. Gere uma chave de API no [Google AI Studio](https://aistudio.google.com/).
 4. Abra o `credentials.json` e adicione manualmente `api_key`, `folder_id` e `folder_name` no topo do arquivo:
 
-```
+```json
 {
   "api_key": "SUA_CHAVE_GEMINI_AQUI",
   "folder_id": "ID_DA_SUA_PASTA_DO_DRIVE_AQUI",
@@ -95,27 +104,28 @@ O ecossistema depende das ferramentas do Google:
 
 ### Passo 4: Permissões no Google Drive
 
-1. Abra a pasta do seu acervo no Google Drive.
-2. Compartilhe a pasta como **Leitor** com o e-mail do seu bot (o `client_email` do JSON).
-3. Copie o ID da pasta na URL (exemplo: `drive.google.com/drive/folders/ID_DA_PASTA`) e cole no seu `credentials.json`.
+1. Compartilhe a pasta do seu acervo no Google Drive como **Leitor** com o e-mail do seu bot (o `client_email` do JSON).
+2. Copie o ID da pasta na URL e cole no seu `credentials.json`.
 
 ## 5. Uso
 
-Sempre execute os comandos com o ambiente virtual ativo.
-
 **Para processar PDFs, atualizar a base e alimentar o banco vetorial:**
+Execute no ambiente virtual Python:
 
-```
+```bash
 python src/watcher.py
 
 ```
 
-**Para consultar o acervo (O script devolve a resposta em formato JSON):**
+**Para iniciar o servidor e acessar a interface de consulta:**
+Execute no diretório raiz:
+
+```bash
+node server.js
 
 ```
-python src/search.py "O que diz o autor sobre este conceito?"
 
-```
+Acesse `http://localhost:3333` em seu navegador.
 
 ## 6. Código Aberto e Contribuições
 
