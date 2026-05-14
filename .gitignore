@@ -6,5 +6,5 @@ package-lock.json
 package.json
 .venv/
 *.pdf
-
+.env
 fabrciodias

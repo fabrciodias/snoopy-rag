@@ -208,6 +208,105 @@ body {
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
+
+.app-container {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 260px;
+    background: var(--card-bg);
+    border-right: 1px solid var(--border-color);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.logo-sidebar {
+    margin-bottom: 30px;
+}
+
+.btn-primary-full {
+    width: 100%;
+    padding: 10px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.auth-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.avatar-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.sidebar-nav {
+    flex: 1;
+    margin-top: 30px;
+}
+
+.nav-title {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 15px;
+}
+
+.main-area {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.nav-search {
+    margin-left: auto;
+}
+/* Classes do Histórico (Sidebar) */
+.history-item {
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    transition: background 0.2s;
+    background: transparent;
+}
+
+.history-item:hover {
+    background: var(--border-color);
+}
+
+.history-icon {
+    opacity: 0.5;
+    margin-right: 5px;
+}
+
+.history-empty {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
 @keyframes spin { 
     0% { 
         transform: rotate(0deg);
@@ -255,5 +354,21 @@ body {
     .content-box {
         padding: 20px;
         font-size: 1rem;
+    }
+    .app-container {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding: 10px 20px;
+    }
+    .logo-sidebar {
+        display: none;
+    }
+    .main-area {
+        height: calc(100vh - 80px);
     }
 }

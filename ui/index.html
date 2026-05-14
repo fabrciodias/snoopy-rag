@@ -8,49 +8,68 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="app">
-        <div id="home-view" class="view active">
-            <div class="hero">
-                <h1 class="logo">Snoopy-RAG</h1>
-                <p class="subtitle">Memória Institucional e Recuperação Semântica Documental</p>
-                <form id="search-home" class="search-box">
-                    <input type="text"id="input-home" placeholder="Pesquisar" required autocomplete="off">
-                    <button type="submit">→</button>
-                </form>
+    <div id="app" class="app-container">
+        
+        <aside class="sidebar">
+            <h2 class="logo-small logo-sidebar" onclick="resetToHome()" style="cursor: pointer;">Snoopy-RAG</h2>
+            
+            <div id="auth-section">
+                <button id="btn-login" class="btn-primary-full">Entrar com Google</button>
+                <div id="user-info" class="hidden auth-user">
+                    <img id="user-avatar" src="" alt="Avatar" class="avatar-img">
+                    <button id="btn-logout" class="btn-outline">Sair</button>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <h3 class="nav-title">Histórico</h3>
+                <div id="history-list">
+                    </div>
+            </nav>
+        </aside>
+
+        <div id="main-content" class="main-area">
+            <div id="home-view" class="view active">
+                <div class="hero">
+                    <h1 class="logo">Snoopy-RAG</h1>
+                    <p class="subtitle">Memória Institucional e Recuperação Semântica Documental</p>
+                    <form id="search-home" class="search-box">
+                        <input type="text" id="input-home" placeholder="Pesquisar" required autocomplete="off">
+                        <button type="submit">→</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="result-view" class="view">
+                <header class="topbar">
+                    <h2 class="logo-small" onclick="resetToHome()">Snoopy-RAG</h2>
+                    <form id="search-nav" class="search-box small nav-search">
+                        <input type="text" id="input-nav" placeholder="Nova Pesquisa..." required autocomplete="off">
+                    </form>
+                </header>
+
+                <main class="layout-grid">
+                    <section class="answer-section">
+                        <h1 id="query-title"></h1>
+                        <div id="loading-state" class="hidden">
+                            <div class="spinner"></div>
+                            <p>Pesquisando no acervo, lendo referências e extraindo síntese...</p>
+                        </div>
+                        <div id="answer-box" class="content-box hidden">
+                            <div id="answer-text"></div>
+                        </div>
+                    </section>
+                    <aside class="evidence-section">
+                        <h3>Fontes Consultadas</h3>
+                        <p class="evidence-subtitle">Documentos consultados nesta síntese</p>
+                        <div id="sources-container"></div>
+                    </aside>
+                </main>
             </div>
         </div>
     </div>
 
-    <div id="result-view" class="view">
-        <header class="topbar">
-            <h2 class="logo-small" onclick="location.reload()">Snoopy-RAG</h2>
-            <form id="search-nav" class="search-box small">
-                <input type="text" id="input-nav" placeholder="Nova Pesquisa..." required autocomplete="off">
-            </form>
-        </header>
-
-        <main class="layout-grid">
-            <section class="answer-section">
-                <h1 id="query-title"></h1>
-
-                <div id="loading-state" class="hidden">
-                    <div class="spinner"></div>
-                    <p>Pesquisando no acervo, lendo referências e extraindo síntese...</p>
-                </div>
-
-                <div id="answer-box" class="content-box hidden">
-                    <div id="answer-text"></div>
-                </div>
-            </section>
-
-            <aside class="evidence-section">
-                <h3>Fontes Consultadas</h3>
-                <p class="evidence-subtitle">Documentos consultados nesta síntese</p>
-                <div id="sources-container">
-                    </div>
-            </aside>
-        </main>
-    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
 </body>
 </html>
