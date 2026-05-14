@@ -4,7 +4,7 @@ O **Snoopy-RAG** é uma infraestrutura local de Recuperação Aumentada por Gera
 
 ## 1. Arquitetura Híbrida e Otimização
 
-O sistema roda sob restrições severas de hardware, validado em um servidor de 2011 (4GB de RAM DDR3, sem GPU, Ubuntu 22.04). A arquitetura foi dividida em microsserviços para maximizar a eficiência e evitar travamentos por falta de memória (OOM):
+O sistema roda sob restrições severas de hardware, validado em um servidor de 2011 (4GB de RAM DDR3, sem GPU, Ubuntu 22.04). A arquitetura foi dividida em módulos desacoplados para maximizar a eficiência e evitar travamentos por falta de memória (OOM):
 
 * **Motor Semântico (Python):** Processa dados em *streaming* e atua de forma **efêmera**. Deleta os PDFs originais do disco após a extração e encerra seus processos imediatamente após cada resposta.
 * **Isolamento (Folder-Tenancy):** O banco vetorial cria instâncias independentes para cada pasta do Google Drive, impedindo a contaminação de contexto entre acervos distintos.
@@ -18,7 +18,7 @@ O sistema opera de forma linear com arquivos de responsabilidade única:
 * **`drive_sync.py`**: Gerencia a coleta. Sincroniza arquivos do Drive e controla o estado local (`drive_state.json`).
 * **`extractor.py` & `cleaner.py`**: Extraem o texto do PDF, normalizam em Markdown semântico e excluem o arquivo original do HD.
 * **`tagger.py`**: Extrai metadados precisos com IA (Gemini).
-* **`chunker.py`**: Fatie o texto semanticamente com base nas seções. Grava os resultados em streaming (`.jsonl`).
+* **`chunker.py`**: Fatia o texto semanticamente com base nas seções. Grava os resultados em streaming (`.jsonl`).
 * **`embedder.py`**: Cria o banco vetorial isolado para a pasta específica no ChromaDB.
 * **`search.py`**: Motor de busca executado como subprocesso. Isola logs no `stderr` e devolve um JSON contendo a resposta gerada e os metadados das fontes.
 * **`watcher.py`**: O orquestrador da ingestão documental de ponta a ponta.
