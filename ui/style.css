@@ -1,3 +1,6 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 :root {
     --bg-color: #f9fafb;
@@ -215,7 +218,42 @@ body {
 }
 
 @media (max-width: 850px) {
+    .logo { 
+        font-size: 2.2rem; 
+    }
+    .subtitle {
+        font-size: 0.95rem;
+        text-align: center;
+        padding: 0 10px;
+    }
+    .search-box {
+        flex-direction: row;
+    }
+    .search-box input {
+        padding: 10px;
+        font-size: 1rem;
+    }
+    .topbar {
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px 20px;
+        align-items: stretch;
+    }
+    .search-box.small {
+        max-width: 100%;
+    }
     .layout-grid {
         grid-template-columns: 1fr;
+        margin: 20px auto;
+        gap: 30px;
+        padding: 0 15px;
+    }
+    #query-title {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+    }
+    .content-box {
+        padding: 20px;
+        font-size: 1rem;
     }
 }

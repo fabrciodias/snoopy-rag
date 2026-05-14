@@ -1,10 +1,4 @@
-data/flashrank_cache
-data/raw_pdfs/*
-data/chroma_db/
-data/documents/
-data/models
-data/*.json
-data/*.jsonl
+data/
 credentials.json
 src/__pycache__
 node_modules
