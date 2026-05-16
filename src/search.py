@@ -3,14 +3,16 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import os 
-import re
 import json
 import sys
-import chromadb 
 import logging
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from flashrank import Ranker, RerankRequest
+from supabase import create_client, Client
+
+load_dotenv()
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("google_genai").setLevel(logging.WARNING)
@@ -52,63 +54,52 @@ def decompose_query(query, client):
         print(f"[AVISO] Falha na decomposição, usando query original: {e}")
         return [query]
 
-def init_search(search):
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cred_path = os.path.join(base_dir, 'credentials.json')
-    state_path = os.path.join(base_dir, 'data', 'drive_state.json')
-    try:
-        with open(cred_path, 'r', encoding='utf-8') as f:
-            creds = json.load(f)
-            api_key = creds.get('api_key')
-            folder_id = creds.get('folder_id')
-            folder_name = creds.get('folder_name', 'Acervo Particular')
-    except Exception as e:
-        print(f"[ERRO] Falha ao ler credentials.json: {e}")
-        return
-    if not folder_id:
-        print("[ERRO] 'folder_id' não encontrado no credentials.json.")
-        return
+def init_search(search_query, user_id, folder_id, api_key):
+    SUPABASE_URL = os.environ.get("SUPABASE_URL")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 
-    file_count = 0
-    if os.path.exists(state_path):
-        with open(state_path, 'r', encoding='utf-8') as f:
-            state = json.load(f)
-            file_count = sum(1 for v in state.values() if v.get('status') == 'processado')
-
-    client = genai.Client(api_key=api_key)
-    db_path = os.path.join(base_dir, 'data', 'chroma_db')
-    chroma_client = chromadb.PersistentClient(path=db_path)
-    safe_name = "pasta_" + re.sub(r'[^a-z0-9_]', '', folder_id.lower())
-    collection = chroma_client.get_or_create_collection(name=safe_name)
-    ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2", cache_dir=os.path.join(base_dir, 'data', 'flashrank_cache'))
+    if not all([SUPABASE_URL, SUPABASE_SERVICE_KEY, api_key]):
+        print(json.dumps({"error": "Credenciais da nuvem ou do Gemini faltando no ambiente."}, ensure_ascii=False))
+        return
     
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    client = genai.Client(api_key=api_key)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2", cache_dir=os.path.join(base_dir, 'data', 'flashrank_cache'))
+
     log("="*50)
     log("SNOOPY-RAG: MOTOR DE BUSCA SEMÂNTICA ATIVADO")
+    log(f"Foco de Busca -> Acervo: {folder_id}")
     log("="*50)
-    log("Carregando motor de Reranking (FlashRank)...")
-    log(f"Documentos disponíveis: {file_count} arquivos(s) (Acervo: {folder_name}).")
-
-    queries = decompose_query(search, client)
+    
+    queries = decompose_query(search_query, client)
     all_results = []
     for q in queries:
         try:
             response = client.models.embed_content(
                 model='gemini-embedding-001',
-                contents=q
+                contents=q,
+                config=types.EmbedContentConfig(output_dimensionality=768)
             )
-            vector = response.embeddings[0].values
-            results = collection.query(
-                query_embeddings=[vector],
-                n_results=5
-            )
+            query_vector = response.embeddings[0].values
+            rpc_response = supabase.rpc('match_chunks', {
+                'query_embedding': query_vector,
+                'match_threshold': 0.4,
+                'match_count': 5,
+                'p_user_id': user_id,
+                'p_folder_id': folder_id
+            }).execute()
 
-            for i in range(len(results['documents'][0])):
-                doc = results['documents'][0][i]
-                meta = results['metadatas'][0][i]
+            for row in rpc_response.data:
                 all_results.append({
-                    "id": results['ids'][0][i],
-                    "text": doc,
-                    "meta": meta
+                    "id": row['id'],
+                    "text": row['content'],
+                    "meta": {
+                        "titulo_original": row['title'],
+                        "arquivo_origem": "Drive/Supabase",
+                        "secao": row['section'],
+                        "link_drive": row['drive_link']
+                    }
                 })
         except Exception as e:
             log(f"Erro na busca da micro-query '{q}': {e}")
@@ -118,10 +109,10 @@ def init_search(search):
 
     if not passages:
         log("Nenhum contexto encontrado para essa pergunta.")
-        print(json.dumps({"query": search, "answer": "Nenhum contexto encontrardo", "sources": []}, ensure_ascii=False))
+        print(json.dumps({"query": search_query, "answer": "Nenhum contexto encontrardo", "sources": []}, ensure_ascii=False))
         return
 
-    rerank_request = RerankRequest(query=search, passages=passages)
+    rerank_request = RerankRequest(query=search_query, passages=passages)
     reranked_results = ranker.rerank(rerank_request)
     top_results = reranked_results[:10]
 
@@ -146,7 +137,7 @@ def init_search(search):
         Se a resposta não estiver nos trechos, diga claramente: "Não encontrei informações suficientes nos documentos indexados para responder a esta pergunta."
         Não invente informações.
             
-        PERGUNTA DO USUÁRIO: {search}
+        PERGUNTA DO USUÁRIO: {search_query}
             
         CONTEXTOS RECUPERADOS:
         {context}
@@ -156,11 +147,11 @@ def init_search(search):
             model='gemini-2.5-flash',
             contents=prompt_rag,
             config=types.GenerateContentConfig(
-                temperature=0.2,
+                temperature=0.2
             )
         )
         final_output = {
-            "query": search,
+            "query": search_query,
             "answer": llm_response.text,
             "sources": used_fonts
         }
@@ -170,10 +161,14 @@ def init_search(search):
         print(json.dumps({"error": str(e)}, ensure_ascii=False))
         
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        log("Uso correto: python search.py \"Sua pergunta entre aspas\"")
-        print(json.dumps({"error": "Nenhuma pergunta fornecida."}, ensure_ascii=False))
+    if len(sys.argv) < 5:
+        log("Uso correto: python search.py \"query\" \"user_id\" \"folder_id\" \"api_key\"")
+        print(json.dumps({"error": "Parâmetros insuficientes passados pelo Node.js."}, ensure_ascii=False))
         sys.exit(1)
         
     query_param = sys.argv[1]
-    init_search(query_param)
+    user_id_param = sys.argv[2]
+    folder_id_param = sys.argv[3]
+    api_key_param = sys.argv[4]
+
+    init_search(query_param, user_id_param, folder_id_param, api_key_param)
