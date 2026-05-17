@@ -10,6 +10,7 @@ const path = require('path');
 const crypto = require('crypto')
 
 const WebSocket = require('ws');
+const { json } = require('stream/consumers');
 global.WebSocket = WebSocket;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -35,10 +36,15 @@ app.get('/api/config', (req, res) => {
 });
 
 app.post('/api/search', async (req, res) => {
-    const { query } = req.body;
+    const { query, folder_id } = req.body;
     if (!query) return res.status(400).json({error: "Pergunta vazia" });
+    if (!folder_id) return res.status(400).json({ error: "Acervo (folder_id) não selecionado" });
 
-    let userId = 'public_user';
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    let userId = '00000000-0000-0000-0000-000000000000';
     const token = req.headers.authorization?.split(' ')[1];
 
     if (token) {
@@ -48,14 +54,16 @@ app.post('/api/search', async (req, res) => {
         }
     }
     
-    const hash = crypto.createHash('md5').update(query.toLowerCase().trim() + userId).digest('hex');
+    const hash = crypto.createHash('md5').update(query.toLowerCase().trim() + userId + folder_id).digest('hex');
     if (cache[hash]) {
-        console.log(`[CACHE HIT] Poupando API. Resposra da memória para: "${query}" (User: ${userId})`);
-        return res.json(cache[hash]);
+        console.log(`[CACHE HIT] Poupando API. Resposta da memória para: "${query}" (User: ${userId}, Acervo: ${folder_id})`);
+        res.write(`data: ${JSON.stringify({ type: 'log', message: '[CACHE HIT] Recuperando resposta da memória local...' })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'result', data: cache[hash] })}\n\n`);
+        return res.end();
     }
-    console.log(`[MOTOR V2] Usuário ${userId} pesquisando: "${query}"`);
+    console.log(`[MOTOR V2] Usuário ${userId} pesquisando: "${query}" no Acervo: ${folder_id}`);
 
-    const pythonProcess = spawn('./.venv/bin/python3', ['src/search.py', query, userId, API_KEY]);
+    const pythonProcess = spawn('./.venv/bin/python3', ['src/search.py', query, userId, folder_id, API_KEY]);
     let rawOutput = '';
 
     pythonProcess.stdout.on('data', (data) => {
@@ -63,7 +71,16 @@ app.post('/api/search', async (req, res) => {
     });
 
     pythonProcess.stderr.on('data', (data) => {
-        console.log(`[SNOOPY LOG]: ${data.toString().trim()}`);
+        const output = data.toString().split('\n');
+        for (const line of output) {
+            const msg = line.trim();
+            if (msg.startsWith('UI_LOG::')) {
+                const cleanMsg = msg.replace('UI_LOG::', '');
+                res.write(`data: ${JSON.stringify({ type: 'log', message: cleanMsg })}\n\n`);
+            } else if (msg) {
+                console.log(`[PYTHON SYSTEM]: ${msg}`)
+            }
+        }
     });
 
     pythonProcess.on('close', (code) => {
@@ -75,10 +92,12 @@ app.post('/api/search', async (req, res) => {
             if (!jsonResponse.error) {
                 cache[hash] = jsonResponse;
             }
-            res.json(jsonResponse);
+            res.write(`data: ${JSON.stringify({ type: 'result', data: jsonResponse })}\n\n`);
+            res.end();
         } catch (e) {
             console.log("[ERRO FATAL] Falha no parser:", rawOutput);
-            res.status(500).json({ error: "Falha na comunicação com o motor semântico." });
+            res.write(`data: ${JSON.stringify({ type: 'error', message: 'Falha na comunicação com o motor semântico.' })}\n\n`);
+            res.end();
         }
     });
 });

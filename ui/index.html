@@ -19,12 +19,17 @@
                     <img id="user-avatar" src="" alt="Avatar" class="avatar-img">
                     <button id="btn-logout" class="btn-outline">Sair</button>
                 </div>
+                
+                <div id="folder-container" class="hidden folder-box">
+                    <span class="folder-label">Acervo:</span>
+                    <span id="folder-name">Carregando...</span>
+                </div>
             </div>
 
             <nav class="sidebar-nav">
                 <h3 class="nav-title">Histórico</h3>
                 <div id="history-list">
-                    </div>
+                </div>
             </nav>
         </aside>
 
@@ -53,7 +58,8 @@
                         <h1 id="query-title"></h1>
                         <div id="loading-state" class="hidden">
                             <div class="spinner"></div>
-                            <p>Pesquisando no acervo, lendo referências e extraindo síntese...</p>
+                            <p>Pesquisando no acervo...</p>
+                            <div id="live-logs" class="live-logs"></div>
                         </div>
                         <div id="answer-box" class="content-box hidden">
                             <div id="answer-text"></div>

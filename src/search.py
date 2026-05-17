@@ -9,7 +9,6 @@ import logging
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from flashrank import Ranker, RerankRequest
 from supabase import create_client, Client
 
 load_dotenv()
@@ -18,8 +17,8 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("google_genai").setLevel(logging.WARNING)
 logging.getLogger("google_genai.models").setLevel(logging.WARNING)
 
-def log(message):
-    print(message, file=sys.stderr)
+def ui_log(message):
+    print(f"UI_LOG::{message}", file=sys.stderr, flush=True)
 
 def decompose_query(query, client):
     prompt = f"""
@@ -64,16 +63,12 @@ def init_search(search_query, user_id, folder_id, api_key):
     
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     client = genai.Client(api_key=api_key)
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2", cache_dir=os.path.join(base_dir, 'data', 'flashrank_cache'))
-
-    log("="*50)
-    log("SNOOPY-RAG: MOTOR DE BUSCA SEMÂNTICA ATIVADO")
-    log(f"Foco de Busca -> Acervo: {folder_id}")
-    log("="*50)
     
+    ui_log("Analisando estrutura da pergunta...")
     queries = decompose_query(search_query, client)
     all_results = []
+
+    ui_log(f"Escaneando o acervo em busca de respostas...")
     for q in queries:
         try:
             response = client.models.embed_content(
@@ -102,19 +97,16 @@ def init_search(search_query, user_id, folder_id, api_key):
                     }
                 })
         except Exception as e:
-            log(f"Erro na busca da micro-query '{q}': {e}")
+            print(f"Erro na busca vetorizada: {e}", file=sys.stderr)
 
-    unique_results = {res['id']: res for res in all_results}.values()
-    passages = [{"id": res['id'], "text": res['text'], "meta": res['meta']} for res in unique_results]
+    unique_results = list({res['id']: res for res in all_results}.values())
 
-    if not passages:
-        log("Nenhum contexto encontrado para essa pergunta.")
+    if not unique_results:
+        ui_log("Nenhum contexto encontrado para essa pergunta.")
         print(json.dumps({"query": search_query, "answer": "Nenhum contexto encontrardo", "sources": []}, ensure_ascii=False))
         return
 
-    rerank_request = RerankRequest(query=search_query, passages=passages)
-    reranked_results = ranker.rerank(rerank_request)
-    top_results = reranked_results[:10]
+    top_results = unique_results[:10]
 
     context = ""
     used_fonts = []
@@ -128,7 +120,7 @@ def init_search(search_query, user_id, folder_id, api_key):
         }
         used_fonts.append(font_data)
         
-    log(f"Lendo {len(top_results)} referências e gerando resposta...")
+    ui_log(f"Lendo referências e extraindo síntese...")
 
     prompt_rag = f"""
         Você é um assistente acadêmico de um grupo de pesquisa.
@@ -155,14 +147,14 @@ def init_search(search_query, user_id, folder_id, api_key):
             "answer": llm_response.text,
             "sources": used_fonts
         }
+        ui_log("Finalizando formatação da resposta...")
         print(json.dumps(final_output, ensure_ascii=False, indent=2))
     except Exception as e:
-        log(f"Erro ao processar a busca: {e}")
+        print(f"Erro ao processar a busca: {e}")
         print(json.dumps({"error": str(e)}, ensure_ascii=False))
         
 if __name__ == '__main__':
     if len(sys.argv) < 5:
-        log("Uso correto: python search.py \"query\" \"user_id\" \"folder_id\" \"api_key\"")
         print(json.dumps({"error": "Parâmetros insuficientes passados pelo Node.js."}, ensure_ascii=False))
         sys.exit(1)
         
