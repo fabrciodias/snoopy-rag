@@ -53,16 +53,16 @@ def decompose_query(query, client):
         print(f"[AVISO] Falha na decomposição, usando query original: {e}")
         return [query]
 
-def init_search(search_query, user_id, folder_id, api_key):
+def init_search(search_query, user_id, folder_id, gemini_api_key):
     SUPABASE_URL = os.environ.get("SUPABASE_URL")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 
-    if not all([SUPABASE_URL, SUPABASE_SERVICE_KEY, api_key]):
+    if not all([SUPABASE_URL, SUPABASE_SERVICE_KEY, gemini_api_key]):
         print(json.dumps({"error": "Credenciais da nuvem ou do Gemini faltando no ambiente."}, ensure_ascii=False))
         return
     
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=gemini_api_key)
     
     ui_log("Analisando estrutura da pergunta...")
     queries = decompose_query(search_query, client)
@@ -161,6 +161,6 @@ if __name__ == '__main__':
     query_param = sys.argv[1]
     user_id_param = sys.argv[2]
     folder_id_param = sys.argv[3]
-    api_key_param = sys.argv[4]
+    gemini_api_key_param = sys.argv[4]
 
-    init_search(query_param, user_id_param, folder_id_param, api_key_param)
+    init_search(query_param, user_id_param, folder_id_param, gemini_api_key_param)

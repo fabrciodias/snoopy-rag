@@ -15,22 +15,43 @@ const liveLogs = document.getElementById('live-logs');
 
 const PUBLIC_FOLDER_ID = "f7faf7d9-ec80-46c6-9572-174865bf1e62";
 
+
 let supabaseClient;
 let userToken = null;
 let folderId = null;
 let isAuthLoaded = false;
 let isSearching = false;
+let isSyncing = false;
+
+let googleToken = null;
+let googleApiKey = null;
+let googleAppId = null;
+let pickerApiLoaded = false;
+
+const gScript = document.createElement('script');
+gScript.src = 'https://apis.google.com/js/api.js';
+gScript.onload = () => gapi.load('picker', () => { pickerApiLoaded = true; });
+document.body.appendChild(gScript);
 
 async function initAuth() {
     try {
         const res = await fetch('/api/config');
         const config = await res.json();
+
         supabaseClient = window.supabase.createClient(config.url, config.key);
+        googleApiKey = config.googleApiKey;
+        googleAppId = config.googleAppId;
 
         const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (session?.provider_token) localStorage.setItem('snoopy_g_token', session.provider_token);
+        googleToken = localStorage.getItem('snoopy_g_token');
         await processSession(session);
 
         supabaseClient.auth.onAuthStateChange(async (event, newSession) => {
+            if (event === 'SIGNED_IN') {
+                if (newSession?.provider_token) localStorage.setItem('snoopy_g_token', newSession.provider_token);
+                googleToken = localStorage.getItem('snoopy_g_token');
+            }
             if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
                 await processSession(newSession);
             }
@@ -46,9 +67,39 @@ async function initAuth() {
         document.getElementById('btn-logout').addEventListener('click', async (e) => {
             e.preventDefault(); 
             console.log("Sinal de Logout enviado ao Supabase...");
+            localStorage.removeItem('snoopy_g_token');
             try { await supabaseClient.auth.signOut(); } catch(err) { console.error(err); }
             window.location.reload(); 
         });
+
+        const btnDrive = document.getElementById('btn-drive');
+        if (btnDrive) {
+            btnDrive.addEventListener('click', () => {
+                if (!pickerApiLoaded) return alert("A API do Google ainda está carregando...");
+                if (!googleToken) return alert("Token do Drive expirado. Por favor, clique em Sair e faça login novamente.");
+
+                const view = new google.picker.DocsView()
+                    .setIncludeFolders(true)
+                    .setMimeTypes('application/vnd.google-apps.folder')
+                    .setSelectFolderEnabled(true)
+                    .setParent('root');
+
+                const picker = new google.picker.PickerBuilder()
+                    .addView(view)
+                    .setOAuthToken(googleToken)
+                    .setDeveloperKey(googleApiKey)
+                    .setAppId(googleAppId)
+                    .setCallback(async (data) => {
+                        if (data.action === google.picker.Action.PICKED) {
+                            const folder = data.docs[0];
+                            console.log("Drive Selecionado:", folder.name, folder.id);
+                            await linkDriveFolder(folder.name, folder.id);
+                        }
+                    })
+                    .build();
+                picker.setVisible(true);
+            });
+        }
         
     } catch (error) {
         console.error("Erro Crítico na inicialização do app:", error);
@@ -57,7 +108,12 @@ async function initAuth() {
 
 async function processSession(session) {
     const folderContainer = document.getElementById('folder-container');
-    const folderNameEl = document.getElementById('folder-name');
+    const folderSelector = document.getElementById('folder-selector');
+    const btnDrive = document.getElementById('btn-drive');
+
+    folderContainer.classList.remove('hidden')
+    folderSelector.innerHTML =`<option value="${PUBLIC_FOLDER_ID}">Acervo Público</option>`;
+    folderId = PUBLIC_FOLDER_ID;
 
     if (session) {
         userToken = session.access_token;
@@ -65,22 +121,24 @@ async function processSession(session) {
         document.getElementById('user-info').classList.remove('hidden');
         document.getElementById('user-avatar').src = session.user.user_metadata.avatar_url;
 
-        await fetchUserFolder(session.user.id, folderContainer, folderNameEl);
+        await fetchUserFolder(session.user.id, folderSelector, btnDrive);
     } else {
         userToken = null;
-        folderId = PUBLIC_FOLDER_ID;
 
         document.getElementById('btn-login').classList.remove('hidden');
         document.getElementById('user-info').classList.add('hidden');
 
-        folderNameEl.textContent = "Acervo Público GEPAFOR";
-        folderContainer.classList.remove('hidden');
+        if (btnDrive) btnDrive.classList.add('hidden');
         isAuthLoaded = true; 
         console.log("Modo Anônimo Ativado. Pasta:", folderId);
     }
+    folderSelector.addEventListener('change', (e) => {
+        folderId = e.target.value;
+        console.log("Contexto de busca alterado para:", folderId);
+    });
 }
 
-async function fetchUserFolder(userId, folderContainer, folderNameEl) {
+async function fetchUserFolder(userId, folderSelector, btnDrive) {
     try {
         const { data, error } = await supabaseClient
             .from('folders')
@@ -90,31 +148,60 @@ async function fetchUserFolder(userId, folderContainer, folderNameEl) {
             .maybeSingle();
 
         if (data) {
-            folderId = data.id;
-            folderNameEl.textContent = data.name;
-            folderContainer.classList.remove('hidden');
-            console.log("Acervo do Usuário carregado:", folderId);
-        } else {
-            console.log("Usuário novo detectado. Criando acervo base...");
-            const { data: newFolder, error: insertError } = await supabaseClient
-                .from('folders')
-                .insert([{ user_id: userId, name: 'Meu Acervo Pessoal' }])
-                .select()
-                .single();
+            const option = document.createElement('option');
+            option.value = data.id;
+            option.textContent = data.name;
+            folderSelector.appendChild(option);
 
-            if (newFolder) {
-                folderId = newFolder.id;
-                folderNameEl.textContent = newFolder.name;
-                folderContainer.classList.remove('hidden');
-                console.log("Acervo criado com sucesso:", folderId);
-            } else {
-                console.error("Erro ao criar acervo:", insertError);
-            }
+            folderSelector.value = data.id;
+            folderId = data.id;
+
+            btnDrive.classList.add('hidden')
+            console.log("Acervo Privado ativado:", folderId);
+            document.getElementById('btn-sync').classList.remove('hidden');
+        } else {
+            console.log("Usuário sem acervo privado. Exibindo botão de conexão.");
+            btnDrive.classList.remove('hidden')
         }
     } catch (err) {
-        console.error("Erro na comunicação com o banco:", err);
+        console.error("Erro ao verificar acervo:", err);
     } finally {
         isAuthLoaded = true;  
+    }
+}
+
+async function linkDriveFolder(folderName, driveFolderId) {
+    try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        const { data, error } = await supabaseClient
+            .from('folders')
+            .insert([{
+                user_id: user.id,
+                name: folderName,
+                drive_id: driveFolderId
+            }])
+            .select()
+            .single();
+        
+        if (error) throw error;
+
+        const folderSelector = document.getElementById('folder-selector');
+        const option = document.createElement('option');
+        option.value = data.id;
+        option.textContent = data.name;
+        folderSelector.appendChild(option);
+
+        folderSelector.value = data.id;
+        folderId = data.id;
+
+        document.getElementById('btn-drive').classList.add('hidden');
+        console.log("Acervo Privado vinculado com sucesso.")
+
+        triggerSync();
+
+    } catch (error) {
+        console.error("Erro ao vincular pasta no banco:", error);
+        alert("Erro ao vincular a pasta no Drive");
     }
 }
 
@@ -253,6 +340,92 @@ navForm.addEventListener('submit', (e) => {
     e.preventDefault();
     performSearch(document.getElementById('input-nav').value);
 });
+
+async function triggerSync() {
+    if (!folderId || folderId === PUBLIC_FOLDER_ID) {
+        alert("O Acervo Público é apenas para leitura. Selecione seu Acervo Privado para sincronizar.");
+        return;
+    }
+    if (!googleToken) {
+        alert("Sessão do Drive expirada. Faça login novamente.");
+        return;
+    }
+    if (isSyncing) return;
+
+    isSyncing = true;
+    const syncBtn = document.getElementById('btn-sync');
+    const syncLogs = document.getElementById('sync-logs');
+
+    if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.style.opacity = '0.5';
+    }
+    if (syncLogs) syncLogs.textContent = "Conectando ao servidor...";
+
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (userToken) {
+            headers['Authorization'] = `Bearer ${userToken}`;
+        }
+
+        const response = await fetch('/api/sync', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ folder_id: folderId, google_token: googleToken })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let done = false;
+        let buffer = "";
+
+        while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            done = readerDone;
+
+            if (value) {
+                buffer += decoder.decode(value, { stream: true });
+                const messages = buffer.split('\n\n');
+                buffer = messages.pop();
+
+                for (const msg of messages) {
+                    if (msg.startsWith('data: ')) {
+                        const jsonStr = msg.replace('data: ', '');
+                        if (!jsonStr.trim()) continue;
+
+                        try {
+                            const payload = JSON.parse(jsonStr);
+                            if (payload.type === 'log') {
+                                if (syncLogs) syncLogs.textContent = payload.message;
+                            } else if (payload.type === 'result') {
+                                if (syncLogs) syncLogs.textContent = "Sincronização Finalizada!";
+                            } else if (payload.type === 'error') {
+                                throw new Error(payload.message);
+                            }
+                        } catch (e) {
+                            console.error("Erro no stream de sync:", e);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Falha no Sync:", error);
+        if (syncLogs) syncLogs.textContent = "Erro: " + error.message;
+    } finally {
+        isSyncing = false;
+        if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.style.opacity = '1';
+        }
+        setTimeout(() => { if (syncLogs) syncLogs.textContent = ""; }, 5000);
+    }
+}
+
+const btnSync = document.getElementById('btn-sync');
+if (btnSync) {
+    btnSync.addEventListener('click', triggerSync);
+}
 
 function renderHistory() {
     const historyList = document.getElementById('history-list');

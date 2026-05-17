@@ -20,9 +20,21 @@
                     <button id="btn-logout" class="btn-outline">Sair</button>
                 </div>
                 
-                <div id="folder-container" class="hidden folder-box">
-                    <span class="folder-label">Acervo:</span>
-                    <span id="folder-name">Carregando...</span>
+                <div id="folder-container" class="folder-box hidden">
+                    <span class="folder-label">Acervo Ativo:</span>
+                    <div style="display: flex; gap: 5px; margin-top: 5px;">
+                        <select id="folder-selector" class="folder-dropdown" style="flex-grow: 1;">
+                            <option value="f7faf7d9-ec80-46c6-9572-174865bf1e62">Acervo Público</option>
+                        </select>
+                        <button id="btn-sync" class="btn-outline hidden" title="Sincronizar Acervo" style="padding: 0 10px;">
+                            ↻
+                        </button>
+                    </div>
+                    <div id="sync-logs" style="font-size: 0.75rem; color: var(--primary); margin-top: 8px; font-weight: bold;"></div>
+
+                    <button id="btn-drive" class="btn-outline hidden" style="margin-top: 10px; width: 100%; font-size: 0.8rem;">
+                        + Conectar Google Drive
+                    </button>
                 </div>
             </div>
 

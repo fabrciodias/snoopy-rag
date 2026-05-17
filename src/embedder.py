@@ -89,11 +89,10 @@ def run_embedder():
                 embeddings.append(emb.values)
 
             print(f"Lote processado: Chunks {i+1} até {min(i+batch_size, len(to_process))} vetorizadas.")
-            time.sleep(1)
 
         except Exception as e:
             print(f"Erro no lote {i}: {e}")
-            time.sleep(10)
+            time.sleep(5)
 
     if documents:
         print("\nSalvando as coordenadas no disco (ChromaDB)...")

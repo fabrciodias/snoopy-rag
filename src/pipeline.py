@@ -4,6 +4,7 @@
 
 import os
 import gc
+import sys
 import hashlib
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -18,10 +19,10 @@ load_dotenv()
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
-API_KEY = os.environ.get("API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-gemini_client = genai.Client(api_key=API_KEY)
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
     try:
@@ -99,9 +100,15 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
         print(f"[ERRO CRÍTICO] Falha no processamento: {e}")
 
 if __name__ == "__main__":
-    pdf_source = "data/raw_pdfs/(A2)-Coévaluation entre pairs apprenants comme échafaudage de la régulation du processus de l'apprentissage  e-JIREF.pdf"
-    supabase_id = "7d373e2e-2efb-4715-b7db-25a15e21bc93"
-    supabase_folder = "f7faf7d9-ec80-46c6-9572-174865bf1e62"
+    if len(sys.argv) < 5:
+        print("[ERRO] Parâmetros insuficientes passados para o pipeline,", file=sys.stderr)
+        sys.exit(1)
+        
+    file_path_param = sys.argv[1]
+    file_id_param = sys.argv[2]
+    user_id_param = sys.argv[3]
+    folder_id_param = sys.argv[4]
+    drive_link_param = sys.argv[5] if len(sys.argv) > 5 else ""
 
-    print("Iniciando teste...")
-    memory_process(pdf_source, "file_id_123", supabase_id, supabase_folder)
+    print(f"[PIPELINE START] Processando arquivo: {file_path_param}")
+    memory_process(file_path_param, file_id_param, user_id_param, folder_id_param, drive_link_param)
