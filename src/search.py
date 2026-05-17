@@ -98,40 +98,56 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
                 })
         except Exception as e:
             print(f"Erro na busca vetorizada: {e}", file=sys.stderr)
+    
+    unique_text = {}
+    for res in all_results:
+        clean_text = " ".join(res['text'].split()).lower()
+        if clean_text not in unique_text:
+            unique_text[clean_text] = res
 
-    unique_results = list({res['id']: res for res in all_results}.values())
+    unique_results = list(unique_text.values())
 
     if not unique_results:
         ui_log("Nenhum contexto encontrado para essa pergunta.")
-        print(json.dumps({"query": search_query, "answer": "Nenhum contexto encontrardo", "sources": []}, ensure_ascii=False))
+        print(json.dumps({"query": search_query, "answer": "Nenhum contexto encontrado", "sources": []}, ensure_ascii=False))
         return
-
-    top_results = unique_results[:10]
-
-    context = ""
-    used_fonts = []
-    for idx, res in enumerate(top_results):
-        context += f"[TRECHO {idx+1}]\n{res['text']}\n\n"
-        font_data = {
-            "titulo": res['meta'].get('titulo_original', 'Sem título'),
-            "arquivo": res['meta'].get('arquivo_origem', 'Desconhecido'),
-            "secao": res['meta'].get('secao', 'Geral'),
-            "link": res['meta'].get('link_drive', 'Link indisponível')
-        }
-        used_fonts.append(font_data)
         
+    top_results = unique_results[:10]
+   
+    context = ""
+    unique_docs = {}
+    for idx, res in enumerate(top_results):
+        trecho_num = str(idx + 1)
+        context += f"[TRECHO {trecho_num}]\n{res['text']}\n\n"
+        title = res['meta'].get('titulo_original', 'Sem título')
+
+        if title not in unique_docs:
+            unique_docs[title] = {
+                "titulo": title,
+                "arquivo": res['meta'].get('arquivo_origem', 'Desconhecido'),
+                "link": res['meta'].get('link_drive', 'Link indisponível'),
+                "trechos": [trecho_num]
+            }
+        else:
+            unique_docs[title]["trechos"].append(trecho_num)
+            
+    used_fonts = list(unique_docs.values())
+
     ui_log(f"Lendo referências e extraindo síntese...")
 
     prompt_rag = f"""
-        Você é um assistente acadêmico de um grupo de pesquisa.
-        Responda à pergunta do usuário utilizando ESTRITAMENTE as informações fornecidas nos trechos de contexto abaixo.
-        REGRA DE CITAÇÃO: Toda vez que você usar uma informação de um trecho, você deve obrigatoriamente colocar a referência logo após a frase. Exemplo: "A regulação é essencial para o ensino [TRECHO 2]."
-        Se a resposta não estiver nos trechos, diga claramente: "Não encontrei informações suficientes nos documentos indexados para responder a esta pergunta."
-        Não invente informações.
+        Você é um assistente acadêmico de um grupo de pesquisa (Snoopy-RAG).
+        Sua missão é gerar um dossiê sintético respondendo à pergunta do usuário, utilizando ESTRITAMENTE as informações dos trechos abaixo.
+        
+        REGRA DE AUDITORIA (CRÍTICA): 
+        - Toda afirmação técnica DEVE ser seguida imediatamente por sua fonte no formato [TRECHO X].
+        - Não agrupe citações no final do texto. Cite a cada frase ou conceito. Exemplo: "A regulação formativa altera o processo [TRECHO 1], exigindo adaptação do professor [TRECHO 2]."
+        - Se a informação não estiver nos trechos, responda categoricamente: "Não encontrei informações nos documentos indexados para responder a esta pergunta."
+        - NUNCA crie conclusões autorais ou deduções que não estejam explicitamente escritas nos trechos.
             
         PERGUNTA DO USUÁRIO: {search_query}
             
-        CONTEXTOS RECUPERADOS:
+        CONTEXTOS RECUPERADOS (Use o número do TRECHO para as citações):
         {context}
         """
     try:
@@ -139,7 +155,7 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
             model='gemini-2.5-flash',
             contents=prompt_rag,
             config=types.GenerateContentConfig(
-                temperature=0.2
+                temperature=0.1
             )
         )
         final_output = {
@@ -150,7 +166,7 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
         ui_log("Finalizando formatação da resposta...")
         print(json.dumps(final_output, ensure_ascii=False, indent=2))
     except Exception as e:
-        print(f"Erro ao processar a busca: {e}")
+        print(f"Erro ao processar a busca: {e}", file=sys.stderr)
         print(json.dumps({"error": str(e)}, ensure_ascii=False))
         
 if __name__ == '__main__':

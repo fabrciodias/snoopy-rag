@@ -122,6 +122,7 @@ async function processSession(session) {
         document.getElementById('user-avatar').src = session.user.user_metadata.avatar_url;
 
         await fetchUserFolder(session.user.id, folderSelector, btnDrive);
+        renderHistory();
     } else {
         userToken = null;
 
@@ -136,6 +137,7 @@ async function processSession(session) {
         folderId = e.target.value;
         console.log("Contexto de busca alterado para:", folderId);
     });
+    renderHistory();
 }
 
 async function fetchUserFolder(userId, folderSelector, btnDrive) {
@@ -144,6 +146,7 @@ async function fetchUserFolder(userId, folderSelector, btnDrive) {
             .from('folders')
             .select('id, name')
             .eq('user_id', userId)
+            .eq('is_active', true)
             .limit(1)
             .maybeSingle();
 
@@ -173,38 +176,64 @@ async function fetchUserFolder(userId, folderSelector, btnDrive) {
 async function linkDriveFolder(folderName, driveFolderId) {
     try {
         const { data: { user } } = await supabaseClient.auth.getUser();
-        const { data, error } = await supabaseClient
-            .from('folders')
-            .insert([{
-                user_id: user.id,
-                name: folderName,
-                drive_id: driveFolderId
-            }])
-            .select()
-            .single();
         
-        if (error) throw error;
+        const { data: existingFolder } = await supabaseClient
+            .from('folders')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('drive_id', driveFolderId)
+            .maybeSingle();
+
+        let targetFolderData;
+
+        if (existingFolder) {
+            const { data, error } = await supabaseClient
+                .from('folders')
+                .update({ is_active: true, name: folderName }) 
+                .eq('id', existingFolder.id)
+                .select()
+                .single();
+            
+            if (error) throw error;
+            targetFolderData = data;
+            console.log("Acervo reativado! Recuperando memória existente...");
+        } else {
+            const { data, error } = await supabaseClient
+                .from('folders')
+                .insert([{
+                    user_id: user.id,
+                    name: folderName,
+                    drive_id: driveFolderId,
+                    is_active: true
+                }])
+                .select()
+                .single();
+            
+            if (error) throw error;
+            targetFolderData = data;
+            console.log("Novo Acervo vinculado com sucesso.");
+        }
 
         const folderSelector = document.getElementById('folder-selector');
-        const option = document.createElement('option');
-        option.value = data.id;
-        option.textContent = data.name;
-        folderSelector.appendChild(option);
+        
+        let option = Array.from(folderSelector.options).find(opt => opt.value === targetFolderData.id);
+        if (!option) {
+            option = document.createElement('option');
+            option.value = targetFolderData.id;
+            option.textContent = targetFolderData.name;
+            folderSelector.appendChild(option);
+        }
 
-        folderSelector.value = data.id;
-        folderId = data.id;
+        folderSelector.value = targetFolderData.id;
+        folderId = targetFolderData.id;
 
-        document.getElementById('btn-drive').classList.add('hidden');
-        console.log("Acervo Privado vinculado com sucesso.")
-
-        triggerSync();
+        window.location.reload();
 
     } catch (error) {
         console.error("Erro ao vincular pasta no banco:", error);
         alert("Erro ao vincular a pasta no Drive");
     }
 }
-
 function resetToHome() {
     resultView.classList.remove('active');
     homeView.classList.add('active');
@@ -318,8 +347,10 @@ function renderResults(data) {
                 ? `<a href="${source.link}" target="_blank" class="drive-link">Abrir no Drive ↗</a>` 
                 : `<span class="drive-link link-disabled">Link indisponível</span>`;
 
+                const trechoStr = source.trechos ? source.trechos.join(', ') : 'N/A';
+
             card.innerHTML = `
-                <div class="badge-secao">Trecho ${index + 1} | ${source.secao.substring(0, 30)}...</div>
+                <div class="badge-secao">Trechos Refrenciados: ${trechoStr}</div>
                 <h4>${source.titulo}</h4>
                 <p class="source-meta">Arq: ${source.arquivo}</p>
                 ${driveBtn}
@@ -427,30 +458,101 @@ if (btnSync) {
     btnSync.addEventListener('click', triggerSync);
 }
 
-function renderHistory() {
-    const historyList = document.getElementById('history-list');
-    let history = JSON.parse(localStorage.getItem('snoopy_history')) || [];
+async function disconnectFolder() {
+    if (!folderId || folderId === PUBLIC_FOLDER_ID) return;
     
-    if (history.length === 0) {
-        historyList.innerHTML = '<p class="history-empty">Nenhuma pesquisa recente.</p>';
+    const confirmDisconnect = confirm("Deseja desconectar este acervo? Ele não aparecerá mais nas suas buscas, mas os dados processados continuarão salvos na nuvem.");
+    if (!confirmDisconnect) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('folders')
+            .update({ is_active: false })
+            .eq('id', folderId);
+
+        if (error) throw error;
+
+        console.log("Acervo desconectado com sucesso (Soft Delete).");
+        window.location.reload(); 
+    } catch (error) {
+        console.error("Erro ao desconectar acervo:", error);
+        alert("Erro ao desconectar o acervo.");
+    }
+}
+
+if (btnSync) {
+    btnSync.addEventListener('click', triggerSync);
+    
+    const btnRemove = document.createElement('button');
+    btnRemove.id = 'btn-remove-folder';
+    btnRemove.className = 'btn-outline';
+    btnRemove.style.color = '#dc3545';  
+    btnRemove.style.borderColor = '#dc3545';
+    btnRemove.style.padding = '0 10px';
+    btnRemove.title = "Desconectar Acervo";
+    btnRemove.textContent = "✖";
+    btnRemove.onclick = disconnectFolder;
+    
+    btnSync.parentNode.insertBefore(btnRemove, btnSync.nextSibling);
+}
+
+async function renderHistory() {
+    const historyList = document.getElementById('history-list');
+    
+    if (!userToken) {
+        historyList.innerHTML = '<p class="history-empty">Faça login para ver seu histórico.</p>';
         return;
     }
-    
-    historyList.innerHTML = history.map(q => `
-        <div class="history-item" onclick="performSearch('${q.replace(/'/g, "\\'")}')">
-            <span class="history-icon">◷</span> ${q}
-        </div>
-    `).join('');
+
+    try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        
+        const { data: history, error } = await supabaseClient
+            .from('search_history')
+            .select('query')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(15);
+
+        if (error) throw error;
+
+        if (!history || history.length === 0) {
+            historyList.innerHTML = '<p class="history-empty">Nenhuma pesquisa recente.</p>';
+            return;
+        }
+        
+        const uniqueQueries = [...new Set(history.map(item => item.query))];
+
+        historyList.innerHTML = uniqueQueries.map(q => `
+            <div class="history-item" onclick="performSearch('${q.replace(/'/g, "\\'")}')">
+                <span class="history-icon">◷</span> ${q}
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error("Erro ao carregar histórico da nuvem:", error);
+        historyList.innerHTML = '<p class="history-empty">Erro ao carregar histórico.</p>';
+    }
 }
 
-function saveHistory(query) {
-    let history = JSON.parse(localStorage.getItem('snoopy_history')) || [];
-    history = history.filter(q => q !== query);
-    history.unshift(query);
-    if(history.length > 15) history.pop();
-    localStorage.setItem('snoopy_history', JSON.stringify(history));
-    renderHistory();
+async function saveHistory(query) {
+    if (!userToken) return; 
+    try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        
+        const { error } = await supabaseClient
+            .from('search_history')
+            .insert([{
+                user_id: user.id,
+                query: query
+            }]);
+        if (error) throw error;
+        
+        renderHistory();
+
+    } catch (error) {
+        console.error("Erro ao salvar histórico na nuvem:", error);
+    }
 }
 
-renderHistory();
 initAuth();
