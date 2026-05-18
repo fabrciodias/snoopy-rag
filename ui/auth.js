@@ -1,7 +1,3 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 export const appState = {
     supabaseClient: null,
     userToken: null,
@@ -25,7 +21,14 @@ export async function initAuth(onSessionUpdate) {
         const res = await fetch('/api/config');
         const config = await res.json();
 
-        appState.supabaseClient = window.supabase.createClient(config.url, config.key);
+        appState.supabaseClient = window.supabase.createClient(config.url, config.key, {
+            auth: {
+                storage: window.localStorage,
+                autoRefreshToken: true,
+                persistSession: true,
+                detectSessionInUrl: true
+            }
+        });
         appState.googleApiKey = config.googleApiKey;
         appState.googleAppId = config.googleAppId;
 
