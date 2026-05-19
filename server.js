@@ -29,7 +29,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
 const app = express();
 app.use(express.json());
 app.use(express.static('ui'));
-
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 const cache = {};
 
 app.get('/api/config', (req, res) => {
