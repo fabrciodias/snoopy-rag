@@ -134,6 +134,8 @@ dom.btnSync.addEventListener('click', async () => {
     setTimeout(() => { dom.syncLogs.textContent = ""; }, 5000);
 });
 
+dom.btnSidebar.addEventListener('click', () => dom.sidebar.classList.toggle('collapsed'));
+
 const btnRemove = document.createElement('button');
 btnRemove.id = 'btn-remove-folder';
 btnRemove.className = 'btn-outline';

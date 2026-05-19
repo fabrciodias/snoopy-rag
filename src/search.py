@@ -154,10 +154,13 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
                 temperature=0.1
             )
         )
+        texts_list = [{"num": str(i + 1), "text": res['text']} for i, res in enumerate(top_results)]
+    
         final_output = {
             "query": search_query,
             "answer": llm_response.text,
-            "sources": used_fonts
+            "sources": used_fonts,
+            "chunks": texts_list
         }
         ui_log("Finalizando formatação da resposta...")
         print(json.dumps(final_output, ensure_ascii=False, indent=2))

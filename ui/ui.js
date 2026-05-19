@@ -10,6 +10,9 @@ export const dom = {
     answerBox: document.getElementById('answer-box'),
     answerText: document.getElementById('answer-text'),
     sourcesContainer: document.getElementById('sources-container'),
+    chunksContainer: document.getElementById('chunks-container'),
+    sidebar: document.querySelector('.sidebar'),
+    btnSidebar: document.getElementById('btn-sidebar'),
     liveLogs: document.getElementById('live-logs'),
     btnLogin: document.getElementById('btn-login'),
     btnLogout: document.getElementById('btn-logout'),
@@ -60,46 +63,89 @@ export function renderResults(data) {
     dom.loadingState.classList.add('hidden');
     dom.answerBox.classList.remove('hidden');
 
-    let formattedAnswer = data.answer.replace(/\[(TRECHOS?[^\]]+)\]/gi, '<span class="trecho-highlight">[$1]</span>');
+    let formattedAnswer = data.answer.replace(/\[TRECHOS?\s*(\d+)\]/gi, (match, numero) => {
+        return `<span class="trecho-highlight" data-trecho="${numero}">${match}</span>`;
+    });
     dom.answerText.innerHTML = formattedAnswer.replace(/\n\n/g, '<br><br>');
     dom.sourcesContainer.innerHTML = '';
+    dom.chunksContainer.innerHTML = '';
+
+    if (data.chunks && data.chunks.length > 0) {
+        data.chunks.forEach(chunk => {
+            const chunkCard = document.createElement('div');
+            chunkCard.className = 'chunk-card';
+            chunkCard.dataset.num = chunk.num;
+
+            const badge = document.createElement('span');
+            badge.className = 'chunk-badge';
+            badge.textContent = `TRECHO ${chunk.num}`;
+
+            const textContent = document.createElement('q');
+            textContent.textContent = chunk.text;
+
+            chunkCard.append(badge, textContent);
+            dom.chunksContainer.appendChild(chunkCard);
+        }); 
+    }
 
     if (data.sources && data.sources.length > 0) {
         data.sources.forEach(source => {
             const card = document.createElement('div');
             card.className = 'source-card';
-            
-            const badge = document.createElement('div');
-            badge.className = 'badge-secao';
-            badge.textContent = `Trechos Referenciados: ${source.trechos ? source.trechos.join(', ') : 'N/A'}`;
-            
+            card.style.cursor = 'pointer';
+     
             const title = document.createElement('h4');
+            title.style.fontSize = '0.85rem';
             title.textContent = source.titulo;
             
             const meta = document.createElement('p');
             meta.className = 'source-meta';
-            meta.textContent = `Arq: ${source.arquivo}`;
+            meta.style.fontSize = '0.75rem';
+            meta.textContent = `Cita os trechos: [${source.trechos ? source.trechos.join(', ') : ''}]`;
             
-            card.append(badge, title, meta);
-
-            if (source.link !== 'Link indisponível') {
-                const link = document.createElement('a');
-                link.href = source.link;
-                link.target = '_blank';
-                link.className = 'drive-link';
-                link.textContent = 'Abrir no Drive ↗';
-                card.appendChild(link);
-            } else {
-                const noLink = document.createElement('span');
-                noLink.className = 'drive-link link-disabled';
-                noLink.textContent = 'Link indisponível';
-                card.appendChild(noLink);
-            }
+            card.append(title, meta);
             dom.sourcesContainer.appendChild(card);
+
+            card.addEventListener('click', () => {
+                dom.sidebar.classList.add('collapsed');
+
+                const trechosAlvo = source.trechos || [];
+                document.querySelectorAll('.chunk-card').forEach(c => {
+                    if (trechosAlvo.includes(c.dataset.num)) {
+                        c.classList.add('highlight-active');
+                        c.style.opacity = '1';
+                        c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } else {
+                        c.classList.remove('highlight-active');
+                        c.style.opacity = '0.2';
+                    }
+                });
+            });
         });
     } else {
-        dom.sourcesContainer.innerHTML = '<p class="no-sources-msg">Nenhuma fonte direta indexada para esta resposta.</p>';
+            dom.sourcesContainer.innerHTML = '<p class="no-sources-msg">Nenhuma fonte direta indexada.</p>';
     }
+    document.querySelectorAll('.trecho-highlight').forEach(tag => {
+        tag.addEventListener('mouseenter', (e) => {
+            const numeroTrecho = e.target.getAttribute('data-trecho');
+
+            document.querySelectorAll('.chunk-card').forEach(c => {
+                if (c.dataset.num === numeroTrecho) {
+                    c.classList.add('highlight-active');
+                    c.style.opacity = '1';
+                } else {
+                    c.style.opacity = '0.2'; // Opacidade reduzida nos outros blocos de texto
+                }
+            });
+        });
+
+        tag.addEventListener('mouseleave', () => {
+            document.querySelectorAll('.chunk-card').forEach(c => {
+                c.classList.remove('highlight-active');
+                c.style.opacity = '1';
+            });
+        });
+    });
 }
 
 export function renderHistoryList(historyArray, onHistoryClick) {
