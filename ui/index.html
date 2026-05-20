@@ -5,44 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Snoopy-RAG | Pesquisa Acadêmica</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:,">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div id="app" class="app-container">
-        
         <aside class="sidebar">
-            <h2 class="logo-small logo-sidebar" onclick="resetToHome()" style="cursor: pointer;">Snoopy-RAG</h2>
-            
-            <div id="auth-section">
-                <button id="btn-login" class="btn-primary-full">Entrar com Google</button>
-                <div id="user-info" class="hidden auth-user">
-                    <img id="user-avatar" src="" alt="Avatar" class="avatar-img">
-                    <button id="btn-logout" class="btn-outline">Sair</button>
-                </div>
-                
-                <div id="folder-container" class="folder-box hidden">
-                    <span class="folder-label">Acervo Ativo:</span>
-                    <div style="display: flex; gap: 5px; margin-top: 5px;">
-                        <select id="folder-selector" class="folder-dropdown" style="flex-grow: 1;">
-                            <option value="f7faf7d9-ec80-46c6-9572-174865bf1e62">Acervo Público</option>
-                        </select>
-                        <button id="btn-sync" class="btn-outline hidden" title="Sincronizar Acervo" style="padding: 0 10px;">
-                            ↻
-                        </button>
+            <div class="sidebar-top">
+                <div class="sidebar-header">
+                    <div id="logo-btn" class="logo-area" title="Página Inicial">
+                        <i data-lucide="microscope" class="icon-brand logo-default"></i>
+                        <i data-lucide="panel-left-open" class="icon-brand logo-hover hidden"></i>
+                        <h2 class="logo-small">Snoopy-RAG</h2>
                     </div>
-                    <div id="sync-logs" style="font-size: 0.75rem; color: var(--primary); margin-top: 8px; font-weight: bold;"></div>
+                    <button id="btn-sidebar-toggle" class="btn-icon" title="Recolher menu">
+                        <i data-lucide="panel-left-close"></i>
+                    </button>
+                </div>
+                <button id="btn-sidebar-new" class="btn-primary-full">
+                    <i data-lucide="plus" class="icon-sm"></i> <span>Nova Pesquisa</span>
+                </button>
+            </div>
+            
+            <div class="sidebar-middle">
+                <div id="auth-section" class="auth-box">
+                    <button id="btn-login" class="btn-outline w-full hidden">
+                        <i data-lucide="log-in" class="icon-sm"></i> Entrar
+                    </button>
+                    <div id="folder-container" class="folder-box hidden">
+                        <span class="folder-label">Acervo Atual</span>
+                        <select id="folder-selector" class="folder-dropdown">
+                            <option value="f7faf7d9-ec80-46c6-9572-174865bf1e62">GEPAFOR (Público)</option>
+                        </select>
+                    </div>
+                </div>
 
-                    <button id="btn-drive" class="btn-outline hidden" style="margin-top: 10px; width: 100%; font-size: 0.8rem;">
-                        + Conectar Google Drive
+                <nav class="sidebar-nav">
+                    <div class="nav-title-box" id="btn-nav-folder" title="Gerenciar Acervos">
+                        <i data-lucide="folder" class="icon-sm"></i>
+                        <h3 class="nav-title">Acervos</h3>
+                    </div>
+
+                    <div class="nav-title-box" id="btn-nav-history" title="Histórico Recente">
+                        <i data-lucide="history" class="icon-sm"></i>
+                        <h3 class="nav-title">Histórico Recente</h3>
+                    </div>
+                    <div id="history-list"></div>
+                </nav>
+            </div>
+
+            <div class="sidebar-bottom">
+                <div id="user-info" class="user-profile hidden" style="display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-app); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        
+                    <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                        <img id="user-avatar" src="" alt="Avatar" class="avatar-img">
+                        <span class="user-name" style="font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Usuário</span>
+                    </div>
+
+                    <button id="btn-settings" class="btn-icon" title="Configurações">
+                        <i data-lucide="settings" style="width: 18px; height: 18px;"></i>
                     </button>
                 </div>
             </div>
-
-            <nav class="sidebar-nav">
-                <h3 class="nav-title">Histórico</h3>
-                <div id="history-list">
-                </div>
-            </nav>
         </aside>
 
         <div id="main-content" class="main-area">
@@ -59,36 +84,38 @@
 
             <div id="result-view" class="view">
                 <header class="topbar">
-                    <button id="btn-sidebar" class="btn-outline" style="font-size: 1.2rem; padding: 2px 10px; margin-right: 10px;">☰</button>
-                    <h2 class="logo-small" onclick="resetToHome()">Snoopy-RAG</h2>
-                    <form id="search-nav" class="search-box small nav-search">
-                        <input type="text" id="input-nav" placeholder="Nova Pesquisa..." required autocomplete="off">
-                    </form>
+                    <h2 id="query-title" class="sticky-query"></h2>
+
+                    <button id="btn-new-search" class="btn-icon" title="Iniciar Nova Pesquisa">
+                        <i data-lucide="plus-circle"></i>
+                    </button>
                 </header>
 
                 <main class="layout-grid">
-                    <section class="answer-section">
-                        <h1 id="query-title"></h1>
+                    <section class="answer-section">        
                         <div id="loading-state" class="hidden">
                             <div class="spinner"></div>
-                            <p>Pesquisando no acervo...</p>
-                            <div id="live-logs" class="live-logs"></div>
-                        </div>
-                        <div id="answer-box" class="content-box hidden">
-                            <div id="answer-text"></div>
-                        </div>
-                    </section>
-                    <aside class="evidence-section">
-                        <div id="chunks-container">
-                            <h3>Arquivos Utilizados</h3>
-                            <p class="evidence-subtitle">Trechos consultados nesta síntese</p>
-                            <div id="sources-container"></div>
+                            <p id="live-logs" class="live-logs">Iniciando motor...</p>
                         </div>
 
-                        <div id="sources-section" style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-                            <h3 style="font-size: 1rem; color: var(--text-muted);">Fontes Consultadas</h3>
-                            <div id="sources-container" style="margin-top: 10px;"></div>
+                        <div id="answer-box" class="hidden">
+                            <div id="answer-text"></div>
+            
+                            <div id="sources-container" style="margin-top: 40px;"></div>
                         </div>
+                    </section>
+
+                    <aside class="evidence-section">
+                        <div class="evidence-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <div>
+                                <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-main);">Trecho Original</h3>
+                                <p class="evidence-subtitle" style="font-size: 0.82rem; color: var(--text-muted);">Fonte bruta extraída do acervo</p>
+                            </div>
+                            <button id="btn-close-evidence" class="btn-icon" title="Fechar painel">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                        <div id="chunks-container"></div>
                     </aside>
                 </main>
             </div>

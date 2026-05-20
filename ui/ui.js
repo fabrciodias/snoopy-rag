@@ -1,10 +1,12 @@
 export const dom = {
+    btnSidebarNew: document.getElementById('btn-sidebar-new'),
+    logoBtn: document.getElementById('logo-btn'),
+    layoutGrid: document.querySelector('.layout-grid'),
+    btnCloseEvidence: document.getElementById('btn-close-evidence'),
     homeView: document.getElementById('home-view'),
     resultView: document.getElementById('result-view'),
     homeForm: document.getElementById('search-home'),
-    navForm: document.getElementById('search-nav'),
     inputHome: document.getElementById('input-home'),
-    inputNav: document.getElementById('input-nav'),
     queryDisplay: document.getElementById('query-title'),
     loadingState: document.getElementById('loading-state'),
     answerBox: document.getElementById('answer-box'),
@@ -12,7 +14,8 @@ export const dom = {
     sourcesContainer: document.getElementById('sources-container'),
     chunksContainer: document.getElementById('chunks-container'),
     sidebar: document.querySelector('.sidebar'),
-    btnSidebar: document.getElementById('btn-sidebar'),
+    sidebarToggle: document.getElementById('btn-sidebar-toggle'),
+    btnSettings: document.getElementById('btn-settings'),
     liveLogs: document.getElementById('live-logs'),
     btnLogin: document.getElementById('btn-login'),
     btnLogout: document.getElementById('btn-logout'),
@@ -23,14 +26,15 @@ export const dom = {
     btnSync: document.getElementById('btn-sync'),
     syncLogs: document.getElementById('sync-logs'),
     btnDrive: document.getElementById('btn-drive'),
-    historyList: document.getElementById('history-list')
+    historyList: document.getElementById('history-list'),
+    btnNewSearch: document.getElementById('btn-new-search')
 };
 
 export function resetToHome() {
+    dom.layoutGrid.classList.remove('evidence-active');
     dom.resultView.classList.remove('active');
     dom.homeView.classList.add('active');
     dom.inputHome.value = '';
-    dom.inputNav.value = '';
     dom.queryDisplay.textContent = '';
     dom.answerBox.classList.add('hidden');
     dom.sourcesContainer.innerHTML = '';
@@ -39,9 +43,9 @@ export function resetToHome() {
 }
 
 export function showSearchState(query) {
+    dom.layoutGrid.classList.remove('evidence-active');
     dom.homeView.classList.remove('active');
     dom.resultView.classList.add('active');
-    dom.inputNav.value = query;
     dom.queryDisplay.textContent = query;
     dom.answerBox.classList.add('hidden');
     dom.sourcesContainer.innerHTML = '';
@@ -126,26 +130,27 @@ export function renderResults(data) {
             dom.sourcesContainer.innerHTML = '<p class="no-sources-msg">Nenhuma fonte direta indexada.</p>';
     }
     document.querySelectorAll('.trecho-highlight').forEach(tag => {
-        tag.addEventListener('mouseenter', (e) => {
+        tag.addEventListener('click', (e) => {
             const numeroTrecho = e.target.getAttribute('data-trecho');
+
+            dom.sidebar.classList.add('collapsed');
+            dom.layoutGrid.classList.add('evidence-active');
 
             document.querySelectorAll('.chunk-card').forEach(c => {
                 if (c.dataset.num === numeroTrecho) {
-                    c.classList.add('highlight-active');
-                    c.style.opacity = '1';
+                    c.classList.add('active-chunk');
                 } else {
-                    c.style.opacity = '0.2'; // Opacidade reduzida nos outros blocos de texto
+                    c.classList.remove('active-chunk');
                 }
             });
         });
-
-        tag.addEventListener('mouseleave', () => {
-            document.querySelectorAll('.chunk-card').forEach(c => {
-                c.classList.remove('highlight-active');
-                c.style.opacity = '1';
-            });
-        });
     });
+
+    if (dom.btnCloseEvidence) {
+        dom.btnCloseEvidence.addEventListener('click', () => {
+            dom.layoutGrid.classList.remove('evidence-active');
+        });
+    }
 }
 
 export function renderHistoryList(historyArray, onHistoryClick) {

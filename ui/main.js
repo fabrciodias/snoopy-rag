@@ -1,13 +1,34 @@
 import { appState, PUBLIC_FOLDER_ID, initAuth, login, logout, fetchUserFolder, linkDriveFolder, disconnectFolder } from './auth.js';
 import { fetchHistory, saveHistory, streamSearch, streamSync } from './api.js';
 import { dom, resetToHome, showSearchState, updateLog, showError, renderResults, renderHistoryList } from './ui.js';
+lucide.createIcons();
 
 let isSearching = false;
 let isSyncing = false;
 
 dom.btnLogin.addEventListener('click', login);
-dom.btnLogout.addEventListener('click', (e) => { e.preventDefault(); logout(); });
-document.querySelectorAll('.logo-small').forEach(el => el.addEventListener('click', resetToHome));
+dom.btnNewSearch.addEventListener('click', resetToHome);
+
+dom.logoBtn.addEventListener('click', () => {
+    if (dom.sidebar.classList.contains('collapsed')) {
+        dom.sidebar.classList.remove('collapsed');
+    } else {
+        resetToHome();
+    }
+});
+
+document.getElementById('btn-nav-folder').addEventListener('click', () => {
+    if (dom.sidebar.classList.contains('collapsed')) {
+        dom.sidebar.classList.remove('collapsed');
+    }
+    dom.folderSelector.focus(); 
+});
+
+document.getElementById('btn-nav-history').addEventListener('click', () => {
+    if (dom.sidebar.classList.contains('collapsed')) {
+        dom.sidebar.classList.remove('collapsed');
+    }
+});
 
 dom.folderSelector.addEventListener('change', (e) => {
     appState.folderId = e.target.value;
@@ -43,16 +64,16 @@ initAuth(async (session) => {
             dom.folderSelector.value = folderData.id;
             appState.folderId = folderData.id;
             
-            dom.btnDrive.classList.add('hidden');
-            dom.btnSync.classList.remove('hidden');
+            //dom.btnDrive.classList.add('hidden');
+            //dom.btnSync.classList.remove('hidden');
         } else {
-            dom.btnDrive.classList.remove('hidden');
+            //dom.btnDrive.classList.remove('hidden');
         }
     } else {
         appState.userToken = null;
         dom.btnLogin.classList.remove('hidden');
         dom.userInfo.classList.add('hidden');
-        dom.btnDrive.classList.add('hidden');
+        //dom.btnDrive.classList.add('hidden');
     }
     appState.isAuthLoaded = true;
     reloadHistory();
@@ -83,12 +104,7 @@ dom.homeForm.addEventListener('submit', (e) => {
     executeSearch(dom.inputHome.value);
 });
 
-dom.navForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    executeSearch(dom.inputNav.value);
-});
-
-dom.btnDrive.addEventListener('click', () => {
+/*dom.btnDrive.addEventListener('click', () => {
     if (!appState.pickerApiLoaded) return alert("A API do Google ainda está carregando...");
     if (!appState.googleToken) return alert("Token expirado. Faça login novamente.");
 
@@ -110,9 +126,9 @@ dom.btnDrive.addEventListener('click', () => {
             }
         }).build();
     picker.setVisible(true);
-});
+});*/
 
-dom.btnSync.addEventListener('click', async () => {
+/*dom.btnSync.addEventListener('click', async () => {
     if (!appState.folderId || appState.folderId === PUBLIC_FOLDER_ID) return alert("Selecione seu Acervo Privado para sincronizar.");
     if (!appState.googleToken) return alert("Sessão do Drive expirada. Faça login novamente.");
     if (isSyncing) return;
@@ -132,11 +148,11 @@ dom.btnSync.addEventListener('click', async () => {
     dom.btnSync.disabled = false;
     dom.btnSync.style.opacity = '1';
     setTimeout(() => { dom.syncLogs.textContent = ""; }, 5000);
-});
+});*/
 
-dom.btnSidebar.addEventListener('click', () => dom.sidebar.classList.toggle('collapsed'));
+dom.sidebarToggle.addEventListener('click', () => dom.sidebar.classList.toggle('collapsed'));
 
-const btnRemove = document.createElement('button');
+/*const btnRemove = document.createElement('button');
 btnRemove.id = 'btn-remove-folder';
 btnRemove.className = 'btn-outline';
 btnRemove.style.color = '#dc3545';  
@@ -146,3 +162,5 @@ btnRemove.title = "Desconectar Acervo";
 btnRemove.textContent = "✖";
 btnRemove.onclick = disconnectFolder;
 dom.btnSync.parentNode.insertBefore(btnRemove, dom.btnSync.nextSibling);
+*/
+
