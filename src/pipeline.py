@@ -47,12 +47,17 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
         semantic_meta = get_metadata(clean_md, gemini_client)
         title = semantic_meta.get("titulo_original", os.path.basename(file_path))
 
+        autores = semantic_meta.get("autores", [])
+        ano = semantic_meta.get("ano_publicacao", "")
+
         print("[4/6] Registrando Documento no Supabase...")
         doc_response = supabase.table("documents").insert({
             "user_id": user_id,
             "folder_id": folder_id,
             "document_hash": doc_hash,
             "title": title,
+            "authors": autores,
+            "publication_year": ano,
             "drive_link": drive_link,
             "drive_file_id": file_id
         }).execute()

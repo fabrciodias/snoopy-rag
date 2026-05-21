@@ -87,6 +87,8 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
                     "text": row['content'],
                     "meta": {
                         "titulo_original": row['title'],
+                        "autores": row.get('authors', []),
+                        "ano_publicacao": row.get('publication_year', ''),
                         "arquivo_origem": "Drive/Supabase",
                         "secao": row['section'],
                         "link_drive": row['drive_link']
@@ -120,6 +122,8 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
         if title not in unique_docs:
             unique_docs[title] = {
                 "titulo": title,
+                "autores": res['meta'].get('autores', []),
+                "ano": res['meta'].get('ano_publicacao', ''),
                 "arquivo": res['meta'].get('arquivo_origem', 'Desconhecido'),
                 "link": res['meta'].get('link_drive', 'Link indisponível'),
                 "trechos": [trecho_num]

@@ -1,6 +1,7 @@
 export const dom = {
     btnSidebarNew: document.getElementById('btn-sidebar-new'),
     logoBtn: document.getElementById('logo-btn'),
+    userName: document.querySelector('.user-name'),
     layoutGrid: document.querySelector('.layout-grid'),
     btnCloseEvidence: document.getElementById('btn-close-evidence'),
     homeView: document.getElementById('home-view'),
@@ -18,13 +19,10 @@ export const dom = {
     btnSettings: document.getElementById('btn-settings'),
     liveLogs: document.getElementById('live-logs'),
     btnLogin: document.getElementById('btn-login'),
-    btnLogout: document.getElementById('btn-logout'),
     userInfo: document.getElementById('user-info'),
     userAvatar: document.getElementById('user-avatar'),
     folderContainer: document.getElementById('folder-container'),
     folderSelector: document.getElementById('folder-selector'),
-    btnSync: document.getElementById('btn-sync'),
-    syncLogs: document.getElementById('sync-logs'),
     btnDrive: document.getElementById('btn-drive'),
     historyList: document.getElementById('history-list'),
     btnNewSearch: document.getElementById('btn-new-search')
@@ -132,6 +130,18 @@ export function renderResults(data) {
     document.querySelectorAll('.trecho-highlight').forEach(tag => {
         tag.addEventListener('click', (e) => {
             const numeroTrecho = e.target.getAttribute('data-trecho');
+            const fonte = data.sources.find(s => s.trechos && s.trechos.includes(numeroTrecho));
+
+            if (fonte) {
+                const autores = fonte.autores && fonte.autores.length > 0
+                    ? fonte.autores.join('; ').toUpperCase()
+                    : 'AUTOR DESCONHECIDO';
+                const ano = fonte.ano || 's.d.';
+
+                document.getElementById('chunk-abnt').textContent = `${autores}. ${fonte.titulo}. ${ano}.`;
+            } else {
+                document.getElementById('chunk-abnt').textContent = `Metadados indisponíveis para este trecho.`;
+            }
 
             dom.sidebar.classList.add('collapsed');
             dom.layoutGrid.classList.add('evidence-active');
@@ -141,16 +151,10 @@ export function renderResults(data) {
                     c.classList.add('active-chunk');
                 } else {
                     c.classList.remove('active-chunk');
-                }
+                }           
             });
         });
     });
-
-    if (dom.btnCloseEvidence) {
-        dom.btnCloseEvidence.addEventListener('click', () => {
-            dom.layoutGrid.classList.remove('evidence-active');
-        });
-    }
 }
 
 export function renderHistoryList(historyArray, onHistoryClick) {

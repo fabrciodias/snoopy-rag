@@ -56,6 +56,11 @@
             </div>
 
             <div class="sidebar-bottom">
+                <button id="btn-theme-toggle" class="btn-icon" style="margin-bottom: 8px; width: 100%; justify-content: flex-start;" title="Alternar Tema">
+                    <i data-lucide="moon" class="icon-sm"></i>
+                    <span class="nav-title" style="font-size: 0.85rem;">Tema</span>
+                </button>
+                
                 <div id="user-info" class="user-profile hidden" style="display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-app); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
         
                     <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
@@ -92,7 +97,9 @@
                 </header>
 
                 <main class="layout-grid">
-                    <section class="answer-section">        
+                    <section class="answer-section">
+                        <h3 style="font-size: 1.8rem; font-weight: 600; color: var(--text-main); margin-bottom: 20px;">Síntese:</style>
+
                         <div id="loading-state" class="hidden">
                             <div class="spinner"></div>
                             <p id="live-logs" class="live-logs">Iniciando motor...</p>
@@ -100,22 +107,26 @@
 
                         <div id="answer-box" class="hidden">
                             <div id="answer-text"></div>
-            
-                            <div id="sources-container" style="margin-top: 40px;"></div>
-                        </div>
+                            </div>
                     </section>
 
                     <aside class="evidence-section">
                         <div class="evidence-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <div>
                                 <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-main);">Trecho Original</h3>
-                                <p class="evidence-subtitle" style="font-size: 0.82rem; color: var(--text-muted);">Fonte bruta extraída do acervo</p>
+                                <p id="chunk-abnt" class="evidence-subtitle" style="font-size: 0.82rem; color: var(--text-muted); font-family: monospace;">Aguardando metadados da fonte...</p>
                             </div>
                             <button id="btn-close-evidence" class="btn-icon" title="Fechar painel">
                                 <i data-lucide="x"></i>
                             </button>
                         </div>
+
                         <div id="chunks-container"></div>
+
+                        <div id="sources-section" style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                            <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Referências do Acervo</h3>
+                            <div id="sources-container"></div>
+                        </div>
                     </aside>
                 </main>
             </div>

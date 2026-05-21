@@ -8,6 +8,8 @@ let isSyncing = false;
 
 dom.btnLogin.addEventListener('click', login);
 dom.btnNewSearch.addEventListener('click', resetToHome);
+dom.btnSidebarNew.addEventListener('click', resetToHome);
+
 
 dom.logoBtn.addEventListener('click', () => {
     if (dom.sidebar.classList.contains('collapsed')) {
@@ -15,6 +17,17 @@ dom.logoBtn.addEventListener('click', () => {
     } else {
         resetToHome();
     }
+});
+
+document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+    const isLight = document.body.classList.toggle('light-theme');
+    
+    const btn = document.querySelector('btn-theme-toggle');
+    btn.innerHTML = `
+        <i data-lucide="${isLight ? 'sun' : 'moon'}" class="icon-sm"></i>
+        <span class="nav-title" style="font-size: 0.85rem;">Tema</span>
+    `;
+    lucide.createIcons();
 });
 
 document.getElementById('btn-nav-folder').addEventListener('click', () => {
@@ -54,6 +67,7 @@ initAuth(async (session) => {
         dom.btnLogin.classList.add('hidden');
         dom.userInfo.classList.remove('hidden');
         dom.userAvatar.src = session.user.user_metadata.avatar_url;
+        dom.userName.textContent = session.user.user_metadata.full_name || 'Usuário';
 
         const folderData = await fetchUserFolder(session.user.id);
         if (folderData) {
@@ -103,6 +117,12 @@ dom.homeForm.addEventListener('submit', (e) => {
     e.preventDefault();
     executeSearch(dom.inputHome.value);
 });
+
+if (dom.btnCloseEvidence) {
+        dom.btnCloseEvidence.addEventListener('click', () => {
+            dom.layoutGrid.classList.remove('evidence-active');
+        });
+    }
 
 /*dom.btnDrive.addEventListener('click', () => {
     if (!appState.pickerApiLoaded) return alert("A API do Google ainda está carregando...");
