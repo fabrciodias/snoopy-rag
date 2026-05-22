@@ -1,4 +1,6 @@
 export const dom = {
+    mobileOverlay: document.getElementById('mobile-overlay'),
+    btnMobileMenu: document.getElementById('btn-mobile-menu'),
     btnSidebarNew: document.getElementById('btn-sidebar-new'),
     logoBtn: document.getElementById('logo-btn'),
     userName: document.querySelector('.user-name'),
@@ -24,6 +26,8 @@ export const dom = {
     folderContainer: document.getElementById('folder-container'),
     folderSelector: document.getElementById('folder-selector'),
     btnDrive: document.getElementById('btn-drive'),
+    btnSync: document.getElementById('btn-sync'), 
+    syncLogs: document.getElementById('sync-logs'), 
     historyList: document.getElementById('history-list'),
     btnNewSearch: document.getElementById('btn-new-search')
 };
@@ -98,7 +102,12 @@ export function renderResults(data) {
      
             const title = document.createElement('h4');
             title.style.fontSize = '0.85rem';
-            title.textContent = source.titulo;
+            const autores = source.autores && source.autores.length > 0
+                ? source.autores.join('; ').toUpperCase()
+                : 'AUTOR DESCONHECIDO';
+            const ano = source.ano || 's.d.';
+            
+            title.textContent = `${autores}. ${source.titulo}. ${ano}.`;
             
             const meta = document.createElement('p');
             meta.className = 'source-meta';
@@ -110,6 +119,7 @@ export function renderResults(data) {
 
             card.addEventListener('click', () => {
                 dom.sidebar.classList.add('collapsed');
+                
 
                 const trechosAlvo = source.trechos || [];
                 document.querySelectorAll('.chunk-card').forEach(c => {
@@ -122,7 +132,14 @@ export function renderResults(data) {
                         c.style.opacity = '0.2';
                     }
                 });
-            });
+                
+                const link = source.link || source.url || source.drive_link;
+                if (link) {
+                    window.open(link, '_blank');
+                } else {
+                    console.warn("Nenhum link do Drive foi retornado para este documento:", source);
+                }
+            })
         });
     } else {
             dom.sourcesContainer.innerHTML = '<p class="no-sources-msg">Nenhuma fonte direta indexada.</p>';
@@ -145,6 +162,7 @@ export function renderResults(data) {
 
             dom.sidebar.classList.add('collapsed');
             dom.layoutGrid.classList.add('evidence-active');
+            dom.mobileOverlay.classList.add('active');
 
             document.querySelectorAll('.chunk-card').forEach(c => {
                 if (c.dataset.num === numeroTrecho) {

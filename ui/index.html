@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snoopy-RAG | Pesquisa Acadêmica</title>
+    <title>LPP-Acervo | Pesquisa Acadêmica</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:,">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+    <div id="mobile-overlay" class="mobile-overlay"></div>
+    <button id="btn-mobile-menu" class="btn-mobile-menu btn-icon" title="Menu">
+        <i data-lucide="menu"></i>
+    </button>
+
     <div id="app" class="app-container">
         <aside class="sidebar">
             <div class="sidebar-top">
@@ -17,7 +22,7 @@
                     <div id="logo-btn" class="logo-area" title="Página Inicial">
                         <i data-lucide="microscope" class="icon-brand logo-default"></i>
                         <i data-lucide="panel-left-open" class="icon-brand logo-hover hidden"></i>
-                        <h2 class="logo-small">Snoopy-RAG</h2>
+                        <h2 class="logo-small">LPP-Acervo</h2>
                     </div>
                     <button id="btn-sidebar-toggle" class="btn-icon" title="Recolher menu">
                         <i data-lucide="panel-left-close"></i>
@@ -30,14 +35,26 @@
             
             <div class="sidebar-middle">
                 <div id="auth-section" class="auth-box">
-                    <button id="btn-login" class="btn-outline w-full hidden">
+                    <button id="btn-login" class="btn-primary-full w-full hidden">
                         <i data-lucide="log-in" class="icon-sm"></i> Entrar
                     </button>
-                    <div id="folder-container" class="folder-box hidden">
-                        <span class="folder-label">Acervo Atual</span>
+                    <div id="folder-container" class="folder-box hidden" style="display: flex; flex-direction: column;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span class="folder-label" style="margin-bottom: 0; line-height: 1;">Acervo Atual</span>
+                            <button id="btn-sync" class="btn-icon hidden" title="Sincronizar Acervo" style="padding: 2px; transform: translateY(3px);">
+                                <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
+                            </button>
+                        </div>
+
                         <select id="folder-selector" class="folder-dropdown">
                             <option value="f7faf7d9-ec80-46c6-9572-174865bf1e62">GEPAFOR (Público)</option>
                         </select>
+
+                        <button id="btn-drive" class="btn-outline w-full hidden" style="margin-top: 10px; font-size: 0.8rem; padding: 6px; justify-content: center;">
+                            <i data-lucide="folder-plus" class="icon-sm"></i> Conectar Pasta Privada
+                        </button>
+                        
+                        <div id="sync-logs" style="font-size: 0.75rem; color: var(--primary); margin-top: 6px; text-align: center; min-height: 14px;"></div>
                     </div>
                 </div>
 
@@ -78,7 +95,7 @@
         <div id="main-content" class="main-area">
             <div id="home-view" class="view active">
                 <div class="hero">
-                    <h1 class="logo">Snoopy-RAG</h1>
+                    <h1 class="logo">LPP-Acervo</h1>
                     <p class="subtitle">Memória Institucional e Recuperação Semântica Documental</p>
                     <form id="search-home" class="search-box">
                         <input type="text" id="input-home" placeholder="Pesquisar" required autocomplete="off">
@@ -98,7 +115,7 @@
 
                 <main class="layout-grid">
                     <section class="answer-section">
-                        <h3 style="font-size: 1.8rem; font-weight: 600; color: var(--text-main); margin-bottom: 20px;">Síntese:</style>
+                        <h3 style="font-size: 1.8rem; font-weight: 600; color: var(--text-main); margin-bottom: 20px;">Síntese:</h3>
 
                         <div id="loading-state" class="hidden">
                             <div class="spinner"></div>
@@ -107,26 +124,26 @@
 
                         <div id="answer-box" class="hidden">
                             <div id="answer-text"></div>
+                            <div id="sources-section" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                                <h3 style="font-size: 1.1rem; color: var(--text-main); font-weight: 600; margin-bottom: 15px;">Referências do Acervo</h3>
+                                <div id="sources-container"></div>
                             </div>
+                        </div>
                     </section>
 
                     <aside class="evidence-section">
-                        <div class="evidence-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <div>
-                                <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-main);">Trecho Original</h3>
-                                <p id="chunk-abnt" class="evidence-subtitle" style="font-size: 0.82rem; color: var(--text-muted); font-family: monospace;">Aguardando metadados da fonte...</p>
-                            </div>
-                            <button id="btn-close-evidence" class="btn-icon" title="Fechar painel">
+                        <div class="bottom-sheet-handle"></div>
+                        
+                        <div class="evidence-sticky-header" style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: -24px; background-color: var(--bg-panel); z-index: 10; padding: 24px 0 10px 0; margin: -24px 0 15px 0;">
+                            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-main); margin: 0;">Trecho Original</h3>
+                            <button id="btn-close-evidence" class="btn-icon" title="Fechar painel" style="margin-right: -8px;">
                                 <i data-lucide="x"></i>
                             </button>
                         </div>
-
+                        
                         <div id="chunks-container"></div>
-
-                        <div id="sources-section" style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);">
-                            <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Referências do Acervo</h3>
-                            <div id="sources-container"></div>
-                        </div>
+                        
+                        <p id="chunk-abnt" class="evidence-subtitle" style="font-size: 0.82rem; color: var(--text-muted); font-family: monospace; margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px;">Aguardando metadados da fonte...</p>
                     </aside>
                 </main>
             </div>

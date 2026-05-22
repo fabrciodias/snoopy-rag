@@ -203,6 +203,29 @@ body {
     background-color: var(--primary-hover);
 }
 
+/* Botão Secundário (Outline) */
+.btn-outline {
+    width: 100%;
+    padding: 10px;
+    background-color: transparent;
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    transition: all var(--trans-fast);
+}
+
+.btn-outline:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background-color: var(--bg-hover);
+}
+
 .btn-icon {
     background: transparent;
     border: none;
@@ -283,6 +306,13 @@ body {
     color: var(--text-main);
 }
 
+.history-empty {
+    padding: 8px var(--space-sm);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
 
 /* --------------------------------------------------------------------------
    4. SIDEBAR COLAPSADA (MODO MINI / FOCO IMERSIVO)
@@ -296,10 +326,14 @@ body {
 .sidebar.collapsed .btn-primary-full span,
 .sidebar.collapsed .nav-title,
 .sidebar.collapsed .history-item,
+.sidebar.collapsed .history-empty,
 .sidebar.collapsed .folder-label,
 .sidebar.collapsed .folder-dropdown,
-.sidebar.collapsed .user-name {
-    display: none;
+.sidebar.collapsed .user-name,
+.sidebar.collapsed #btn-drive,
+.sidebar.collapsed #btn-sync,
+.sidebar.collapsed #sync-logs {
+    display: none !important;
 }
 
 /* Ajustes de Alinhamento Central no Cabeçalho */
@@ -407,6 +441,10 @@ body {
     text-overflow: ellipsis;
     max-width: 90%;
     margin: 0;
+}
+
+#btn-new-search {
+    display: none;
 }
 
 
@@ -591,7 +629,8 @@ body {
     border-radius: var(--radius-lg);
     padding: var(--space-lg);
     height: 100%;
-    overflow-y: auto;
+     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;   
     display: none; 
 }
 
@@ -677,4 +716,117 @@ body {
 .source-meta {
     color: var(--text-muted);
     margin-top: var(--space-xs);
+}
+
+/* --------------------------------------------------------------------------
+   9. RESPONSIVIDADE (MOBILE & TABLET)
+   -------------------------------------------------------------------------- */
+
+/* Esconde elementos exclusivos do mobile em telas grandes */
+@media (min-width: 851px) {
+    .btn-mobile-menu,
+    .mobile-overlay,
+    .bottom-sheet-handle {
+        display: none !important;
+    }
+}
+
+@media (max-width: 850px) {
+    /* 1. O Menu Sanduíche Flutuante */
+    .btn-mobile-menu {
+        display: flex;
+        position: fixed;
+        top: 11px;
+        left: 15px;
+        z-index: 998;
+        background-color: var(--bg-panel);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    #btn-new-search {
+        display: flex;
+    }
+
+    /* 2. O Overlay (Fundo Escuro Desfocado) */
+     .mobile-overlay {
+        visibility: hidden; 
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(2px);
+        z-index: 999;
+        opacity: 0;
+        transition: opacity 0.3s ease, visibility 0.3s ease; 
+    }
+
+    .mobile-overlay.active {
+        visibility: visible; 
+        opacity: 1;
+    }
+
+    /* 3. A Sidebar (Off-Canvas na Esquerda) */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 1000;
+        transform: translateX(-100%);
+        width: 280px !important;
+        transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1); /* Animação ultra suave sincronizada */
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.6); /* Sombra de profundidade nativa */
+    }
+    
+    /* 4. Ajustes do Layout Central */
+    .layout-grid, .layout-grid.evidence-active {
+        grid-template-columns: 1fr;
+        padding: 80px var(--space-md) var(--space-md) var(--space-md); /* Espaço pro botão do menu */
+        gap: 0;
+        height: calc(100vh - 80px);
+    }
+
+    .hero .logo { font-size: 2.2rem; }
+    .hero { padding: var(--space-md); text-align: center; }
+    
+    .topbar {
+        padding-left: 60px; /* Não sobrepor o botão sanduíche */
+    }
+
+    /* 5. A BOTTOM SHEET (A Mágica da Gaveta) */
+    .evidence-section {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100vw;
+        height: 85vh; 
+        border-radius: 24px 24px 0 0;
+        z-index: 1001;
+        transform: translateY(100%); 
+        display: flex !important; 
+        flex-direction: column;
+        transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+    }
+
+    .layout-grid.evidence-active .evidence-section {
+        transform: translateY(0); /* A gaveta sobe! */
+    }
+
+    /* A pílula de "arrastar" no topo da gaveta */
+    .bottom-sheet-handle {
+        width: 40px;
+        height: 5px;
+        background-color: var(--border-color);
+        border-radius: 10px;
+        margin: 0 auto 15px auto;
+    }
 }
