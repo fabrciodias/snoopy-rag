@@ -5,6 +5,7 @@ export const dom = {
     mobileOverlay: document.getElementById('mobile-overlay'),
 
     // 1.2. Modais e Configurações
+    btnSettings: document.getElementById('btn-settings'),
     settingsModal: document.getElementById('settings-modal'),
     btnCloseModal: document.getElementById('btn-close-modal'),
     btnRemoveFolder: document.getElementById('btn-remove-folder'),

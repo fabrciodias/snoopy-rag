@@ -220,9 +220,10 @@ dom.btnSync.addEventListener('click', async () => {
     setTimeout(() => { dom.syncLogs.textContent = ""; }, 5000);
 });
 
-// Lógica da Modal de Configurações (Sala de Máquinas)
+// Lógica da Modal de Configurações
 dom.btnSettings?.addEventListener('click', () => {
     dom.settingsModal.classList.remove('hidden');
+    // Timeout rapidinho só pro CSS ler e fazer a animação de fade
     setTimeout(() => dom.settingsModal.classList.add('active'), 10); 
 });
 
@@ -232,7 +233,6 @@ const closeModal = () => {
 };
 
 dom.btnCloseModal?.addEventListener('click', closeModal);
-
 dom.settingsModal?.addEventListener('click', (e) => {
     if (e.target === dom.settingsModal) closeModal(); // Fecha se clicar fora da caixa
 });
@@ -243,7 +243,7 @@ dom.btnLogout?.addEventListener('click', () => {
 });
 
 dom.btnRemoveFolder?.addEventListener('click', () => {
-    if(confirm("Tem a certeza? Isto vai desvincular o seu acervo do Drive.")) {
+    if(confirm("Tem certeza? Isso vai desvincular seu acervo do Drive.")) {
         disconnectFolder();
     }
 });
