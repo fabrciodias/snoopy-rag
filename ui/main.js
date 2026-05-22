@@ -99,8 +99,10 @@ initAuth(async (session) => {
             
             dom.btnDrive.classList.add('hidden');
             dom.btnSync.classList.remove('hidden');
+            dom.btnRemoveFolder.classList.remove('hidden');
         } else {
             dom.btnDrive.classList.remove('hidden');
+            dom.btnRemoveFolder.classList.add('hidden');
         }
     } else {
         appState.userToken = null;
@@ -194,6 +196,32 @@ dom.sidebarToggle.addEventListener('click', () => {
         dom.mobileOverlay.classList.remove('active');
     } else {
         dom.sidebar.classList.toggle('collapsed');
+    }
+});
+
+dom.btnSettings?.addEventListener('click', () => {
+    dom.settingsModal.classList.remove('hidden');
+    setTimeout(() => dom.settingsModal.classList.add('active'), 10); 
+});
+
+const closeModal = () => {
+    dom.settingsModal.classList.remove('active');
+    setTimeout(() => dom.settingsModal.classList.add('hidden'), 250);
+};
+
+dom.btnCloseModal?.addEventListener('click', closeModal);
+dom.settingsModal?.addEventListener('click', (e) => {
+    if (e.target === dom.settingsModal) closeModal(); // Fecha se clicar fora da caixa
+});
+
+dom.btnLogout?.addEventListener('click', () => {
+    logout();
+    closeModal();
+});
+
+dom.btnRemoveFolder?.addEventListener('click', () => {
+    if(confirm("Tem certeza? Isso vai desvincular seu acervo do Drive.")) {
+        disconnectFolder();
     }
 });
 

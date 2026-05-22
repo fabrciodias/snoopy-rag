@@ -29,7 +29,11 @@ export const dom = {
     btnSync: document.getElementById('btn-sync'), 
     syncLogs: document.getElementById('sync-logs'), 
     historyList: document.getElementById('history-list'),
-    btnNewSearch: document.getElementById('btn-new-search')
+    btnNewSearch: document.getElementById('btn-new-search'),
+    settingsModal: document.getElementById('settings-modal'),
+    btnCloseModal: document.getElementById('btn-close-modal'),
+    btnRemoveFolder: document.getElementById('btn-remove-folder'),
+    btnLogout: document.getElementById('btn-logout')
 };
 
 export function resetToHome() {
