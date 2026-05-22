@@ -1,7 +1,8 @@
+// 1. ESTADO GLOBAL DE AUTENTICAÇÃO
 export const appState = {
     supabaseClient: null,
     userToken: null,
-    folderId: "f7faf7d9-ec80-46c6-9572-174865bf1e62", 
+    folderId: "f7faf7d9-ec80-46c6-9572-174865bf1e62", // Default: Acervo Público
     isAuthLoaded: false,
     googleToken: null,
     googleApiKey: null,
@@ -11,16 +12,20 @@ export const appState = {
 
 export const PUBLIC_FOLDER_ID = "f7faf7d9-ec80-46c6-9572-174865bf1e62";
 
+// 2. INJEÇÃO DE DEPENDÊNCIAS EXTERNAS (Google Picker)
 const gScript = document.createElement('script');
 gScript.src = 'https://apis.google.com/js/api.js';
 gScript.onload = () => gapi.load('picker', () => { appState.pickerApiLoaded = true; });
 document.body.appendChild(gScript);
 
+// 3. INICIALIZAÇÃO E ESCUTA DE SESSÃO
 export async function initAuth(onSessionUpdate) {
     try {
+        // 3.1. Busca as chaves públicas no servidor
         const res = await fetch('/api/config');
         const config = await res.json();
 
+        // 3.2. Inicializa o cliente do Supabase
         appState.supabaseClient = window.supabase.createClient(config.url, config.key, {
             auth: {
                 storage: window.localStorage,
@@ -29,18 +34,26 @@ export async function initAuth(onSessionUpdate) {
                 detectSessionInUrl: true
             }
         });
+        
         appState.googleApiKey = config.googleApiKey;
         appState.googleAppId = config.googleAppId;
 
+        // 3.3. Restaura a sessão existente (se houver)
         const { data: { session } } = await appState.supabaseClient.auth.getSession();
-        if (session?.provider_token) localStorage.setItem('snoopy_g_token', session.provider_token);
+        
+        if (session?.provider_token) {
+            localStorage.setItem('snoopy_g_token', session.provider_token);
+        }
         appState.googleToken = localStorage.getItem('snoopy_g_token');
         
         await onSessionUpdate(session);
 
+        // 3.4. Fica escutando mudanças na conta (Login/Logout)
         appState.supabaseClient.auth.onAuthStateChange(async (event, newSession) => {
             if (event === 'SIGNED_IN') {
-                if (newSession?.provider_token) localStorage.setItem('snoopy_g_token', newSession.provider_token);
+                if (newSession?.provider_token) {
+                    localStorage.setItem('snoopy_g_token', newSession.provider_token);
+                }
                 appState.googleToken = localStorage.getItem('snoopy_g_token');
             }
             if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
@@ -48,10 +61,11 @@ export async function initAuth(onSessionUpdate) {
             }
         });
     } catch (error) {
-        console.error("Erro Crítico na inicialização do auth:", error);
+        console.error("[AUTH] Erro Crítico na inicialização:", error);
     }
 }
 
+// 4. AÇÕES DE CONTA (Login / Logout)
 export async function login() {
     await appState.supabaseClient.auth.signInWithOAuth({
         provider: 'google',
@@ -60,12 +74,19 @@ export async function login() {
 }
 
 export async function logout() {
-    console.log("Sinal de Logout enviado ao Supabase...");
+    console.log("[AUTH] Sinal de Logout enviado ao Supabase...");
     localStorage.removeItem('snoopy_g_token');
-    try { await appState.supabaseClient.auth.signOut(); } catch(err) { console.error(err); }
+    
+    try { 
+        await appState.supabaseClient.auth.signOut(); 
+    } catch(err) { 
+        console.error(err); 
+    }
+    
     window.location.reload(); 
 }
 
+// 5. OPERAÇÕES DE ACERVO (Banco de Dados)
 export async function fetchUserFolder(userId) {
     try {
         const { data, error } = await appState.supabaseClient
@@ -77,7 +98,7 @@ export async function fetchUserFolder(userId) {
             .maybeSingle();
         return data;
     } catch (err) {
-        console.error("Erro ao verificar acervo:", err);
+        console.error("[AUTH] Erro ao verificar acervo:", err);
         return null;
     }
 }
@@ -85,6 +106,8 @@ export async function fetchUserFolder(userId) {
 export async function linkDriveFolder(folderName, driveFolderId) {
     try {
         const { data: { user } } = await appState.supabaseClient.auth.getUser();
+        
+        // Verifica se a pasta já existe no banco (mesmo desativada)
         const { data: existingFolder } = await appState.supabaseClient
             .from('folders')
             .select('id')
@@ -93,11 +116,13 @@ export async function linkDriveFolder(folderName, driveFolderId) {
             .maybeSingle();
 
         if (existingFolder) {
+            // Reativa e atualiza o nome (Soft Undelete)
             await appState.supabaseClient
                 .from('folders')
                 .update({ is_active: true, name: folderName }) 
                 .eq('id', existingFolder.id);
         } else {
+            // Cria um novo registro de pasta
             await appState.supabaseClient
                 .from('folders')
                 .insert([{
@@ -107,9 +132,10 @@ export async function linkDriveFolder(folderName, driveFolderId) {
                     is_active: true
                 }]);
         }
+        
         window.location.reload();
     } catch (error) {
-        console.error("Erro ao vincular pasta no banco:", error);
+        console.error("[AUTH] Erro ao vincular pasta no banco:", error);
         alert("Erro ao vincular a pasta no Drive");
     }
 }
@@ -121,14 +147,16 @@ export async function disconnectFolder() {
     if (!confirmDisconnect) return;
 
     try {
+        // Soft Delete: Apenas marca como is_active = false
         await appState.supabaseClient
             .from('folders')
             .update({ is_active: false })
             .eq('id', appState.folderId);
-        console.log("Acervo desconectado com sucesso (Soft Delete).");
+            
+        console.log("[AUTH] Acervo desconectado com sucesso (Soft Delete).");
         window.location.reload(); 
     } catch (error) {
-        console.error("Erro ao desconectar acervo:", error);
+        console.error("[AUTH] Erro ao desconectar acervo:", error);
         alert("Erro ao desconectar o acervo.");
     }
 }

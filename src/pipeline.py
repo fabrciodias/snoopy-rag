@@ -1,3 +1,4 @@
+# 1. IMPORTAÇÕES
 import os
 import gc
 import sys
@@ -6,11 +7,15 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from google import genai
 from google.genai import types
+
+# Módulos Locais do Snoopy
 from extractor import extract_pdf_data
 from cleaner import to_markdown
 from tagger import get_metadata
 from chunker import semantic_chunking
 
+
+# 2. CONFIGURAÇÕES E CLIENTES GLOBAIS
 load_dotenv()
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -20,8 +25,11 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
+
+# 3. MOTOR DE PROCESSAMENTO (CORE)
 def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
     try:
+        # [PASSO 0]: Verificação de Redundância (Hash MD5)
         print(f"\n[0/6] Gerando Hash de Segurança...")
         with open(file_path, "rb") as f:
             file_bytes = f.read()
@@ -29,27 +37,28 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
 
         existing_doc = supabase.table("documents").select("id").eq("folder_id", folder_id).eq("document_hash", doc_hash).execute()
         if len(existing_doc.data) > 0:
-            print(f"[AVISO] Arquivo indêntico já existe no acervo (Hash: {doc_hash}). Processamento cancelado para este arquivo.")
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            print(f"[AVISO] Arquivo idêntico já existe no acervo (Hash: {doc_hash}). Processamento cancelado.")
             return 
         
+        # [PASSO 1]: Extração Bruta
         print(f"\n[1/6] Extraindo texto: {file_path}")
         pdf_meta, raw_text = extract_pdf_data(file_path)
 
         if not raw_text:
             raise Exception("PDF vazio ou corrompido.")
         
+        # [PASSO 2]: Higienização
         print("[2/6] Limpando ruídos e formatando Markdown...")
         clean_md = to_markdown(raw_text)
 
+        # [PASSO 3]: Extração Semântica de Metadados (LLM)
         print("[3/6] LLM Tagger: Extraindo Metadados Semânticos...")
         semantic_meta = get_metadata(clean_md, gemini_client)
         title = semantic_meta.get("titulo_original", os.path.basename(file_path))
-
         autores = semantic_meta.get("autores", [])
         ano = semantic_meta.get("ano_publicacao", "")
 
+        # [PASSO 4]: Registro no Banco de Dados
         print("[4/6] Registrando Documento no Supabase...")
         doc_response = supabase.table("documents").insert({
             "user_id": user_id,
@@ -64,20 +73,24 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
 
         document_id = doc_response.data[0]['id']
 
+        # [PASSO 5]: Fatiamento Semântico
         print("[5/6] Dividindo o texto (Chunking)...")
         chunks = semantic_chunking(clean_md, {})
 
+        # [PASSO 6]: Vetorização e Ingestão no VectorDB
         print(f"[6/6] Vetorizando {len(chunks)} chunks e subindo para Nuvem...")
         batch_size = 5
+        
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i : i + batch_size]
             texts = [c['text'] for c in batch]
 
             response = gemini_client.models.embed_content(
-                model='gemini-embedding-001',
+                model='text-embedding-004',
                 contents=texts,
                 config=types.EmbedContentConfig(output_dimensionality=768)            
             )
+            
             supabase_payload = []
             for j, emb in enumerate(response.embeddings):
                 supabase_payload.append({
@@ -88,18 +101,29 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
                     "section": batch[j]['metadata'].get('secao', 'Geral'),
                     "embedding": emb.values
                 })
+                
             supabase.table("chunks").insert(supabase_payload).execute()
             print(f"-> Lote {i+1} a {min(i+batch_size, len(chunks))} salvo no Supabase.")
         
-        print("\n[SUCESSO] Pipeline concluído! Limpando memória e apagando PDF...")
+        print("\n[SUCESSO] Pipeline concluído!")
+
+    except Exception as e:
+        print(f"[ERRO CRÍTICO] Falha no processamento: {e}")
+        
+    finally:
+        # [CLEANUP]: Garantia absoluta de limpeza do disco e RAM
+        print("[CLEANUP] Executando rotina de higienização do servidor...")
         if os.path.exists(file_path):
             os.remove(file_path)
         
-        del raw_text, clean_md, chunks, supabase_payload
+        # Tenta deletar variáveis pesadas se elas existirem neste escopo
+        for var in ['raw_text', 'clean_md', 'chunks', 'supabase_payload']:
+            if var in locals():
+                del locals()[var]
+                
         gc.collect()
-    except Exception as e:
-        print(f"[ERRO CRÍTICO] Falha no processamento: {e}")
 
+# 4. PONTO DE ENTRADA (CLI)
 if __name__ == "__main__":
     if len(sys.argv) < 5:
         print("[ERRO] Parâmetros insuficientes passados para o pipeline,", file=sys.stderr)

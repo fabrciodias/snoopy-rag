@@ -1,6 +1,9 @@
+# 1. IMPORTAÇÕES
 import json
+import sys
 from google.genai import types
 
+# 2. MOTOR DE EXTRAÇÃO (LLM)
 def get_metadata(markdown_text, client):
     prompt = """
     Você é um bibliotecário acadêmico especialista em extração de metadados.
@@ -32,5 +35,5 @@ def get_metadata(markdown_text, client):
         )
         return json.loads(response.text)
     except Exception as e:
-        print(f"[ERRO LLM] Erro ao extrair metadados: {e}")
+        print(f"[ERRO LLM] Erro ao extrair metadados: {e}", file=sys.stderr)
         return {}

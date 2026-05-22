@@ -1,75 +1,19 @@
+// 1. IMPORTAÇÕES E INICIALIZAÇÃO 
 import { appState, PUBLIC_FOLDER_ID, initAuth, login, logout, fetchUserFolder, linkDriveFolder, disconnectFolder } from './auth.js';
 import { fetchHistory, saveHistory, streamSearch, streamSync } from './api.js';
 import { dom, resetToHome, showSearchState, updateLog, showError, renderResults, renderHistoryList } from './ui.js';
+
 lucide.createIcons();
 
+
+// 2. ESTADO LOCAL DE EXECUÇÃO 
 let isSearching = false;
 let isSyncing = false;
 
-dom.btnLogin.addEventListener('click', login);
-dom.btnNewSearch?.addEventListener('click', resetToHome);
-dom.btnSidebarNew.addEventListener('click', resetToHome);
-
-dom.btnMobileMenu?.addEventListener('click', () => {
-    dom.sidebar.classList.add('mobile-open');
-    dom.mobileOverlay.classList.add('active');
-});
-
-dom.mobileOverlay?.addEventListener('click', () => {
-    dom.sidebar.classList.remove('mobile-open');
-    dom.layoutGrid.classList.remove('evidence-active');
-    dom.mobileOverlay.classList.remove('active');
-});
-
-if (dom.btnCloseEvidence) {
-    dom.btnCloseEvidence.addEventListener('click', () => {
-        dom.layoutGrid.classList.remove('evidence-active');
-        dom.mobileOverlay.classList.remove('active'); // Adiciona isso
-    });
-}
-
-dom.logoBtn.addEventListener('click', () => {
-    if (dom.sidebar.classList.contains('collapsed')) {
-        dom.sidebar.classList.remove('collapsed');
-    } else {
-        resetToHome();
-    }
-});
-
-document.getElementById('btn-theme-toggle').addEventListener('click', () => {
-    const isLight = document.body.classList.toggle('light-theme');
-    
-    const btn = document.getElementById('btn-theme-toggle');
-    if (btn) {
-        btn.innerHTML = `
-            <i data-lucide="${isLight ? 'sun' : 'moon'}" class="icon-sm"></i>
-            <span class="nav-title" style="font-size: 0.85rem;">Tema</span>
-        `;
-        lucide.createIcons();
-    }
-});
-
-document.getElementById('btn-nav-folder').addEventListener('click', () => {
-    if (dom.sidebar.classList.contains('collapsed')) {
-        dom.sidebar.classList.remove('collapsed');
-    }
-    dom.folderSelector.focus(); 
-});
-
-document.getElementById('btn-nav-history').addEventListener('click', () => {
-    if (dom.sidebar.classList.contains('collapsed')) {
-        dom.sidebar.classList.remove('collapsed');
-    }
-});
-
-dom.folderSelector.addEventListener('change', (e) => {
-    appState.folderId = e.target.value;
-    console.log("Contexto de busca alterado para:", appState.folderId);
-});
-
+// 3. CICLO DE VIDA (BOOT E AUTENTICAÇÃO) 
 async function reloadHistory() {
     if (!appState.userToken) {
-        dom.historyList.innerHTML = '<p class="history-empty">Faça login para ver seu histórico.</p>';
+        dom.historyList.innerHTML = '<p class="history-empty">Faça login para ver o seu histórico.</p>';
         return;
     }
     const history = await fetchHistory();
@@ -77,11 +21,13 @@ async function reloadHistory() {
 }
 
 initAuth(async (session) => {
+    // Configuração base da interface de Acervos
     dom.folderContainer.classList.remove('hidden');
     dom.folderSelector.innerHTML = `<option value="${PUBLIC_FOLDER_ID}">Acervo Público</option>`;
     appState.folderId = PUBLIC_FOLDER_ID;
 
     if (session) {
+        // Estado: Logado
         appState.userToken = session.access_token;
         dom.btnLogin.classList.add('hidden');
         dom.userInfo.classList.remove('hidden');
@@ -90,6 +36,7 @@ initAuth(async (session) => {
 
         const folderData = await fetchUserFolder(session.user.id);
         if (folderData) {
+            // Tem acervo privado vinculado
             const option = document.createElement('option');
             option.value = folderData.id;
             option.textContent = folderData.name;
@@ -101,26 +48,31 @@ initAuth(async (session) => {
             dom.btnSync.classList.remove('hidden');
             dom.btnRemoveFolder.classList.remove('hidden');
         } else {
+            // Sem acervo privado
             dom.btnDrive.classList.remove('hidden');
             dom.btnRemoveFolder.classList.add('hidden');
         }
     } else {
+        // Estado: Deslogado
         appState.userToken = null;
         dom.btnLogin.classList.remove('hidden');
         dom.userInfo.classList.add('hidden');
         dom.btnDrive.classList.add('hidden');
     }
+    
     appState.isAuthLoaded = true;
     reloadHistory();
 });
 
+// 4. CONTROLADORES CORE (Lógica Principal) 
 async function executeSearch(query) {
     if (!query.trim() || isSearching) return;
-    if (!appState.isAuthLoaded) return alert("Sistema inicializando... Aguarde.");
+    if (!appState.isAuthLoaded) return alert("Sistema a inicializar... Aguarde.");
     if (!appState.folderId) return alert("Nenhum acervo carregado.");
 
     isSearching = true;
 
+    // Recolhe menus no mobile ao pesquisar
     if (window.innerWidth <= 850) {
         dom.sidebar.classList.remove('mobile-open');
         dom.mobileOverlay.classList.remove('active');
@@ -137,16 +89,93 @@ async function executeSearch(query) {
         },
         onError: showError
     });
+    
     isSearching = false;
 }
+
+// 5. EVENT LISTENERS: NAVEGAÇÃO E UI
+// Ações de Reset e Navegação Principal
+dom.btnNewSearch?.addEventListener('click', resetToHome);
+dom.btnSidebarNew.addEventListener('click', resetToHome);
+dom.logoBtn.addEventListener('click', () => {
+    if (dom.sidebar.classList.contains('collapsed')) {
+        dom.sidebar.classList.remove('collapsed');
+    } else {
+        resetToHome();
+    }
+});
+
+// Comportamentos Mobile
+dom.btnMobileMenu?.addEventListener('click', () => {
+    dom.sidebar.classList.add('mobile-open');
+    dom.mobileOverlay.classList.add('active');
+});
+
+dom.mobileOverlay?.addEventListener('click', () => {
+    dom.sidebar.classList.remove('mobile-open');
+    dom.layoutGrid.classList.remove('evidence-active');
+    dom.mobileOverlay.classList.remove('active');
+});
+
+if (dom.btnCloseEvidence) {
+    dom.btnCloseEvidence.addEventListener('click', () => {
+        dom.layoutGrid.classList.remove('evidence-active');
+        dom.mobileOverlay.classList.remove('active');
+    });
+}
+
+// Toggle da Sidebar (Desktop vs Mobile)
+dom.sidebarToggle.addEventListener('click', () => {
+    if (window.innerWidth <= 850) {
+        dom.sidebar.classList.remove('mobile-open');
+        dom.mobileOverlay.classList.remove('active');
+    } else {
+        dom.sidebar.classList.toggle('collapsed');
+    }
+});
+
+// Alternador de Tema (Light/Dark)
+document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+    const isLight = document.body.classList.toggle('light-theme');
+    const btn = document.getElementById('btn-theme-toggle');
+    if (btn) {
+        btn.innerHTML = `
+            <i data-lucide="${isLight ? 'sun' : 'moon'}" class="icon-sm"></i>
+            <span class="nav-title" style="font-size: 0.85rem;">Tema</span>
+        `;
+        lucide.createIcons();
+    }
+});
+
+// Atalhos da Sidebar Colapsada
+document.getElementById('btn-nav-folder').addEventListener('click', () => {
+    if (dom.sidebar.classList.contains('collapsed')) dom.sidebar.classList.remove('collapsed');
+    dom.folderSelector.focus(); 
+});
+
+document.getElementById('btn-nav-history').addEventListener('click', () => {
+    if (dom.sidebar.classList.contains('collapsed')) dom.sidebar.classList.remove('collapsed');
+});
+
+dom.folderSelector.addEventListener('change', (e) => {
+    appState.folderId = e.target.value;
+    console.log("Contexto de busca alterado para:", appState.folderId);
+});
+
+// --- 6. EVENT LISTENERS: INTEGRAÇÕES E MODAIS ---
+// Execução de Pesquisa
 dom.homeForm.addEventListener('submit', (e) => {
     e.preventDefault();
     executeSearch(dom.inputHome.value);
 });
 
+// Autenticação
+dom.btnLogin.addEventListener('click', login);
+
+// Conexão com Google Drive (Picker)
 dom.btnDrive.addEventListener('click', () => {
-    if (!appState.pickerApiLoaded) return alert("A API do Google ainda está carregando...");
-    if (!appState.googleToken) return alert("Token expirado. Faça login novamente.");
+    if (!appState.pickerApiLoaded) return alert("A API do Google ainda está a carregar...");
+    if (!appState.googleToken) return alert("Sessão expirada. Faça login novamente.");
 
     const view = new google.picker.DocsView()
         .setIncludeFolders(true)
@@ -168,15 +197,16 @@ dom.btnDrive.addEventListener('click', () => {
     picker.setVisible(true);
 });
 
+// Sincronização Manual do Acervo
 dom.btnSync.addEventListener('click', async () => {
-    if (!appState.folderId || appState.folderId === PUBLIC_FOLDER_ID) return alert("Selecione seu Acervo Privado para sincronizar.");
+    if (!appState.folderId || appState.folderId === PUBLIC_FOLDER_ID) return alert("Selecione o seu Acervo Privado para sincronizar.");
     if (!appState.googleToken) return alert("Sessão do Drive expirada. Faça login novamente.");
     if (isSyncing) return;
 
     isSyncing = true;
     dom.btnSync.disabled = true;
     dom.btnSync.style.opacity = '0.5';
-    dom.syncLogs.textContent = "Conectando ao servidor...";
+    dom.syncLogs.textContent = "A conectar ao servidor...";
 
     await streamSync({
         onLog: (msg) => dom.syncLogs.textContent = msg,
@@ -190,15 +220,7 @@ dom.btnSync.addEventListener('click', async () => {
     setTimeout(() => { dom.syncLogs.textContent = ""; }, 5000);
 });
 
-dom.sidebarToggle.addEventListener('click', () => {
-    if (window.innerWidth <= 850) {
-        dom.sidebar.classList.remove('mobile-open');
-        dom.mobileOverlay.classList.remove('active');
-    } else {
-        dom.sidebar.classList.toggle('collapsed');
-    }
-});
-
+// Lógica da Modal de Configurações (Sala de Máquinas)
 dom.btnSettings?.addEventListener('click', () => {
     dom.settingsModal.classList.remove('hidden');
     setTimeout(() => dom.settingsModal.classList.add('active'), 10); 
@@ -210,6 +232,7 @@ const closeModal = () => {
 };
 
 dom.btnCloseModal?.addEventListener('click', closeModal);
+
 dom.settingsModal?.addEventListener('click', (e) => {
     if (e.target === dom.settingsModal) closeModal(); // Fecha se clicar fora da caixa
 });
@@ -220,22 +243,7 @@ dom.btnLogout?.addEventListener('click', () => {
 });
 
 dom.btnRemoveFolder?.addEventListener('click', () => {
-    if(confirm("Tem certeza? Isso vai desvincular seu acervo do Drive.")) {
+    if(confirm("Tem a certeza? Isto vai desvincular o seu acervo do Drive.")) {
         disconnectFolder();
     }
 });
-
-/*
-
-const btnRemove = document.createElement('button');
-btnRemove.id = 'btn-remove-folder';
-btnRemove.className = 'btn-outline';
-btnRemove.style.color = '#dc3545';  
-btnRemove.style.borderColor = '#dc3545';
-btnRemove.style.padding = '0 10px';
-btnRemove.title = "Desconectar Acervo";
-btnRemove.textContent = "✖";
-btnRemove.onclick = disconnectFolder;
-dom.btnSync.parentNode.insertBefore(btnRemove, dom.btnSync.nextSibling);
-
-*/

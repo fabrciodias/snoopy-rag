@@ -1,3 +1,4 @@
+# 1. IMPORTAÇÕES 
 import os 
 import json
 import sys
@@ -7,15 +8,20 @@ from google import genai
 from google.genai import types
 from supabase import create_client, Client
 
+# 2. CONFIGURAÇÕES GLOBAIS
 load_dotenv()
 
+# Silencia logs barulhentos das bibliotecas HTTP para não poluir o Node.js
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("google_genai").setLevel(logging.WARNING)
 logging.getLogger("google_genai.models").setLevel(logging.WARNING)
 
+# 3. FUNÇÕES UTILITÁRIAS DE TELEMETRIA 
 def ui_log(message):
+    """Envia logs em tempo real (SSE) para o front-end via stderr"""
     print(f"UI_LOG::{message}", file=sys.stderr, flush=True)
 
+# 4. MOTOR LÓGICO E ROTEAMENTO 
 def decompose_query(query, client):
     prompt = f"""
     Você é um roteador de buscas acadêmicas de alta precisão.
@@ -46,10 +52,12 @@ def decompose_query(query, client):
         )
         return json.loads(response.text)
     except Exception as e:
-        print(f"[AVISO] Falha na decomposição, usando query original: {e}")
+        print(f"[AVISO] Falha na decomposição, usando query original: {e}", file=sys.stderr)
         return [query]
 
+# 5. PIPELINE DE BUSCA E SÍNTESE (RAG CORE)
 def init_search(search_query, user_id, folder_id, gemini_api_key):
+    # 5.1. Inicialização de Clientes
     SUPABASE_URL = os.environ.get("SUPABASE_URL")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 
@@ -60,19 +68,22 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     client = genai.Client(api_key=gemini_api_key)
     
+    # 5.2. Decomposição da Pergunta
     ui_log("Analisando estrutura da pergunta...")
     queries = decompose_query(search_query, client)
     all_results = []
 
+    # 5.3. Varredura Vetorial no Supabase
     ui_log(f"Escaneando o acervo em busca de respostas...")
     for q in queries:
         try:
             response = client.models.embed_content(
-                model='gemini-embedding-001',
+                model='text-embedding-004',
                 contents=q,
                 config=types.EmbedContentConfig(output_dimensionality=768)
             )
             query_vector = response.embeddings[0].values
+            
             rpc_response = supabase.rpc('match_chunks', {
                 'query_embedding': query_vector,
                 'match_threshold': 0.4,
@@ -97,6 +108,7 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
         except Exception as e:
             print(f"Erro na busca vetorizada: {e}", file=sys.stderr)
     
+    # 5.4. Deduplicação de Contextos (Remove trechos idênticos retornados por sub-buscas diferentes)
     unique_text = {}
     for res in all_results:
         clean_text = " ".join(res['text'].split()).lower()
@@ -112,8 +124,10 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
         
     top_results = unique_results[:10]
    
+    # 5.5. Formatação do Contexto para a LLM e Agrupamento de Referências
     context = ""
     unique_docs = {}
+    
     for idx, res in enumerate(top_results):
         trecho_num = str(idx + 1)
         context += f"[TRECHO {trecho_num}]\n{res['text']}\n\n"
@@ -133,6 +147,7 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
             
     used_fonts = list(unique_docs.values())
 
+    # 5.6. Geração da Síntese (O Dossiê Final)
     ui_log(f"Lendo referências e extraindo síntese...")
 
     prompt_rag = f"""
@@ -150,6 +165,7 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
         CONTEXTOS RECUPERADOS (Use o número do TRECHO para as citações):
         {context}
         """
+        
     try:
         llm_response = client.models.generate_content(
             model='gemini-2.5-flash',
@@ -166,12 +182,16 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
             "sources": used_fonts,
             "chunks": texts_list
         }
-        ui_log("Finalizando formatação da resposta...")
-        print(json.dumps(final_output, ensure_ascii=False, indent=2))
-    except Exception as e:
-        print(f"Erro ao processar a busca: {e}", file=sys.stderr)
-        print(json.dumps({"error": str(e)}, ensure_ascii=False))
         
+        ui_log("Finalizando formatação da resposta...")
+        # O Node.js está escutando o stdout para extrair este JSON
+        print(json.dumps(final_output, ensure_ascii=False, indent=2))
+        
+    except Exception as e:
+        print(f"Erro ao processar a síntese final: {e}", file=sys.stderr)
+        print(json.dumps({"error": str(e)}, ensure_ascii=False))
+
+# 6. PONTO DE ENTRADA (CLI) 
 if __name__ == '__main__':
     if len(sys.argv) < 5:
         print(json.dumps({"error": "Parâmetros insuficientes passados pelo Node.js."}, ensure_ascii=False))
