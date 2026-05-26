@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import fitz
 import os
 import re
@@ -5,28 +9,22 @@ import re
 def extract_pdf_data(file_path):
     metadata = {}
     text = ""
-
-    # Verifica se o arquivo existe antes de abrir
     if not os.path.exists(file_path):
         print(f"[ERROR] Arquivo não encontrado: {file_path}")
         return metadata, text
         
     try:
-        # Abre o documento e captura metadados (autor, título, etc.)
-        doc = fitz.open(file_path)
-        metadata = {k: v for k, v in doc.metadata.items()}
-        
-        for page in doc:
-            # Extrai blocos de texto (b[6] == 0 filtra apenas texto, ignorando imagens/vetores)
-            for b in page.get_text("blocks"):
+        pdf_document = fitz.open(file_path)
+        metadata = {k: v for k, v in pdf_document.metadata.items()}
+        for page in pdf_document:
+            blocks = page.get_text("blocks")
+            for b in blocks:
                 if b[6] == 0:
-                    # Normaliza espaços múltiplos e limpa quebras de linha dentro do bloco
-                    line = re.sub(r' {2,}', ' ', b[4].strip().replace('\n', ' '))
-                    if line:
-                        text += line + "\n\n"
-        
-        doc.close()
+                    block_text = re.sub(r' {2,}', ' ', b[4].strip().replace('\n', ' '))
+                    if block_text:
+                        text += block_text + "\n\n"
+        pdf_document.close()
     except Exception as e:
-        print(f"[ERRO] Falha ao processar PDF: {e}")
+        print(f"[ERRO] Falha ao ler '{file_path}': {e}")
         
     return metadata, text

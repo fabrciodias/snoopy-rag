@@ -723,7 +723,173 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   9. RESPONSIVIDADE (MOBILE & TABLET)
+   9. MODAIS E SOBREPOSIÇÕES
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 420px;
+    padding: var(--space-lg);
+    transform: translateY(20px) scale(0.95);
+    transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.modal-overlay.active .modal-content {
+    transform: translateY(0) scale(1);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--space-md);
+}
+
+.modal-header h3 { font-size: 1.15rem; font-weight: 600; color: var(--text-main); }
+.setting-group h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
+.setting-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; }
+
+
+.btn-danger {
+    width: 100%;
+    padding: 10px;
+    background-color: transparent;
+    color: #ef4444; 
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    transition: all var(--trans-fast);
+}
+
+.btn-danger:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+}
+
+/* --------------------------------------------------------------------------
+   10. READING VIEW (MODO LEITURA IMERSIVO)
+   -------------------------------------------------------------------------- */
+#reading-view {
+    background-color: var(--bg-app);
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.reading-layout {
+    padding: 60px 20px 100px 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.reading-container {
+    width: 100%;
+    max-width: 720px; /* A largura de ouro para leitura (Substack/Notion) */
+    display: flex;
+    flex-direction: column;
+    gap: 40px; /* Respiro gigante entre as quebras de seção */
+}
+
+/* O Bloco de Texto (Chunk) */
+.reading-chunk {
+    position: relative;
+    font-size: 1.15rem; 
+    line-height: 1.85;
+    color: var(--text-main);
+    padding-right: 45px; /* Deixa um espaço na direita pro botão fantasma não morder o texto */
+    transition: color var(--trans-fast);
+}
+
+.reading-chunk-section {
+    font-size: 0.8rem;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: block;
+    opacity: 0.7;
+}
+
+/* O Botão Fantasma de Tradução */
+.btn-translate-chunk {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0; /* Invisível por padrão */
+    transform: translateX(10px);
+    transition: all var(--trans-fast);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* A mágica do Hover */
+.reading-chunk:hover .btn-translate-chunk {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.btn-translate-chunk:hover {
+    background-color: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    transform: scale(1.1);
+}
+
+.btn-translate-chunk:active {
+    transform: scale(0.95);
+}
+
+/* Animaçãozinha marota pra quando o texto estiver sendo traduzido */
+.translating-pulse {
+    animation: pulse-text 1.5s infinite alternate;
+}
+
+@keyframes pulse-text {
+    0% { opacity: 0.5; }
+    100% { opacity: 1; color: var(--primary); }
+}
+
+/* --------------------------------------------------------------------------
+   11. RESPONSIVIDADE (MOBILE & TABLET)
    -------------------------------------------------------------------------- */
 
 /* Esconde elementos exclusivos do mobile em telas grandes */
@@ -835,77 +1001,18 @@ body {
         border-radius: 10px;
         margin: 0 auto 15px auto;
     }
-}
 
-/* --------------------------------------------------------------------------
-   10. MODAIS E SOBREPOSIÇÕES
-   -------------------------------------------------------------------------- */
-.modal-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.25s ease, visibility 0.25s ease;
-}
-
-.modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.modal-content {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    width: 90%;
-    max-width: 420px;
-    padding: var(--space-lg);
-    transform: translateY(20px) scale(0.95);
-    transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-}
-
-.modal-overlay.active .modal-content {
-    transform: translateY(0) scale(1);
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-lg);
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: var(--space-md);
-}
-
-.modal-header h3 { font-size: 1.15rem; font-weight: 600; color: var(--text-main); }
-.setting-group h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
-.setting-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; }
-
-/* Botão Destrutivo (Perigo) */
-.btn-danger {
-    width: 100%;
-    padding: 10px;
-    background-color: transparent;
-    color: #ef4444; /* Vermelho Erro */
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: var(--radius-md);
-    font-weight: 500;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-sm);
-    transition: all var(--trans-fast);
-}
-
-.btn-danger:hover {
-    background-color: rgba(239, 68, 68, 0.1);
-    border-color: #ef4444;
+    .reading-layout { padding: 30px 15px 80px 15px; }
+    .reading-chunk { font-size: 1.05rem; padding-right: 0; }
+    
+    .btn-translate-chunk {
+        position: relative;
+        opacity: 1;
+        transform: none;
+        float: right;
+        margin: 5px 0 10px 15px;
+        background-color: transparent;
+        border: 1px dashed var(--border-color);
+        box-shadow: none;
+    }
 }

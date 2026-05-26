@@ -11,6 +11,9 @@ from supabase import create_client, Client
 # 2. CONFIGURAÇÕES GLOBAIS
 load_dotenv()
 
+if "GOOGLE_API_KEY" in os.environ:
+    del os.environ["GOOGLE_API_KEY"]
+
 # Silencia logs barulhentos das bibliotecas HTTP para não poluir o Node.js
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("google_genai").setLevel(logging.WARNING)
@@ -77,8 +80,9 @@ def init_search(search_query, user_id, folder_id, gemini_api_key):
     ui_log(f"Escaneando o acervo em busca de respostas...")
     for q in queries:
         try:
+            # MODELO ATUALIZADO
             response = client.models.embed_content(
-                model='text-embedding-004',
+                model='gemini-embedding-2',
                 contents=q,
                 config=types.EmbedContentConfig(output_dimensionality=768)
             )

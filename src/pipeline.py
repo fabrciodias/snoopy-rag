@@ -18,6 +18,9 @@ from chunker import semantic_chunking
 # 2. CONFIGURAÇÕES E CLIENTES GLOBAIS
 load_dotenv()
 
+if "GOOGLE_API_KEY" in os.environ:
+    del os.environ["GOOGLE_API_KEY"]
+
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -85,8 +88,9 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
             batch = chunks[i : i + batch_size]
             texts = [c['text'] for c in batch]
 
+            # MODELO ATUALIZADO
             response = gemini_client.models.embed_content(
-                model='text-embedding-004',
+                model='gemini-embedding-2',
                 contents=texts,
                 config=types.EmbedContentConfig(output_dimensionality=768)            
             )

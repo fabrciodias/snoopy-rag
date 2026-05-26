@@ -131,7 +131,7 @@
                     <aside class="evidence-section">
                         <div class="bottom-sheet-handle"></div>
                         
-                        <div class="evidence-sticky-header" style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: -24px; background-color: var(--bg-panel); z-index: 10; padding: 24px 0 10px 0; margin: -24px 0 15px 0;">
+                        <div class="evidence-sticky-header" style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: -24px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border-color); z-index: 10; padding: 24px 24px 10px 24px; margin: -24px -24px 15px -24px;">
                             <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-main); margin: 0;">Trecho Original</h3>
                             <button id="btn-close-evidence" class="btn-icon" title="Fechar painel" style="margin-right: -8px;">
                                 <i data-lucide="x"></i>
@@ -142,6 +142,27 @@
                         
                         <p id="chunk-abnt" class="evidence-subtitle" style="font-size: 0.82rem; color: var(--text-muted); font-family: monospace; margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px;">Aguardando metadados da fonte...</p>
                     </aside>
+                </main>
+            </div>
+
+            <div id="reading-view" class="view">
+                <header class="topbar" style="justify-content: flex-start; gap: 20px;">
+                    <button id="btn-close-reading" class="btn-outline" style="width: auto; padding: 6px 12px; border: none;" title="Voltar para a pesquisa">
+                        <i data-lucide="arrow-left" class="icon-sm"></i> Voltar
+                    </button>
+                    
+                    <div style="flex-grow: 1; overflow: hidden;">
+                        <h2 id="reading-title" class="sticky-query" style="max-width: 100%;">Título do Documento</h2>
+                    </div>
+
+                    <a id="reading-original-link" href="#" target="_blank" class="btn-primary-full" style="width: auto; padding: 8px 16px; font-size: 0.85rem; text-decoration: none;">
+                        <i data-lucide="external-link" class="icon-sm"></i> PDF Original
+                    </a>
+                </header>
+
+                <main class="reading-layout">
+                    <div id="reading-content" class="reading-container">
+                    </div>
                 </main>
             </div>
         </div>

@@ -8,6 +8,7 @@ lucide.createIcons();
 
 // 2. ESTADO LOCAL DE EXECUÇÃO 
 let isSearching = false;
+let isUiInitialized = false;
 let isSyncing = false;
 
 // 3. CICLO DE VIDA (BOOT E AUTENTICAÇÃO) 
@@ -21,36 +22,39 @@ async function reloadHistory() {
 }
 
 initAuth(async (session) => {
-    // Configuração base da interface de Acervos
-    dom.folderContainer.classList.remove('hidden');
-    dom.folderSelector.innerHTML = `<option value="${PUBLIC_FOLDER_ID}">Acervo Público</option>`;
-    appState.folderId = PUBLIC_FOLDER_ID;
+    // Se for o primeiro carregamento, constrói a base do zero
+    if (!isUiInitialized) {
+        dom.folderContainer.classList.remove('hidden');
+        dom.folderSelector.innerHTML = `<option value="${PUBLIC_FOLDER_ID}">Acervo Público</option>`;
+        appState.folderId = PUBLIC_FOLDER_ID;
+    }
 
     if (session) {
-        // Estado: Logado
+        // Estado: Logado (Atualiza dados do usuário sempre)
         appState.userToken = session.access_token;
         dom.btnLogin.classList.add('hidden');
         dom.userInfo.classList.remove('hidden');
         dom.userAvatar.src = session.user.user_metadata.avatar_url;
         dom.userName.textContent = session.user.user_metadata.full_name || 'Usuário';
 
-        const folderData = await fetchUserFolder(session.user.id);
-        if (folderData) {
-            // Tem acervo privado vinculado
-            const option = document.createElement('option');
-            option.value = folderData.id;
-            option.textContent = folderData.name;
-            dom.folderSelector.appendChild(option);
-            dom.folderSelector.value = folderData.id;
-            appState.folderId = folderData.id;
-            
-            dom.btnDrive.classList.add('hidden');
-            dom.btnSync.classList.remove('hidden');
-            dom.btnRemoveFolder.classList.remove('hidden');
-        } else {
-            // Sem acervo privado
-            dom.btnDrive.classList.remove('hidden');
-            dom.btnRemoveFolder.classList.add('hidden');
+        // Só busca a pasta no banco e injeta no dropdown se a UI não foi inicializada ainda
+        if (!isUiInitialized) {
+            const folderData = await fetchUserFolder(session.user.id);
+            if (folderData) {
+                const option = document.createElement('option');
+                option.value = folderData.id;
+                option.textContent = folderData.name;
+                dom.folderSelector.appendChild(option);
+                dom.folderSelector.value = folderData.id;
+                appState.folderId = folderData.id;
+                
+                dom.btnDrive.classList.add('hidden');
+                dom.btnSync.classList.remove('hidden');
+                dom.btnRemoveFolder.classList.remove('hidden');
+            } else {
+                dom.btnDrive.classList.remove('hidden');
+                dom.btnRemoveFolder.classList.add('hidden');
+            }
         }
     } else {
         // Estado: Deslogado
@@ -61,7 +65,12 @@ initAuth(async (session) => {
     }
     
     appState.isAuthLoaded = true;
-    reloadHistory();
+    
+    // Evita reinicialização em backgorund
+    if (!isUiInitialized) {
+        reloadHistory();
+        isUiInitialized = true;
+    }
 });
 
 // 4. CONTROLADORES CORE (Lógica Principal) 
@@ -246,4 +255,10 @@ dom.btnRemoveFolder?.addEventListener('click', () => {
     if(confirm("Tem certeza? Isso vai desvincular seu acervo do Drive.")) {
         disconnectFolder();
     }
+});
+
+// 7. EVENT LISTENERS: MODO LEITURA
+dom.btnCloseReading?.addEventListener('click', () => {
+    dom.readingView.classList.remove('active');
+    dom.resultView.classList.add('active');
 });

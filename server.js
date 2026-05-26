@@ -193,68 +193,67 @@ app.post('/api/sync', async (req, res) => {
 
         // PASSO 5: A Esteira de Processamento (Download e Extração via Python)
         sendLog(`Encontrado ${newFiles.length} novo(s) arquivo(s). Iniciando esteira sequencial...`);
-        
         for (let i = 0; i < newFiles.length; i++) {
             const file = newFiles[i];
-            const currentIdx = i + 1;
+            const currentIdx = i+1;
 
-            sendLog(`[${currentIdx}/${newFiles.length}] Baixando binário de: "${file.name}"...`);
-            const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
-            
-            const downloadRes = await fetch(downloadUrl, { headers: { 'Authorization': `Bearer ${google_token}` } });
+            try { 
+                sendLog(`[${currentIdx}/${newFiles.length}] Baixando binário de: "${file.name}"...`);
+                const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+                
+                const downloadRes = await fetch(downloadUrl, {
+                    headers: { 'Authorization': `Bearer ${google_token}` }
+                });
 
-            if (!downloadRes.ok) {
-                console.error(`Falha ao baixar ${file.name}`);
+                if (!downloadRes.ok) {
+                    console.error(`Falha ao baixar ${file.name}`);
+                    continue; 
+                }
+
+                const arrayBuffer = await downloadRes.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+
+                const tempDir = path.join(__dirname, 'data', 'raw_pdfs');
+                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+                const tempPath = path.join(tempDir, `${file.id}.pdf`);
+                fs.writeFileSync(tempPath, buffer);
+
+                sendLog(`[${currentIdx}/${newFiles.length}] Triturando e vetorizando: "${file.name}"...`);
+
+                await new Promise((resolve) => {
+                    const pythonProcess = spawn('./.venv/bin/python3', [
+                        'src/pipeline.py', tempPath, file.id, userId, folder_id, file.webViewLink
+                    ]);
+
+                    pythonProcess.stdout.on('data', (data) => {
+                        const lines = data.toString().split('\n');
+                        for (const line of lines) {
+                            if (line.trim()) console.log(`[PYTHON PIPELINE]: ${line.trim()}`);
+                        }
+                    });
+
+                    pythonProcess.stderr.on('data', (data) => {
+                        const lines = data.toString().split('\n');
+                        for (const line of lines) {
+                            const msg = line.trim();
+                            if (msg && !msg.includes("DEBUG") && !msg.includes("INFO")) {
+                                console.log(`[PIPELINE SYS LOG]: ${msg}`);
+                            }
+                        }
+                    });
+
+                    pythonProcess.on('close', (code) => {
+                        try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch(e) {}
+                        resolve();
+                    });
+                });
+            } catch (err) { 
+                sendLog(`[AVISO] Falha na rede ao processar "${file.name}". Pulando para o próximo.`);
+                console.error(`Erro no arquivo ${file.name}:`, err);
                 continue; 
             }
-
-            const arrayBuffer = await downloadRes.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-
-            const tempDir = path.join(__dirname, 'data', 'raw_pdfs');
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-            const tempPath = path.join(tempDir, `${file.id}.pdf`);
-            fs.writeFileSync(tempPath, buffer);
-
-            sendLog(`[${currentIdx}/${newFiles.length}] Triturando e vetorizando: "${file.name}"...`);
-
-            // Roda o Python e espera terminar antes de ir para o próximo PDF
-            await new Promise((resolve) => {
-                const pythonProcess = spawn('./.venv/bin/python3', [
-                    'src/pipeline.py', 
-                    tempPath, 
-                    file.id, 
-                    userId, 
-                    folder_id, 
-                    file.webViewLink
-                ]);
-
-                pythonProcess.stdout.on('data', (data) => {
-                    const lines = data.toString().split('\n');
-                    for (const line of lines) {
-                        if (line.trim()) console.log(`[PYTHON PIPELINE]: ${line.trim()}`);
-                    }
-                });
-
-                pythonProcess.stderr.on('data', (data) => {
-                    const lines = data.toString().split('\n');
-                    for (const line of lines) {
-                        const msg = line.trim();
-                        if (msg && !msg.includes("DEBUG") && !msg.includes("INFO")) {
-                            console.log(`[PIPELINE SYS LOG]: ${msg}`);
-                        }
-                    }
-                });
-
-                // Apaga o PDF temporário e resolve a Promise
-                pythonProcess.on('close', (code) => {
-                    try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch(e) {}
-                    resolve();
-                });
-            });
         }
-
         sendLog("Sincronização concluída com sucesso! Atualizando acervo...");
         res.write(`data: ${JSON.stringify({ type: 'result', status: 'success' })}\n\n`);
         res.end();
@@ -266,8 +265,69 @@ app.post('/api/sync', async (req, res) => {
     }
 });
 
+// 6. Modo Leitura
+app.get('/api/document-chunks', async (req, res) => {
+    const { title, folder_id } = req.query;
 
-// 5. INICIALIZAÇÃO DO SERVIDOR
+    console.log(`[MODO LEITURA] Buscando documento: "${title}" na pasta: ${folder_id}`);
+
+    if (!title || !folder_id) {
+        return res.status(400).json({ error: 'Título e folder_id são obrigatórios.' });
+    }
+
+    try {
+        // Busca o ID do documento usando o título exato
+        const { data: docData, error: docError } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('folder_id', folder_id)
+            .eq('title', title)
+            .limit(1);
+
+        if (docError) {
+            console.error("[MODO LEITURA] Erro no banco de dados:", docError);
+            return res.status(500).json({ error: 'Erro ao consultar o banco de dados: ' + docError.message });
+        }
+
+        let documentId;
+
+        // Se falhar a busca exata (problema de codificação ou espaços), tenta a busca aproximada (ilike)
+        if (!docData || docData.length === 0) {
+            console.log("[MODO LEITURA] Documento não encontrado com nome exato. Tentando busca tolerante (ilike)...");
+            
+            const { data: fallbackData } = await supabase
+                .from('documents')
+                .select('id')
+                .eq('folder_id', folder_id)
+                .ilike('title', `%${title.trim()}%`)
+                .limit(1);
+                
+            if (!fallbackData || fallbackData.length === 0) {
+                 return res.status(404).json({ error: `O documento original "${title}" não foi encontrado neste acervo.` });
+            }
+            documentId = fallbackData[0].id;
+        } else {
+            documentId = docData[0].id;
+        }
+
+        // Puxa todos os chunks pertencentes àquele documento
+        const { data: chunksData, error: chunksError } = await supabase
+            .from('chunks')
+            .select('id, content, section')
+            .eq('document_id', documentId)
+            .order('id', { ascending: true });
+
+        if (chunksError) throw chunksError;
+
+        console.log(`[MODO LEITURA] Sucesso! ${chunksData.length} chunks enviados para a interface.`);
+        res.json({ chunks: chunksData });
+    } catch (error) {
+        console.error('Anomalia ao recuperar chunks do acervo:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 7. INICIALIZAÇÃO DO SERVIDOR
 const PORT = 3333;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n=========================================`);
