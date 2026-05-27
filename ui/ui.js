@@ -153,8 +153,13 @@ export function renderResults(data) {
             header.appendChild(title);
             header.appendChild(btnLeitura);
 
+            // Formata a Gaveta
             const text = document.createElement('p');
-            text.textContent = chunk.text;
+            let cleanGaveta = chunk.text.replace(/\[SEÇÃO:.*?\]\s*/gi, '').trim();
+            cleanGaveta = cleanGaveta.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            text.innerHTML = cleanGaveta;
+            text.style.whiteSpace = 'pre-wrap'; 
+            text.style.lineHeight = '1.6';
         
             card.appendChild(header);
             card.appendChild(text);
@@ -183,7 +188,6 @@ export function renderResults(data) {
 
                 try {
                     const folderId = dom.folderSelector.value;
-                    
                     const res = await fetch(`/api/document-chunks?title=${encodeURIComponent(fonteOriginal.titulo)}&folder_id=${folderId}`);
                     
                     if (!res.ok) {
@@ -193,7 +197,6 @@ export function renderResults(data) {
                     
                     const docData = await res.json();
                     dom.readingContent.innerHTML = ''; 
-                    
                     let targetElement = null;
                     
                     docData.chunks.forEach((c) => {
@@ -207,14 +210,14 @@ export function renderResults(data) {
                             chunkDiv.appendChild(secSpan);
                         }
 
+                        // CORREÇÃO VISUAL
                         let cleanText = c.content.replace(/\[SEÇÃO:.*?\]\s*/gi, '').trim();
-                        cleanText = cleanText
-                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\n\n/g, '<br><br>');
+                        cleanText = cleanText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                         
                         const textSpan = document.createElement('span');
                         textSpan.className = 'chunk-text-content';
                         textSpan.innerHTML = cleanText;
+                        textSpan.style.whiteSpace = 'pre-wrap'; 
                         chunkDiv.appendChild(textSpan);
                         
                         const btnTranslate = document.createElement('button');
@@ -251,11 +254,10 @@ export function renderResults(data) {
                                 if (!tRes.ok) throw new Error();
                                 const tData = await tRes.json();
 
-                                let translatedClean = tData.translation
-                                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                    .replace(/\n\n/g, '<br><br>');
+                                let translatedClean = tData.translation.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                                 
-                                textSpan.innerHTML = `<strong>[Traduzido]:</strong> ${tData.translation}`;
+                                // INJEÇÃO DA TRADUÇÃO
+                                textSpan.innerHTML = `<strong style="color: var(--primary);">[Tradução Original]:</strong>\n\n${translatedClean}`;
                                 textSpan.style.color = 'var(--text-main)';
                             } catch (err) {
                                 alert('Incapaz de obter tradução da inteligência central. Tente novamente.');

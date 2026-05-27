@@ -171,7 +171,7 @@ dom.folderSelector.addEventListener('change', (e) => {
     console.log("Contexto de busca alterado para:", appState.folderId);
 });
 
-// --- 6. EVENT LISTENERS: INTEGRAÇÕES E MODAIS ---
+// 6. EVENT LISTENERS: INTEGRAÇÕES E MODAIS 
 // Execução de Pesquisa
 dom.homeForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -261,4 +261,23 @@ dom.btnRemoveFolder?.addEventListener('click', () => {
 dom.btnCloseReading?.addEventListener('click', () => {
     dom.readingView.classList.remove('active');
     dom.resultView.classList.add('active');
+});
+
+let lastScrollTop = 0;
+const readingTopbar = document.querySelector('.reading-topbar');
+
+dom.readingView?.addEventListener('scroll', () => {
+    const currentScroll = dom.readingView.scrollTop;
+    
+    if (currentScroll > 60) {
+        if (currentScroll > lastScrollTop) {
+            readingTopbar.classList.add('hidden-on-scroll');
+        } else {
+            readingTopbar.classList.remove('hidden-on-scroll');
+        }
+    } else {
+        readingTopbar.classList.remove('hidden-on-scroll');
+    }
+    
+    lastScrollTop = currentScroll;
 });

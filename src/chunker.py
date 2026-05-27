@@ -1,7 +1,3 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
 def semantic_chunking(markdown_text, doc_metadata, max_len=1500):
     paragraphs = markdown_text.split('\n\n')
     chunks = []

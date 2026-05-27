@@ -1,13 +1,10 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
 import re
 from collections import Counter
 
 def to_markdown(raw_text):
     if not raw_text: return ""
     
+    text = re.sub(r'[\uf000-\uf8ff]', '', raw_text)
     text = re.sub(r'\.{4,}', ' ', raw_text)
     paragraphs = text.split('\n\n')
     block_counts = Counter(p.strip() for p in paragraphs if len(p.strip()) > 15)

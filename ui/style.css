@@ -811,6 +811,55 @@ body {
     justify-content: center;
 }
 
+.reading-topbar {
+    display: grid !important;
+    grid-template-columns: 120px 1fr 120px; 
+    padding: 0 20px;
+    height: 60px;
+    gap: 15px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: var(--bg-app); 
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.reading-topbar.hidden-on-scroll {
+    transform: translateY(-100%);
+}
+
+.topbar-side {
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+.topbar-side.right {
+    justify-content: flex-end;
+}
+
+.topbar-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    height: 100%;
+}
+
+.topbar-center h2 {
+    text-align: center;
+    width: 100%;
+}
+
+.btn-reading-action {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    width: auto;
+    border-color: var(--border-color);
+    color: var(--text-main);
+    margin: 0;
+}
+
 .reading-container {
     width: 100%;
     max-width: 720px; /* A largura de ouro para leitura (Substack/Notion) */
@@ -1014,5 +1063,19 @@ body {
         background-color: transparent;
         border: 1px dashed var(--border-color);
         box-shadow: none;
+    }
+
+    .reading-topbar {
+        grid-template-columns: 40px 1fr 40px; 
+        padding: 0 10px;
+        gap: 10px;
+    }
+    
+    .hide-mobile {
+        display: none;
+    }
+    
+    .btn-reading-action {
+        padding: 8px; 
     }
 }

@@ -327,6 +327,46 @@ app.get('/api/document-chunks', async (req, res) => {
     }
 });
 
+// [ROTA]: Tradução Sob Demanda (Modo Leitura)
+app.post('/api/translate', async (req, res) => {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'Texto ausente.' });
+
+    try {
+        const prompt = `Você é um tradutor acadêmico especializado de alta precisão. 
+Traduza o seguinte trecho de um documento científico/acadêmico para o Português.
+Mantenha o rigor técnico, preserve integralmente jargões conceituais, e respeite fielmente o tom do autor original.
+Retorne APENAS o texto traduzido limpo, sem comentários ou aspas extras.
+
+TEXTO ORIGINAL:
+${text}`;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.1 }
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error?.message || 'Falha na API do Gemini');
+        }
+
+        const data = await response.json();
+        const translatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        
+        res.json({ translation: translatedText.trim() });
+    } catch (error) {
+        console.error('Falha na rota de tradução:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // 7. INICIALIZAÇÃO DO SERVIDOR
 const PORT = 3333;
 app.listen(PORT, '0.0.0.0', () => {
