@@ -951,7 +951,7 @@ body {
 }
 
 @media (max-width: 850px) {
-    /* 1. O Menu Sanduíche Flutuante */
+    /* 1. Menu Flutuante */
     .btn-mobile-menu {
         display: flex;
         position: fixed;
@@ -962,6 +962,11 @@ body {
         border-radius: var(--radius-md);
         border: 1px solid var(--border-color);
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    .btn-mobile-menu.menu-hidden {
+        transform: translateY(-150%);
     }
 
     #btn-new-search {

@@ -174,6 +174,7 @@ export function renderResults(data) {
                 dom.resultView.classList.remove('active');
                 dom.readingView.classList.add('active');
                 
+                dom.mobileOverlay.classList.remove('active');
                 dom.readingTitle.textContent = fonteOriginal.titulo;
                 const link = fonteOriginal.link || fonteOriginal.url || fonteOriginal.drive_link || '#';
                 dom.readingOriginalLink.href = link;

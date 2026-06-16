@@ -116,6 +116,7 @@ dom.logoBtn.addEventListener('click', () => {
 
 // Comportamentos Mobile
 dom.btnMobileMenu?.addEventListener('click', () => {
+    dom.sidebar.classList.remove('collapsed');
     dom.sidebar.classList.add('mobile-open');
     dom.mobileOverlay.classList.add('active');
 });
@@ -272,11 +273,14 @@ dom.readingView?.addEventListener('scroll', () => {
     if (currentScroll > 60) {
         if (currentScroll > lastScrollTop) {
             readingTopbar.classList.add('hidden-on-scroll');
+            dom.btnMobileMenu?.classList.add('menu-hidden'); 
         } else {
             readingTopbar.classList.remove('hidden-on-scroll');
+            dom.btnMobileMenu?.classList.remove('menu-hidden'); 
         }
     } else {
         readingTopbar.classList.remove('hidden-on-scroll');
+        dom.btnMobileMenu?.classList.remove('menu-hidden');
     }
     
     lastScrollTop = currentScroll;
