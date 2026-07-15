@@ -119,8 +119,16 @@ export function renderResults(data) {
     dom.sourcesContainer.innerHTML = '';
     dom.chunksContainer.innerHTML = '';
 
-    let formattedAnswer = data.answer.replace(/\[TRECHOS?\s*(\d+)\]/gi, (match, numero) => {
-        return `<span class="trecho-highlight" data-trecho="${numero}">${match}</span>`;
+let formattedAnswer = data.answer.replace(/\[([^\]]*TRECHO[^\]]*)\]/gi, (match) => {
+        // Extrai apenas os números que estão dentro do colchete
+        const numeros = match.match(/\d+/g);
+        if (!numeros) return match; 
+        
+        // Transforma cada número isolado num botão padronizado e funcional
+        const spans = numeros.map(num => `<span class="trecho-highlight" data-trecho="${num}">[TRECHO ${num}]</span>`);
+        
+        // Devolve os botões separados por vírgula para a fluidez da leitura
+        return spans.join(', ');
     });
 
     formattedAnswer = formattedAnswer
@@ -172,7 +180,7 @@ export function renderResults(data) {
             btnLeitura.addEventListener('click', async (e) => {
                 e.stopPropagation();
 
-                const fonteOriginal = data.sources.find(s => s.trechos && s.trechos.includes(chunk.num));
+                const fonteOriginal = data.sources.find(s => s.trechos && (s.trechos.includes(chunk.num) || s.trechos.includes(Number(chunk.num))));
                 if (!fonteOriginal) return alert('Impossível rastrear o documento original de origem deste trecho.');
                 
                 dom.resultView.classList.remove('active');
@@ -180,8 +188,12 @@ export function renderResults(data) {
                 
                 dom.mobileOverlay.classList.remove('active');
                 dom.readingTitle.textContent = fonteOriginal.titulo;
-                const link = fonteOriginal.link || fonteOriginal.url || fonteOriginal.drive_link || '#';
-                dom.readingOriginalLink.href = link;
+
+                let link = fonteOriginal.link || fonteOriginal.url || fonteOriginal.drive_link;
+                if (!link && fonteOriginal.drive_file_id) {
+                    link = `https://drive.google.com/file/d/${fonteOriginal.drive_file_id}/view`;
+                }
+                dom.readingOriginalLink.href = link || '#';
 
                 dom.readingContent.innerHTML = `
                     <div style="text-align: center; margin-top: 60px; color: var(--text-muted);">
@@ -322,7 +334,7 @@ export function renderResults(data) {
                 
                 const trechosAlvo = source.trechos || [];
                 document.querySelectorAll('.chunk-card').forEach(c => {
-                    if (trechosAlvo.includes(c.dataset.num)) {
+                    if (trechosAlvo.includes(c.dataset.num) || trechosAlvo.includes(Number(c.dataset.num))) {
                         c.classList.add('highlight-active');
                         c.style.opacity = '1';
                         c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -332,8 +344,11 @@ export function renderResults(data) {
                     }
                 });
                 
-                const link = source.link || source.url || source.drive_link;
-                if (link) window.open(link, '_blank');
+                let link = source.link || source.url || source.drive_link;
+                if (!link && source.drive_file_id) {
+                    link = `https://drive.google.com/file/d/${source.drive_file_id}/view`;
+                } 
+                if (link && link !== '#') window.open(link, '_blank');
             });
         });
     } else {
@@ -344,7 +359,7 @@ export function renderResults(data) {
     document.querySelectorAll('.trecho-highlight').forEach(tag => {
         tag.addEventListener('click', (e) => {
             const numeroTrecho = e.target.getAttribute('data-trecho');
-            const fonte = data.sources.find(s => s.trechos && s.trechos.includes(numeroTrecho));
+            const fonte = data.sources.find(s => s.trechos && (s.trechos.includes(numeroTrecho) || s.trechos.includes(Number(numeroTrecho))));
 
             if (fonte) {
                 const autores = fonte.autores && fonte.autores.length > 0

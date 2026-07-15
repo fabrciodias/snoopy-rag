@@ -71,7 +71,7 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
             "title": title,
             "authors": autores,
             "publication_year": ano,
-            "drive_link": drive_link,
+            "drive_link": f"https://drive.google.com/file/d/{file_id}/view",
             "drive_file_id": file_id
         }).execute()
 
