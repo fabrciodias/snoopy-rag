@@ -1,8 +1,7 @@
 // 1. IMPORTAÇÕES E INICIALIZAÇÃO 
 import { appState, PUBLIC_FOLDER_ID, initAuth, login, logout, fetchUserFolder, linkDriveFolder, disconnectFolder } from './auth.js';
-import { fetchHistory, saveHistory, streamSearch, streamSync } from './api.js';
-import { dom, resetToHome, showSearchState, updateLog, showError, renderResults, renderHistoryList } from './ui.js';
-
+import { fetchHistory, saveHistory, streamSearch, streamSync, fetchActiveJobs, listenToSyncQueue } from './api.js';
+import { dom, resetToHome, showSearchState, updateLog, showError, renderResults, renderHistoryList, renderSyncProgress } from './ui.js';
 lucide.createIcons();
 
 
@@ -51,6 +50,9 @@ initAuth(async (session) => {
                 dom.btnDrive.classList.add('hidden');
                 dom.btnSync.classList.remove('hidden');
                 dom.btnRemoveFolder.classList.remove('hidden');
+
+                listenToSyncQueue(renderSyncProgress);
+                fetchActiveJobs().then(renderSyncProgress);
             } else {
                 dom.btnDrive.classList.remove('hidden');
                 dom.btnRemoveFolder.classList.add('hidden');
@@ -170,6 +172,9 @@ document.getElementById('btn-nav-history').addEventListener('click', () => {
 dom.folderSelector.addEventListener('change', (e) => {
     appState.folderId = e.target.value;
     console.log("Contexto de busca alterado para:", appState.folderId);
+
+    listenToSyncQueue(renderSyncProgress);
+    fetchActiveJobs().then(renderSyncProgress);
 });
 
 // 6. EVENT LISTENERS: INTEGRAÇÕES E MODAIS 
@@ -221,13 +226,25 @@ dom.btnSync.addEventListener('click', async () => {
     await streamSync({
         onLog: (msg) => dom.syncLogs.textContent = msg,
         onResult: (statusMsg) => dom.syncLogs.textContent = statusMsg,
-        onError: (err) => dom.syncLogs.textContent = "Erro: " + err
+        onError: (err) => {
+            dom.syncLogs.textContent = "Falha na sincronização.";
+            if (err.includes("expirou") || err.includes("Acesso negado")) {
+                alert("Por segurança, a permissão para ler seu Google Drive expirou (limite de 60 min). O sistema fará o logout para você renovar o acesso e continuar sincronizando novos arquivos.");
+                logout();
+            } else {
+                alert("Erro: " + err);
+            }
+        }
     });
 
     isSyncing = false;
     dom.btnSync.disabled = false;
     dom.btnSync.style.opacity = '1';
     setTimeout(() => { dom.syncLogs.textContent = ""; }, 5000);
+});
+
+dom.btnToggleSync?.addEventListener('click', () => {
+    dom.syncProgressContainer.classList.toggle('expanded');
 });
 
 // Lógica da Modal de Configurações

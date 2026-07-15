@@ -2,6 +2,7 @@
 import os
 import gc
 import sys
+import time
 import hashlib
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -88,12 +89,26 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
             batch = chunks[i : i + batch_size]
             texts = [c['text'] for c in batch]
 
-            # MODELO ATUALIZADO
-            response = gemini_client.models.embed_content(
-                model='gemini-embedding-2',
-                contents=texts,
-                config=types.EmbedContentConfig(output_dimensionality=768)            
-            )
+            # Loop de Exponential Backoff 
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    response = gemini_client.models.embed_content(
+                        model='gemini-embedding-2',
+                        contents=texts,
+                        config=types.EmbedContentConfig(output_dimensionality=768)            
+                    )
+                    break
+
+                except Exception as api_err:
+                    if "429" in str(api_err) or "Too Many Requests" in str(api_err):
+                        if attempt == max_retries - 1:
+                            raise Exception("Falha crítica: Limite de taxa excedido repetidamente.")
+                        sleep_time = 2 * (2 ** attempt)
+                        print(f"[API LIMIT] Quase estourando cota. Pausando por {sleep_time}s...")
+                        time.sleep(sleep_time)
+                    else:
+                        raise api_err 
             
             supabase_payload = []
             for j, emb in enumerate(response.embeddings):
@@ -108,19 +123,24 @@ def memory_process(file_path, file_id, user_id, folder_id, drive_link=""):
                 
             supabase.table("chunks").insert(supabase_payload).execute()
             print(f"-> Lote {i+1} a {min(i+batch_size, len(chunks))} salvo no Supabase.")
-        
+
+            current_progress = int(((i + len(batch)) / len(chunks)) * 100)
+            supabase.table("jobs").update({
+                "progress": current_progress
+            }).eq("drive_file_id", file_id).eq("status", "processing").execute()
+
         print("\n[SUCESSO] Pipeline concluído!")
 
     except Exception as e:
         print(f"[ERRO CRÍTICO] Falha no processamento: {e}")
+        raise e
         
     finally:
-        # [CLEANUP]: Garantia absoluta de limpeza do disco e RAM
+        # [CLEANUP]: Limpeza do disco e RAM
         print("[CLEANUP] Executando rotina de higienização do servidor...")
         if os.path.exists(file_path):
             os.remove(file_path)
         
-        # Tenta deletar variáveis pesadas se elas existirem neste escopo
         for var in ['raw_text', 'clean_md', 'chunks', 'supabase_payload']:
             if var in locals():
                 del locals()[var]

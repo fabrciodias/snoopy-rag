@@ -1,0 +1,26 @@
+{
+  "name": "snoopy-rag",
+  "version": "2.0.0-core",
+  "description": "O Snoopy-RAG é uma infraestrutura Cloud-Native de Recuperação Aumentada por Geração (RAG) desenvolvida para indexar e consultar coleções de artigos, teses e livros. O projeto foca no rigor acadêmico, garante consultas rápidas e rastreia estritamente as informações geradas através de citações diretas.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fabrciodias/snoopy-rag.git"
+  },
+  "keywords": ["rag", "llm", "gemini", "supabase", "academic", "pesquisa"],
+  "author": "fabrciodias",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/fabrciodias/snoopy-rag/issues"
+  },
+  "homepage": "https://github.com/fabrciodias/snoopy-rag#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "ws": "^8.20.1"
+  }
+}

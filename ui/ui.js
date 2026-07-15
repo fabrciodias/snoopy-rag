@@ -24,7 +24,11 @@ export const dom = {
     folderSelector: document.getElementById('folder-selector'),
     btnDrive: document.getElementById('btn-drive'),
     btnSync: document.getElementById('btn-sync'), 
-    syncLogs: document.getElementById('sync-logs'), 
+    syncLogs: document.getElementById('sync-logs'),
+    syncProgressContainer: document.getElementById('sync-progress-container'),
+    btnToggleSync: document.getElementById('btn-toggle-sync'),
+    syncGlobalStatus: document.getElementById('sync-global-status'),
+    syncJobsList: document.getElementById('sync-jobs-list'), 
     historyList: document.getElementById('history-list'),
 
     homeView: document.getElementById('home-view'),
@@ -367,6 +371,54 @@ export function renderResults(data) {
         });
     });
 
-    // CORREÇÃO FINAL: Garante que todos os ícones desenhados nas linhas acima vão aparecer de primeira!
+    lucide.createIcons();
+}
+
+// 4. RENDERIZAÇÃO DA SANFONA DE SINCRONIZAÇÃO (PROGRESSO)
+export function renderSyncProgress(jobs) {
+    // Se a fila estiver vazia, esconde a sanfona
+    if (!jobs || jobs.length === 0) {
+        dom.syncProgressContainer.classList.add('hidden');
+        dom.syncProgressContainer.classList.remove('expanded');
+        return;
+    }
+
+    // Se tem arquivo na fila, mostra a sanfona
+    dom.syncProgressContainer.classList.remove('hidden');
+
+    const total = jobs.length;
+    const processing = jobs.filter(j => j.status === 'processing').length;
+    const pending = jobs.filter(j => j.status === 'pending').length;
+
+    // Atualiza o título global da sanfona
+    if (processing > 0) {
+        dom.syncGlobalStatus.textContent = `Vetorizando arquivos... (${total} restantes)`;
+    } else if (pending > 0) {
+        dom.syncGlobalStatus.textContent = `Aguardando motor... (${total} na fila)`;
+    }
+
+    // Limpa a lista atual e redesenha as barrinhas
+    dom.syncJobsList.innerHTML = '';
+    
+    jobs.forEach(job => {
+        const progress = job.progress || 0;
+        const isPending = job.status === 'pending';
+        const statusText = isPending ? 'Na fila' : `${progress}%`;
+
+        // Aqui o Width da barra (style="width: X%") dita o preenchimento fluido!
+        const itemHtml = `
+            <div class="sync-job-item ${isPending ? 'pending' : ''}">
+                <div class="sync-job-info">
+                    <span class="sync-job-filename" title="${job.file_name}">${job.file_name}</span>
+                    <span class="sync-job-percentage">${statusText}</span>
+                </div>
+                <div class="sync-progress-track">
+                    <div class="sync-progress-fill" style="width: ${isPending ? '0' : progress}%;"></div>
+                </div>
+            </div>
+        `;
+        dom.syncJobsList.insertAdjacentHTML('beforeend', itemHtml);
+    });
+    
     lucide.createIcons();
 }

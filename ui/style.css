@@ -289,6 +289,115 @@ body {
     display: none;
 }
 
+/* --- SANFONA DE SINCRONIZAÇÃO (ACCORDION) --- */
+.sync-accordion {
+    margin-top: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-app);
+    overflow: hidden; 
+}
+
+.sync-accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    cursor: pointer;
+    background-color: var(--bg-panel);
+    transition: background-color var(--trans-fast);
+}
+
+.sync-accordion-header:hover {
+    background-color: var(--bg-hover);
+}
+
+.sync-status-text {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sync-chevron {
+    transition: transform var(--trans-fast);
+    color: var(--text-muted);
+}
+
+/* Quando adicionarmos a classe 'expanded' no JS, a setinha vira pra cima */
+.sync-accordion.expanded .sync-chevron {
+    transform: rotate(180deg);
+}
+
+.sync-accordion-body {
+    display: none;
+    padding: 10px;
+    border-top: 1px solid var(--border-color);
+    max-height: 160px;
+    overflow-y: auto; /* Se tiver 50 arquivos pendentes, ele cria uma rolagem interna e não quebra a tela */
+}
+
+.sync-accordion.expanded .sync-accordion-body {
+    display: block;
+    animation: fadeIn 0.2s ease;
+}
+
+/* --- BARRAS DE PROGRESSO INDIVIDUAIS --- */
+.sync-job-item {
+    margin-bottom: 12px;
+}
+
+.sync-job-item:last-child {
+    margin-bottom: 0;
+}
+
+.sync-job-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.sync-job-filename {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px; /* Corta o nome do arquivo se for gigante */
+}
+
+.sync-job-percentage {
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.sync-progress-track {
+    width: 100%;
+    height: 4px;
+    background-color: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+/* A barra que enche */
+.sync-progress-fill {
+    height: 100%;
+    background-color: var(--primary);
+    width: 0%; /* O JavaScript vai mexer nisso aqui ao vivo */
+    transition: width 0.3s ease-out; 
+    border-radius: 2px;
+    box-shadow: 0 0 5px rgba(106, 132, 101, 0.5); /* Efeito neon sutil do motor trabalhando */
+}
+
+/* Se o arquivo tá esperando na fila, a barra fica neutra */
+.sync-job-item.pending .sync-progress-fill {
+    width: 0%;
+    background-color: transparent;
+    box-shadow: none;
+}
+
 .history-item {
     padding: 8px var(--space-sm);
     cursor: pointer;

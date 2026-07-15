@@ -121,3 +121,54 @@ async function readStream(response, onLog, onResult, onError) {
         }
     }
 }
+
+// 5. WEBSOCKETS (REALTIME)
+let syncChannel = null;
+
+export async function fetchActiveJobs() {
+    if (!appState.userToken || !appState.supabaseClient || !appState.folderId) return [];
+    
+    try {
+        const { data, error } = await appState.supabaseClient
+            .from('jobs')
+            .select('id, file_name, status, progress, drive_file_id')
+            .eq('folder_id', appState.folderId)
+            .in('status', ['pending', 'processing'])
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error("[API] Erro ao carregar fila de processamento:", error);
+        return [];
+    }
+}
+
+export function listenToSyncQueue(onQueueUpdate) {
+    if (!appState.supabaseClient || !appState.folderId) return;
+
+    // Se já estivermos a escutar outro acervo, desliga o rádio antigo
+    if (syncChannel) {
+        appState.supabaseClient.removeChannel(syncChannel);
+    }
+
+    console.log(`[REALTIME] A sintonizar atualizações do acervo: ${appState.folderId}`);
+
+    syncChannel = appState.supabaseClient
+        .channel(`jobs_channel_${appState.folderId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: '*', // Escuta tudo: INSERT, UPDATE, DELETE
+                schema: 'public',
+                table: 'jobs',
+                filter: `folder_id=eq.${appState.folderId}`
+            },
+            async (payload) => {
+                // Sempre que o motor Python ou o Node mexerem na tabela, isto dispara!
+                const currentQueue = await fetchActiveJobs();
+                onQueueUpdate(currentQueue);
+            }
+        )
+        .subscribe();
+}

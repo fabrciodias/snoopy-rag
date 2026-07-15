@@ -55,6 +55,14 @@
                         </button>
                         
                         <div id="sync-logs" style="font-size: 0.75rem; color: var(--primary); margin-top: 6px; text-align: center; min-height: 14px;"></div>
+                        <div id="sync-progress-container" class="sync-accordion hidden">
+                            <div class="sync-accordion-header" id="btn-toggle-sync">
+                                <span id="sync-global-status" class="sync-status-text">Processando arquivos...</span>
+                                <i data-lucide="chevron-down" class="sync-chevron icon-sm"></i>
+                            </div>
+                            <div id="sync-jobs-list" class="sync-accordion-body">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
