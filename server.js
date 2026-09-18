@@ -373,7 +373,7 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_LL
 });
 
 // 7. INICIALIZAÇÃO DO SERVIDOR
-const PORT = 3000;
+const PORT = 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n=========================================`);
     console.log(`SNOOPY-RAG V2 (SaaS) ATIVADO`);
