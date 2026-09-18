@@ -1,4 +1,3 @@
-// Tá foda, cara. PQP github
 // 1. DEPENDÊNCIAS E IMPORTAÇÕES
 require('dotenv').config({ override: true });
 const express = require('express');
@@ -17,7 +16,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_LLM_MODEL = process.env.GEMINI_LLM_MODEL || 'gemini-2.5-flash';
+const GEMINI_LLM_MODEL = process.env.GEMINI_LLM_MODEL || 'gemini-3.5-flash';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
     auth: {

@@ -4,8 +4,8 @@ from collections import Counter
 def to_markdown(raw_text):
     if not raw_text: return ""
     
-    text = re.sub(r'[\uf000-\uf8ff]', '', raw_text)
-    text = re.sub(r'\.{4,}', ' ', raw_text)
+    clean_text = re.sub(r'[\uf000-\uf8ff]', '', raw_text)
+    text = re.sub(r'\.{4,}', ' ', clean_text)
     paragraphs = text.split('\n\n')
     block_counts = Counter(p.strip() for p in paragraphs if len(p.strip()) > 15)
     repetitive_blocks = {p for p, count in block_counts.items() if count > 3}
