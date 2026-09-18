@@ -10,7 +10,14 @@
     "type": "git",
     "url": "git+https://github.com/fabrciodias/snoopy-rag.git"
   },
-  "keywords": ["rag", "llm", "gemini", "supabase", "academic", "pesquisa"],
+  "keywords": [
+    "rag",
+    "llm",
+    "gemini",
+    "supabase",
+    "academic",
+    "pesquisa"
+  ],
   "author": "fabrciodias",
   "license": "MIT",
   "bugs": {
@@ -22,5 +29,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "supabase": "^2.117.0"
   }
 }
