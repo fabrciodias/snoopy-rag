@@ -1,9 +1,24 @@
-data/
-credentials.json
-src/__pycache__
-node_modules
-package-lock.json
+# Ambientes Virtuais
 .venv/
-*.pdf
+venv/
+env/
+
+# Chaves e Segredos
 .env
-fabrciodias
+.env.local
+*.pem
+
+# Python Cache e Logs
+__pycache__/
+data/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.log
+
+# Arquivos de Sistema e Editor
+node_modules/
+.vscode/
+.idea/
+.DS_Store

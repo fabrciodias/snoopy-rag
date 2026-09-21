@@ -1,7 +1,21 @@
-PyMuPDF
-google-genai
-chromadb
+# Processamento Documental e Extração
+pymupdf>=1.25.0
+
+# Inteligência e Embeddings
+google-genai>=0.3.0
+
+# Infraestrutura e Banco de Dados
+supabase>=2.3.4
+python-dotenv>=1.0.1
+
+# API, Contratos e Streaming (Substitutos do Express/Node.js)
+fastapi>=0.109.2
+uvicorn>=0.27.1
+pydantic>=2.6.1
+sse-starlette>=2.0.0
+
+# Ecossistema Google (Drive e LLM)
 google-api-python-client
 google-auth
-supabase
-python-dotenv
+google-auth-oauthlib
+google-auth-httplib2
