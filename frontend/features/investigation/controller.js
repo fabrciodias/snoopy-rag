@@ -11,6 +11,7 @@ import {
 
 import {
     investigate,
+    fetchDocument,
 } from "../../infrastructure/api.js";
 
 import {
@@ -70,6 +71,10 @@ export function createInvestigationController() {
                 5
             );
 
+            await enrichEvidenceMetadata(
+                result.evidences || []
+            );
+
             completeInvestigation(result);
 
             renderResult(result);
@@ -88,6 +93,59 @@ export function createInvestigationController() {
         } finally {
             busy = false;
         }
+    }
+
+    async function enrichEvidenceMetadata(
+        evidences
+    ) {
+        const documentCache =
+            new Map();
+
+        for (
+            const evidence of evidences
+        ) {
+            if (
+                !evidence.document_id
+            ) {
+                continue;
+            }
+
+            if (
+                !documentCache.has(
+                    evidence.document_id
+                )
+            ) {
+                try {
+                    const document =
+                        await fetchDocument(
+                            evidence.document_id
+                        );
+
+                    documentCache.set(
+                        evidence.document_id,
+                        document
+                    );
+                } catch {
+                    documentCache.set(
+                        evidence.document_id,
+                        null 
+                    );
+                }
+            }
+
+            const document =
+                documentCache.get(
+                    evidence.document_id
+                );
+
+            if (document) {
+                evidence.document_title =
+                    document.title ||
+                    "Documento";
+            }
+        }
+
+        return evidences;
     }
 
 
@@ -166,6 +224,13 @@ export function createInvestigationController() {
                     "button"
                 );
 
+            const location =
+                evidence.location || {};
+
+            const page = 
+                location.page ??
+                location.page_number;
+
             button.type =
                 "button";
 
@@ -173,7 +238,12 @@ export function createInvestigationController() {
                 "source-card";
 
             button.textContent =
-                `Evidência ${reference}`;
+                page
+                    ? `${evidence.document_title || "Documento"} · p. ${page}`
+                    : (
+                        evidence.document_title ||
+                        "Documento"
+                    );
 
             button.addEventListener(
                 "click",

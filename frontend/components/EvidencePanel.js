@@ -113,8 +113,11 @@ export function renderEvidencePanel(
 
     provenance.textContent =
         page
-            ? `Documento: ${evidence.document_id} · Página: ${page}`
-            : `Documento: ${evidence.document_id}`;
+            ? `${evidence.document_title || "Documento"} · Página: ${page}`
+            : (
+                evidence.document_title ||
+                "Documento"
+            );
 
     card.append(
         header,
@@ -129,7 +132,7 @@ export function renderEvidencePanel(
     document.getElementById(
         "chunk-abnt"
     ).textContent =
-        `Proveniência: ${evidence.evidence_id}`;
-
-    openEvidencePanel();
+        page
+            ? `Fonte: ${evidence.document_title || "Documento"} · Página ${page}`
+            : `Fonte: ${evidence.document_title || "Documento"}`;
 }

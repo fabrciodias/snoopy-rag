@@ -226,6 +226,10 @@ export const dom = {
 };
 
 
+/* ============================================================
+   Navegação
+   ============================================================ */
+
 export function showHome() {
     dom.homeView.classList.add(
         "active"
@@ -275,8 +279,12 @@ export function showInvestigation(
     dom.queryDisplay.textContent =
         query;
 
+    /*
+     * Limpa completamente a investigação anterior
+     * antes de iniciar uma nova.
+     */
     dom.answerText.textContent =
-    "";
+        "";
 
     dom.answerText.className =
         "";
@@ -373,6 +381,10 @@ export function closeReading() {
 }
 
 
+/* ============================================================
+   Histórico
+   ============================================================ */
+
 export function renderHistory(
     history,
     onSelect
@@ -399,47 +411,73 @@ export function renderHistory(
         return;
     }
 
-    history.forEach(query => {
-        const item =
-            document.createElement(
-                "div"
+    history.forEach(
+        entry => {
+            /*
+             * O backend V3 retorna objetos:
+             *
+             * {
+             *   query,
+             *   created_at
+             * }
+             *
+             * O renderer também aceita strings para
+             * manter compatibilidade com respostas antigas.
+             */
+            const query =
+                typeof entry === "string"
+                    ? entry
+                    : entry?.query || "";
+
+            if (!query) {
+                return;
+            }
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+            item.className =
+                "history-item";
+
+            const icon =
+                document.createElement(
+                    "span"
+                );
+
+            icon.className =
+                "history-icon";
+
+            icon.textContent =
+                "◷";
+
+            const text =
+                document.createTextNode(
+                    ` ${query}`
+                );
+
+            item.append(
+                icon,
+                text
             );
 
-        item.className =
-            "history-item";
-
-        const icon =
-            document.createElement(
-                "span"
+            item.addEventListener(
+                "click",
+                () => onSelect(query)
             );
 
-        icon.className =
-            "history-icon";
-
-        icon.textContent =
-            "◷";
-
-        const text =
-            document.createTextNode(
-                ` ${query}`
+            dom.historyList.appendChild(
+                item
             );
-
-        item.append(
-            icon,
-            text
-        );
-
-        item.addEventListener(
-            "click",
-            () => onSelect(query)
-        );
-
-        dom.historyList.appendChild(
-            item
-        );
-    });
+        }
+    );
 }
 
+
+/* ============================================================
+   Acervos
+   ============================================================ */
 
 export function renderFolders(
     folders,
@@ -481,6 +519,10 @@ export function renderFolders(
 }
 
 
+/* ============================================================
+   Sincronização
+   ============================================================ */
+
 export function setSyncState(
     message
 ) {
@@ -497,7 +539,9 @@ export function setSyncOperationState(
     );
 
     const status =
-        operation.status;
+        String(
+            operation?.status || ""
+        ).toUpperCase();
 
     if (
         status === "PROCESSING"
@@ -514,6 +558,19 @@ export function setSyncOperationState(
     ) {
         dom.syncGlobalStatus.textContent =
             "Sincronização concluída.";
+    } else if (
+        status === "FAILED"
+    ) {
+        dom.syncGlobalStatus.textContent =
+            "Falha na sincronização.";
+    } else if (
+        status === "CANCELLED"
+    ) {
+        dom.syncGlobalStatus.textContent =
+            "Sincronização cancelada.";
+    } else {
+        dom.syncGlobalStatus.textContent =
+            "Atualizando sincronização...";
     }
 
     dom.syncJobsList.innerHTML =
@@ -544,7 +601,7 @@ export function setSyncOperationState(
         "sync-job-filename";
 
     label.textContent =
-        `Operação ${operation.operation_id}`;
+        "Sincronização do acervo";
 
     const state =
         document.createElement(

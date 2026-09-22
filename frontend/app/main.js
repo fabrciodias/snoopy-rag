@@ -52,7 +52,6 @@ if (window.lucide) {
     lucide.createIcons();
 }
 
-
 /* ============================================================
    Tema
    ============================================================ */
@@ -118,7 +117,6 @@ dom.themeToggle?.addEventListener(
 );
 
 updateThemeButton();
-
 
 /* ============================================================
    Acervos
@@ -191,11 +189,21 @@ function updateFolderControls() {
         return;
     }
 
-    dom.btnDrive?.classList.remove(
-        "hidden"
-    );
-
+    /*
+     * Acervo público:
+     *
+     * - pode conectar uma pasta privada;
+     * - não pode sincronizar;
+     * - não pode desconectar o público.
+     *
+     * O botão de desconectar permanece dentro
+     * das Configurações.
+     */
     if (isPublic) {
+        dom.btnDrive?.classList.remove(
+            "hidden"
+        );
+
         dom.btnSync?.classList.add(
             "hidden"
         );
@@ -203,15 +211,29 @@ function updateFolderControls() {
         dom.btnRemoveFolder?.classList.add(
             "hidden"
         );
-    } else {
-        dom.btnSync?.classList.remove(
-            "hidden"
-        );
 
-        dom.btnRemoveFolder?.classList.remove(
-            "hidden"
-        );
+        return;
     }
+
+    /*
+     * Acervo privado:
+     *
+     * - "Conectar Pasta Privada" desaparece;
+     * - sincronização aparece;
+     * - desconectar permanece disponível
+     *   dentro das Configurações.
+     */
+    dom.btnDrive?.classList.add(
+        "hidden"
+    );
+
+    dom.btnSync?.classList.remove(
+        "hidden"
+    );
+
+    dom.btnRemoveFolder?.classList.remove(
+        "hidden"
+    );
 }
 
 
@@ -235,7 +257,6 @@ dom.folderSelector?.addEventListener(
         updateFolderControls();
     }
 );
-
 
 /* ============================================================
    Google Picker
@@ -266,7 +287,7 @@ async function openDrivePicker() {
             )
             .setSelectFolderEnabled(
                 true
-            )
+            );
 
     const picker =
         new google.picker.PickerBuilder()
@@ -300,10 +321,6 @@ async function openDrivePicker() {
                     }
 
                     try {
-                        /*
-                        * A API devolve exatamente o acervo criado.
-                        * Não procuramos pelo nome.
-                        */
                         const created =
                             await createFolder(
                                 folder.name,
@@ -353,13 +370,70 @@ dom.btnDrive?.addEventListener(
     openDrivePicker
 );
 
-
 /* ============================================================
    Sincronização
    ============================================================ */
 
 let syncBusy =
     false;
+
+let syncHideTimer =
+    null;
+
+
+function showSyncProgress() {
+    if (
+        syncHideTimer
+    ) {
+        clearTimeout(
+            syncHideTimer
+        );
+
+        syncHideTimer =
+            null;
+    }
+
+    dom.syncProgressContainer.classList.remove(
+        "hidden"
+    );
+
+    dom.syncProgressContainer.classList.add(
+        "expanded"
+    );
+}
+
+
+function hideSyncProgress(
+    delay = 5000
+) {
+    if (
+        syncHideTimer
+    ) {
+        clearTimeout(
+            syncHideTimer
+        );
+    }
+
+    syncHideTimer =
+        setTimeout(
+            () => {
+                dom.syncLogs.textContent =
+                    "";
+
+                dom.syncProgressContainer.classList.remove(
+                    "expanded"
+                );
+
+                dom.syncProgressContainer.classList.add(
+                    "hidden"
+                );
+
+                syncHideTimer =
+                    null;
+            },
+            delay
+        );
+}
 
 
 dom.btnSync?.addEventListener(
@@ -397,6 +471,8 @@ dom.btnSync?.addEventListener(
                 "Iniciando sincronização..."
             );
 
+            showSyncProgress();
+
             const operation =
                 await startSync(
                     appState.folderId,
@@ -412,7 +488,11 @@ dom.btnSync?.addEventListener(
                     operation.operation_id,
                     {
                         onUpdate:
-                            setSyncOperationState,
+                            operation => {
+                                setSyncOperationState(
+                                    operation
+                                );
+                            },
                     }
                 );
 
@@ -423,32 +503,33 @@ dom.btnSync?.addEventListener(
             setSyncOperationState(
                 finished
             );
+
+            await loadFolders();
+
+            hideSyncProgress(
+                5000
+            );
+
         } catch (error) {
             setSyncState(
                 "Falha na sincronização."
             );
 
+            showSyncProgress();
+
             alert(
                 error.message
             );
+
         } finally {
             syncBusy =
                 false;
 
             dom.btnSync.disabled =
                 false;
-
-            setTimeout(
-                () => {
-                    dom.syncLogs.textContent =
-                        "";
-                },
-                5000
-            );
         }
     }
 );
-
 
 /* ============================================================
    Investigação
@@ -457,6 +538,15 @@ dom.btnSync?.addEventListener(
 async function executeSearch(
     query
 ) {
+    const normalizedQuery =
+        String(
+            query || ""
+        ).trim();
+
+    if (!normalizedQuery) {
+        return;
+    }
+
     if (
         window.innerWidth <=
         850
@@ -472,10 +562,12 @@ async function executeSearch(
 
     try {
         await investigation.execute(
-            query
+            normalizedQuery
         );
     } catch {
-        // O controller já renderizou o erro.
+        /*
+         * O controller já renderizou o erro.
+         */
     }
 }
 
@@ -490,7 +582,6 @@ dom.homeForm?.addEventListener(
         );
     }
 );
-
 
 /* ============================================================
    Histórico
@@ -509,15 +600,25 @@ async function reloadHistory() {
         return;
     }
 
-    const history =
-        await fetchHistory();
+    try {
+        const history =
+            await fetchHistory();
 
-    renderHistory(
-        history,
-        executeSearch
-    );
+        renderHistory(
+            history,
+            executeSearch
+        );
+
+    } catch (error) {
+        console.error(
+            "[HISTORY]",
+            error
+        );
+
+        dom.historyList.innerHTML =
+            "<p class=\"history-empty\">Não foi possível carregar o histórico.</p>";
+    }
 }
-
 
 /* ============================================================
    Autenticação
@@ -607,12 +708,6 @@ async function handleSession(
         appState.folderId =
             PUBLIC_FOLDER_ID;
 
-        /*
-         * O endpoint /folders/ é protegido.
-         * Não tente chamá-lo sem sessão.
-         *
-         * O acervo público já é conhecido pelo ID.
-         */
         appState.folders = [
             {
                 id:
@@ -626,6 +721,14 @@ async function handleSession(
             appState.folders,
             PUBLIC_FOLDER_ID
         );
+
+        renderHistory(
+            [],
+            executeSearch
+        );
+
+        dom.historyList.innerHTML =
+            "<p class=\"history-empty\">Faça login para ver o seu histórico.</p>";
     }
 }
 
@@ -648,10 +751,10 @@ dom.btnLogout?.addEventListener(
     "click",
     async () => {
         closeSettings();
+
         await logout();
     }
 );
-
 
 /* ============================================================
    Desconectar acervo
@@ -685,6 +788,9 @@ dom.btnRemoveFolder?.addEventListener(
                 PUBLIC_FOLDER_ID;
 
             await loadFolders();
+
+            closeSettings();
+
         } catch (error) {
             alert(
                 error.message
@@ -693,9 +799,8 @@ dom.btnRemoveFolder?.addEventListener(
     }
 );
 
-
 /* ============================================================
-   Nova pesquisa / home
+   Nova pesquisa / Home
    ============================================================ */
 
 dom.btnSidebarNew?.addEventListener(
@@ -722,7 +827,6 @@ dom.logoBtn?.addEventListener(
         }
     }
 );
-
 
 /* ============================================================
    Sidebar
@@ -784,6 +888,10 @@ dom.mobileOverlay?.addEventListener(
     }
 );
 
+/* ============================================================
+   Painel de sincronização
+   ============================================================ */
+
 dom.btnToggleSync?.addEventListener(
     "click",
     () => {
@@ -792,7 +900,6 @@ dom.btnToggleSync?.addEventListener(
         );
     }
 );
-
 
 /* ============================================================
    Evidência
@@ -805,10 +912,23 @@ dom.btnCloseEvidence?.addEventListener(
     }
 );
 
-
 /* ============================================================
    Reading
    ============================================================ */
+
+function normalizeReadingText(
+    text
+) {
+    return String(
+        text || ""
+    )
+        .replace(
+            /\s+/g,
+            ""
+        )
+        .toLowerCase();
+}
+
 
 async function openReading(
     evidence
@@ -876,6 +996,7 @@ async function openReading(
             documentData,
             evidence
         );
+
     } catch (error) {
         dom.readingContent.innerHTML =
             "";
@@ -899,7 +1020,6 @@ async function openReading(
         );
     }
 }
-
 
 function renderDocumentRepresentation(
     documentData,
@@ -939,6 +1059,17 @@ function renderDocumentRepresentation(
     let target =
         null;
 
+    /*
+     * Remove espaços e quebras de linha e
+     * normaliza capitalização para que a evidência
+     * consiga localizar o bloco correspondente
+     * na representação canônica.
+     */
+    const evidenceText =
+        normalizeReadingText(
+            evidence?.content
+        );
+
     for (
         const page of
         representation.pages
@@ -959,8 +1090,8 @@ function renderDocumentRepresentation(
         pageTitle.textContent =
             `Página ${page.page_number}`;
 
-        pageTitle.style.margin =
-            "32px 0 16px";
+        pageTitle.className =
+            "reading-page-title";
 
         pageElement.appendChild(
             pageTitle
@@ -987,23 +1118,10 @@ function renderDocumentRepresentation(
             paragraph.style.lineHeight =
                 "1.7";
 
-            const evidenceText =
-                (evidence.content ||
-                    "")
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
             const blockText =
-                (block.text ||
-                    "")
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
+                normalizeReadingText(
+                    block.text
+                );
 
             if (
                 evidenceText &&
@@ -1017,11 +1135,9 @@ function renderDocumentRepresentation(
                     )
                 )
             ) {
-                paragraph.style.borderLeft =
-                    "4px solid var(--primary)";
-
-                paragraph.style.paddingLeft =
-                    "16px";
+                paragraph.classList.add(
+                    "reading-evidence-target"
+                );
 
                 target =
                     paragraph;
@@ -1069,7 +1185,6 @@ window.addEventListener(
         );
     }
 );
-
 
 /* ============================================================
    Settings
@@ -1128,7 +1243,6 @@ dom.settingsModal?.addEventListener(
     }
 );
 
-
 /* ============================================================
    Google Picker bootstrap
    ============================================================ */
@@ -1142,7 +1256,6 @@ loadGooglePicker().catch(
     }
 );
 
-
 /* ============================================================
    BOOT
    ============================================================ */
@@ -1153,7 +1266,9 @@ async function boot() {
          * A autenticação precisa terminar antes de qualquer
          * chamada à API protegida.
          */
-        await initAuth(handleSession);
+        await initAuth(
+            handleSession
+        );
 
         /*
          * O Picker é auxiliar da interface.
