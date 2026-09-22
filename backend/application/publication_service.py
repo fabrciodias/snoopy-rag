@@ -15,58 +15,42 @@ class PublicationService:
     
     def __init__(
         self, 
-        doc_processor: DocumentProcessor,
-        seg_service: SegmentationService,
-        doc_repo: DocumentRepository,
-        unit_repo: RetrievalUnitRepository,
-        emb_provider: EmbeddingProvider
+        document_repo, 
+        unit_repo, 
+        processor, 
+        segmentation_service, 
+        embedding_provider
     ):
-        self.doc_processor = doc_processor
-        self.seg_service = seg_service
-        self.doc_repo = doc_repo
+        self.document_repo = document_repo
         self.unit_repo = unit_repo
-        self.emb_provider = emb_provider
+        self.processor = processor
+        self.segmentation_service = segmentation_service
+        self.embedding_provider = embedding_provider
 
-    def process_and_publish(self, file_path: str, document_id: str, title: str, folder_id: str, user_id: str, drive_file_id: str) -> None:
+    def process_and_publish(self, document_id: str, user_id: str, folder_id: str, file_path: str):
         try:
-            # 1. Gerar Hash de Segurança
-            with open(file_path, "rb") as f:
-                doc_hash = hashlib.md5(f.read()).hexdigest()
-
-            # 2. Registar o documento como PROCESSING
-            self.doc_repo.create_or_update(
-                document_id=document_id, title=title, folder_id=folder_id, 
-                user_id=user_id, drive_file_id=drive_file_id, document_hash=doc_hash
-            )
-
-            # 3. Fase 2: Extrair a Representação Canónica
-            representation = self.doc_processor.process_pdf(file_path, document_id)
-
-            # 4. Fase 3: Segmentar com rigor espacial
-            units = self.seg_service.segment(representation)
-
-            # 5. Fase 4: Vetorização e Persistência em Lotes
-            batch_size = 5
-            for i in range(0, len(units), batch_size):
-                batch_units = units[i : i + batch_size]
-                texts = [u.content for u in batch_units]
-                
-                # Gera os Embeddings
-                embeddings = self.emb_provider.generate_embeddings(texts)
-                
-                # Grava no Supabase (chunks)
-                self.unit_repo.save_batch(batch_units, embeddings, user_id, folder_id)
-
-            # 6. Publicação Atómica (Opcional na V2, Obrigatório na V3)
-            self.doc_repo.update_status(document_id, DocumentStatus.ACTIVE)
-
-        except Exception as e:
-            # Em caso de qualquer erro crítico, o documento é marcado como FAILED
-            # e a exceção é repassada para que a Operation (Fase 1) registre o log.
-            self.doc_repo.update_status(document_id, DocumentStatus.FAILED)
-            raise e
+            # 1. Trava o estado para PROCESSING
+            self.document_repo.update_status(document_id, DocumentStatus.PROCESSING)
             
-        finally:
-            # Limpeza do ficheiro físico (mantendo o rigor do LPP-Acervo)
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            # 2. Extrai e guarda a Representação Canónica
+            representation = self.processor.extract(file_path, document_id)
+            self.document_repo.save_representation(document_id, representation)
+            
+            # 3. Segmenta de forma governada
+            units = self.segmentation_service.segment(representation)
+            
+            # 4. Gera Embeddings
+            texts_to_embed = [unit.content for unit in units]
+            embeddings = self.embedding_provider.generate_embeddings(texts_to_embed)
+            
+            # 5. Persiste as Unidades + Embeddings (O FTS será gerado via trigger ou persistência SQL do Supabase)
+            self.unit_repo.save_batch(units, embeddings, user_id, folder_id)
+            
+            # 6. Publicação Coerente: Só agora vai para ACTIVE
+            self.document_repo.update_status(document_id, DocumentStatus.ACTIVE)
+            
+        except Exception as e:
+            # Em caso de falha em qualquer etapa (extração, LLM timeout, erro no pgvector), reverte o estado lógico
+            self.document_repo.update_status(document_id, DocumentStatus.FAILED)
+            # A operação assíncrona (Operation) registará o erro no seu próprio fluxo
+            raise e

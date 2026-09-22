@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
-from backend.domain.entities import Operation, OperationStatus, DocumentStatus, RetrievalUnit
+from backend.domain.entities import Operation, OperationStatus, DocumentStatus, RetrievalUnit, DocumentRepresentation
 
 class OperationRepository(ABC):
     """
@@ -28,12 +28,21 @@ class DocumentRepository(ABC):
     def update_status(self, document_id: str, status: DocumentStatus) -> None:
         pass
 
+    # NOVO: Obriga a persistência da representação documental canónica
+    @abstractmethod
+    def save_representation(self, document_id: str, representation: DocumentRepresentation) -> None:
+        pass
+
+    # NOVO: Permite reconstruir a localização e rastreabilidade a partir da representação preservada
+    @abstractmethod
+    def get_representation(self, document_id: str) -> Optional[DocumentRepresentation]:
+        pass
 
 class RetrievalUnitRepository(ABC):
+    # ATUALIZADO: Fica explícito que a representação está atrelada à unidade na base de dados
     @abstractmethod
     def save_batch(self, units: List[RetrievalUnit], embeddings: List[List[float]], user_id: str, folder_id: str) -> None:
         pass
-
 
 class EmbeddingProvider(ABC):
     """

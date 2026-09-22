@@ -1,7 +1,7 @@
 from typing import Optional, List
 from datetime import datetime, timezone
 from supabase import Client
-from backend.domain.entities import Operation, OperationStatus, DocumentStatus, RetrievalUnit
+from backend.domain.entities import Operation, OperationStatus, DocumentStatus, DocumentRepresentation, RetrievalUnit
 from backend.domain.repositories import OperationRepository, DocumentRepository, RetrievalUnitRepository
 
 class SupabaseOperationRepository(OperationRepository):
@@ -70,6 +70,28 @@ class SupabaseDocumentRepository(DocumentRepository):
             "status": DocumentStatus.PROCESSING.value
         }
         self.client.table(self.table_name).upsert(data).execute()
+
+    def save_representation(self, document_id: str, representation: DocumentRepresentation) -> None:
+        """
+        Injeta o JSON da representação canônica na coluna 'representation' da tabela documents.
+        """
+        # Converte o modelo Pydantic para um dicionário JSON-serializable
+        data = {"representation": representation.model_dump(mode="json", exclude_none=True)}
+        
+        # Faz o update direto no Supabase
+        self.client.table("documents").update(data).eq("id", document_id).execute()
+
+    def get_representation(self, document_id: str) -> Optional[DocumentRepresentation]:
+        """
+        Recupera e reconstrói o modelo DocumentRepresentation a partir do banco.
+        """
+        response = self.client.table("documents").select("representation").eq("id", document_id).execute()
+        
+        if response.data and response.data[0].get("representation"):
+            # Reconstrói a entidade Pydantic a partir do JSONB do banco
+            return DocumentRepresentation(**response.data[0]["representation"])
+            
+        return None
 
     def update_status(self, document_id: str, status: DocumentStatus) -> None:
         self.client.table(self.table_name).update({"status": status.value}).eq("id", document_id).execute()

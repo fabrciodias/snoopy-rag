@@ -32,11 +32,11 @@ doc_processor = DocumentProcessor()
 seg_service = SegmentationService()
 
 publication_service = PublicationService(
-    doc_processor=doc_processor,
-    seg_service=seg_service,
-    doc_repo=doc_repo,
+    processor=doc_processor,
+    segmentation_service=seg_service,
+    document_repo=doc_repo,
     unit_repo=unit_repo,
-    emb_provider=emb_provider
+    embedding_provider=emb_provider
 )
 
 # 3. Modelos de Entrada (Contratos HTTP)
