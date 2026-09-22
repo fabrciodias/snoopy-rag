@@ -2,6 +2,7 @@ import {
     openEvidencePanel,
 } from "../renderer/render.js";
 
+import "../features/reading/translation.js";
 
 export function renderEvidencePanel(
     evidence,
@@ -135,4 +136,9 @@ export function renderEvidencePanel(
         page
             ? `Fonte: ${evidence.document_title || "Documento"} · Página ${page}`
             : `Fonte: ${evidence.document_title || "Documento"}`;
+
+    // A V2 abria a gaveta imediatamente após selecionar
+    // um trecho. O V3 já possui a mesma função de abertura;
+    // apenas faltava acioná-la depois da renderização.
+    openEvidencePanel();
 }

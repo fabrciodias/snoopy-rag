@@ -297,13 +297,6 @@ export async function waitForOperation(
                 operation.status || ""
             ).toUpperCase();
 
-        /*
-         * Estados terminais são tratados fora do
-         * bloco de comunicação.
-         *
-         * Uma operação FAILED não é uma falha
-         * de comunicação.
-         */
         if (
             status === "COMPLETED"
         ) {
@@ -347,6 +340,52 @@ export async function fetchDocument(
     return request(
         `/documents/${encodeURIComponent(documentId)}`
     );
+}
+
+
+/* ============================================================
+   Tradução / Reading
+   ============================================================ */
+
+export async function translateText(
+    text
+) {
+    const normalizedText =
+        String(
+            text || ""
+        ).trim();
+
+    if (!normalizedText) {
+        throw new Error(
+            "Não há texto para traduzir."
+        );
+    }
+
+    const result =
+        await request(
+            "/translate/",
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    text: normalizedText,
+                }),
+            }
+        );
+
+    const translation =
+        result?.translation;
+
+    if (
+        typeof translation !==
+        "string" ||
+        !translation.trim()
+    ) {
+        throw new Error(
+            "O servidor não retornou uma tradução válida."
+        );
+    }
+
+    return translation.trim();
 }
 
 

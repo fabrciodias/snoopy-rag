@@ -12,6 +12,9 @@ from fastapi.responses import FileResponse
 
 from pydantic import BaseModel, Field
 
+from backend.api.translation import (
+    router as translation_router,
+)
 
 from backend.config import settings
 
@@ -92,6 +95,10 @@ app = FastAPI(
 
 PUBLIC_FOLDER_ID = (
     "f7faf7d9-ec80-46c6-9572-174865bf1e62"
+)
+
+app.include_router(
+    translation_router
 )
 
 
