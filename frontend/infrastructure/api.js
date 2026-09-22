@@ -149,7 +149,9 @@ export async function fetchFolders() {
             "/folders/"
         );
 
-    return result?.folders || [];
+    return Array.isArray(result)
+        ? result
+        : (result?.folders || []);
 }
 
 
@@ -251,7 +253,7 @@ export async function waitForOperation(
     {
         onUpdate,
         interval = 1500,
-        maxAttempts = 160,
+        maxAttempts = 600,
     } = {}
 ) {
     let communicationFailures = 0;
@@ -261,38 +263,16 @@ export async function waitForOperation(
         attempt < maxAttempts;
         attempt++
     ) {
+        let operation;
+
         try {
-            const operation =
+            operation =
                 await getOperation(
                     operationId
                 );
 
             communicationFailures = 0;
 
-            if (onUpdate) {
-                onUpdate(
-                    operation
-                );
-            }
-
-            if (
-                operation.status ===
-                "COMPLETED"
-            ) {
-                return operation;
-            }
-
-            if (
-                operation.status ===
-                    "FAILED" ||
-                operation.status ===
-                    "CANCELLED"
-            ) {
-                throw new Error(
-                    operation.error_log ||
-                    `Operação ${operation.status.toLowerCase()}.`
-                );
-            }
         } catch (error) {
             communicationFailures += 1;
 
@@ -303,6 +283,49 @@ export async function waitForOperation(
                     "A conexão com o servidor foi perdida durante o acompanhamento da operação."
                 );
             }
+
+            await sleep(interval);
+            continue;
+        }
+
+        if (onUpdate) {
+            onUpdate(operation);
+        }
+
+        const status =
+            String(
+                operation.status || ""
+            ).toUpperCase();
+
+        /*
+         * Estados terminais são tratados fora do
+         * bloco de comunicação.
+         *
+         * Uma operação FAILED não é uma falha
+         * de comunicação.
+         */
+        if (
+            status === "COMPLETED"
+        ) {
+            return operation;
+        }
+
+        if (
+            status === "FAILED"
+        ) {
+            throw new Error(
+                operation.error_log ||
+                "A operação falhou."
+            );
+        }
+
+        if (
+            status === "CANCELLED"
+        ) {
+            throw new Error(
+                operation.error_log ||
+                "A operação foi cancelada."
+            );
         }
 
         await sleep(interval);
@@ -332,76 +355,25 @@ export async function fetchDocument(
    ============================================================ */
 
 export async function fetchHistory() {
-    if (
-        !appState.user ||
-        !appState.supabaseClient
-    ) {
+    if (!appState.user) {
         return [];
     }
 
-    const {
-        data,
-        error,
-    } =
-        await appState.supabaseClient
-            .from("search_history")
-            .select("query")
-            .eq(
-                "user_id",
-                appState.user.id
-            )
-            .order(
-                "created_at",
-                {
-                    ascending: false,
-                }
-            )
-            .limit(15);
+    const result = await request(
+        "/history/"
+    );
 
-    if (error) {
-        console.error(
-            "[HISTORY]",
-            error
-        );
-
+    if (!Array.isArray(result)) {
         return [];
     }
 
-    return [
-        ...new Set(
-            (data || []).map(
-                item => item.query
-            )
-        ),
-    ];
-}
+    return result
+        .map(item => {
+            if (typeof item === "string") {
+                return item;
+            }
 
-
-export async function saveHistory(
-    query
-) {
-    if (
-        !appState.user ||
-        !appState.supabaseClient
-    ) {
-        return;
-    }
-
-    const {
-        error,
-    } =
-        await appState.supabaseClient
-            .from("search_history")
-            .insert({
-                user_id:
-                    appState.user.id,
-                query,
-            });
-
-    if (error) {
-        console.error(
-            "[HISTORY]",
-            error
-        );
-    }
+            return item?.query || "";
+        })
+        .filter(Boolean);
 }

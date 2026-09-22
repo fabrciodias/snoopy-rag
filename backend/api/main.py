@@ -10,7 +10,7 @@ from fastapi import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 from backend.config import settings
@@ -109,8 +109,10 @@ investigation_repo = SupabaseInvestigationRepository(
     supabase_client
 )
 
-retrieval_result_repo = SupabaseRetrievalResultRepository(
-    supabase_client
+retrieval_result_repo = (
+    SupabaseRetrievalResultRepository(
+        supabase_client
+    )
 )
 
 evidence_repo = SupabaseEvidenceRepository(
@@ -316,7 +318,11 @@ class DriveSyncRequest(BaseModel):
 class InvestigateRequest(BaseModel):
     folder_id: str
     query: str
-    limit: int = 5
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+    )
 
 
 class FolderCreateRequest(BaseModel):
@@ -470,7 +476,9 @@ def delete_folder(
     folder = (
         supabase_client
         .table("folders")
-        .select("id, user_id, is_active")
+        .select(
+            "id, user_id, is_active"
+        )
         .eq("id", folder_id)
         .eq("is_active", True)
         .limit(1)
@@ -608,10 +616,25 @@ def sync_drive(
         authorization
     )
 
-    ensure_folder_access(
+    folder = ensure_folder_access(
         request.folder_id,
         user_id,
     )
+
+    # O acervo público é somente para leitura.
+    # Ele não pode receber sincronização através da
+    # identidade de um usuário.
+    if request.folder_id == PUBLIC_FOLDER_ID:
+        raise HTTPException(
+            status_code=403,
+            detail="O acervo público não pode ser sincronizado pelo frontend.",
+        )
+
+    if not folder.get("drive_id"):
+        raise HTTPException(
+            status_code=400,
+            detail="O acervo não possui uma pasta do Google Drive vinculada.",
+        )
 
     try:
         operation = operation_service.start_operation(
@@ -681,6 +704,12 @@ def get_operation(
             detail="Operação não encontrada.",
         )
 
+    if not operation.target_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Operação sem acervo associado.",
+        )
+
     ensure_folder_access(
         operation.target_id,
         user_id,
@@ -690,7 +719,76 @@ def get_operation(
 
 
 # ============================================================
-# 12. Endpoints — Investigation
+# 12. Endpoints — History
+# ============================================================
+
+@app.get(
+    "/history/",
+    tags=["History"],
+)
+def list_history(
+    authorization: str | None = Header(
+        default=None
+    ),
+):
+    """
+    Retorna o histórico recente de investigações
+    pertencentes ao usuário autenticado.
+
+    O histórico é auxiliar à experiência da aplicação.
+    Não constitui a fonte de verdade de uma Investigation.
+    """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    response = (
+        supabase_client
+        .table("search_history")
+        .select(
+            "query, created_at"
+        )
+        .eq(
+            "user_id",
+            user_id,
+        )
+        .order(
+            "created_at",
+            desc=True,
+        )
+        .limit(15)
+        .execute()
+    )
+
+    seen = set()
+    history = []
+
+    for item in response.data or []:
+        query = (
+            item.get("query") or ""
+        ).strip()
+
+        if not query:
+            continue
+
+        if query in seen:
+            continue
+
+        seen.add(query)
+
+        history.append({
+            "query": query,
+            "created_at": item.get(
+                "created_at"
+            ),
+        })
+
+    return history
+
+
+# ============================================================
+# 13. Endpoints — Investigation
 # ============================================================
 
 @app.post(
@@ -728,6 +826,14 @@ def investigate(
         user_id,
     )
 
+    query = request.query.strip()
+
+    if not query:
+        raise HTTPException(
+            status_code=400,
+            detail="A consulta não pode ser vazia.",
+        )
+
     try:
 
         # ----------------------------------------------------
@@ -738,7 +844,7 @@ def investigate(
             retrieval_service.search(
                 user_id=user_id,
                 folder_id=request.folder_id,
-                query=request.query,
+                query=query,
                 limit=request.limit,
             )
         )
@@ -748,6 +854,7 @@ def investigate(
         # ----------------------------------------------------
 
         if not results:
+
             return {
                 "message": (
                     "Nenhuma evidência encontrada no acervo "
@@ -770,7 +877,36 @@ def investigate(
         )
 
         # ----------------------------------------------------
-        # 4. Retorno
+        # 4. Histórico
+        #
+        # O histórico é persistido somente depois que a
+        # investigação e a síntese terminaram com sucesso.
+        #
+        # Falha no histórico não invalida a investigação.
+        # ----------------------------------------------------
+
+        try:
+
+            (
+                supabase_client
+                .table("search_history")
+                .insert({
+                    "user_id": user_id,
+                    "folder_id": request.folder_id,
+                    "query": query,
+                })
+                .execute()
+            )
+
+        except Exception:
+            # Histórico é uma funcionalidade auxiliar.
+            # Uma falha nessa persistência não deve transformar
+            # uma investigação concluída em uma investigação
+            # malsucedida.
+            pass
+
+        # ----------------------------------------------------
+        # 5. Retorno
         # ----------------------------------------------------
 
         return {
@@ -783,6 +919,7 @@ def investigate(
         raise
 
     except Exception as error:
+
         raise HTTPException(
             status_code=500,
             detail=str(error),
@@ -790,7 +927,7 @@ def investigate(
 
 
 # ============================================================
-# 13. Frontend V3
+# 14. Frontend V3
 # ============================================================
 
 FRONTEND_DIR = (

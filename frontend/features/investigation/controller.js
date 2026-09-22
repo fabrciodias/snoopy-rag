@@ -11,14 +11,13 @@ import {
 
 import {
     investigate,
-    saveHistory,
 } from "../../infrastructure/api.js";
 
 import {
     showInvestigation,
     showInvestigationError,
     dom,
-} from "../../components/ResultList.js";
+} from "../../renderer/render.js";
 
 import {
     renderEvidencePanel,
@@ -74,17 +73,6 @@ export function createInvestigationController() {
             completeInvestigation(result);
 
             renderResult(result);
-
-            if (result.response) {
-                try {
-                    await saveHistory(normalized);
-                } catch (historyError) {
-                    console.warn(
-                        "[INVESTIGATION] Falha ao salvar histórico:",
-                        historyError
-                    );
-                }
-            }
 
             return result;
 

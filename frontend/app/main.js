@@ -267,7 +267,6 @@ async function openDrivePicker() {
             .setSelectFolderEnabled(
                 true
             )
-            .setParent("root");
 
     const picker =
         new google.picker.PickerBuilder()
@@ -301,35 +300,40 @@ async function openDrivePicker() {
                     }
 
                     try {
-                        await createFolder(
-                            folder.name,
-                            folder.id
-                        );
+                        /*
+                        * A API devolve exatamente o acervo criado.
+                        * Não procuramos pelo nome.
+                        */
+                        const created =
+                            await createFolder(
+                                folder.name,
+                                folder.id
+                            );
 
                         await loadFolders();
 
-                        const created =
-                            appState.folders.find(
-                                item =>
-                                    item.name ===
-                                        folder.name &&
-                                    item.id !==
-                                        PUBLIC_FOLDER_ID
-                            );
-
-                        if (created) {
+                        if (created?.id) {
                             appState.folderId =
                                 created.id;
 
-                            dom.folderSelector.value =
-                                created.id;
-
                             appState.folderName =
-                                created.name;
+                                created.name ||
+                                folder.name;
+
+                            renderFolders(
+                                appState.folders,
+                                created.id
+                            );
                         }
 
                         updateFolderControls();
+
                     } catch (error) {
+                        console.error(
+                            "[PICKER]",
+                            error
+                        );
+
                         alert(
                             `Não foi possível vincular o acervo: ${error.message}`
                         );
@@ -547,6 +551,10 @@ async function handleSession(
             );
     }
 
+    if (!session) {
+        closeSettings();
+    }
+
     if (session) {
         dom.btnLogin?.classList.add(
             "hidden"
@@ -639,6 +647,7 @@ dom.btnLogin?.addEventListener(
 dom.btnLogout?.addEventListener(
     "click",
     async () => {
+        closeSettings();
         await logout();
     }
 );
@@ -771,6 +780,15 @@ dom.mobileOverlay?.addEventListener(
 
         dom.mobileOverlay.classList.remove(
             "active"
+        );
+    }
+);
+
+dom.btnToggleSync?.addEventListener(
+    "click",
+    () => {
+        dom.syncProgressContainer.classList.toggle(
+            "expanded"
         );
     }
 );

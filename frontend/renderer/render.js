@@ -275,6 +275,18 @@ export function showInvestigation(
     dom.queryDisplay.textContent =
         query;
 
+    dom.answerText.textContent =
+    "";
+
+    dom.answerText.className =
+        "";
+
+    dom.sourcesContainer.innerHTML =
+        "";
+
+    dom.chunksContainer.innerHTML =
+        "";
+
     dom.answerBox.classList.add(
         "hidden"
     );
@@ -294,6 +306,12 @@ export function showInvestigationError(
     dom.loadingState.classList.add(
         "hidden"
     );
+
+    dom.sourcesContainer.innerHTML =
+        "";
+
+    dom.chunksContainer.innerHTML =
+        "";
 
     dom.answerBox.classList.remove(
         "hidden"
