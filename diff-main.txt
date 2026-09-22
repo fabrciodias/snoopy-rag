@@ -1,0 +1,484 @@
+﻿diff --git a/backend/api/main.py b/backend/api/main.py
+index b403626..aec8778 100644
+--- a/backend/api/main.py
++++ b/backend/api/main.py
+@@ -1,34 +1,126 @@
+-import os
+-import shutil
+-
+-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
++from fastapi import (
++    FastAPI,
++    HTTPException,
++    BackgroundTasks,
++    Header,
++)
+ from pydantic import BaseModel
+-from typing import Optional
+ 
+-from backend.infrastructure.database import supabase_client
+-from backend.infrastructure.supabase_repositories import SupabaseOperationRepository, SupabaseDocumentRepository, SupabaseRetrievalUnitRepository
+-from backend.infrastructure.gemini_provider import GeminiEmbeddingProvider
++from backend.infrastructure.supabase_repositories import (
++    SupabaseOperationRepository,
++    SupabaseDocumentRepository,
++    SupabaseRetrievalUnitRepository,
++    SupabaseInvestigationRepository,
++    SupabaseRetrievalResultRepository,
++    SupabaseEvidenceRepository,
++)
++
++from backend.infrastructure.gemini_provider import (
++    GeminiEmbeddingProvider,
++)
++
++from backend.infrastructure.database import (
++    supabase_client,
++)
++
++from backend.infrastructure.drive_provider import (
++    GoogleDriveProvider,
++)
++
++from backend.application.drive_sync_service import (
++    DriveSyncService,
++)
++
++from backend.application.operation_service import (
++    OperationService,
++)
++
++from backend.application.retrieval_service import (
++    RetrievalService,
++)
++
++from backend.application.synthesis_service import (
++    SynthesisService,
++)
++
++from backend.application.document_processor import (
++    DocumentProcessor,
++)
++
++from backend.application.segmentation_service import (
++    SegmentationService,
++)
++
++from backend.application.publication_service import (
++    PublicationService,
++)
+ 
+-from backend.application.operation_service import OperationService
+-from backend.application.retrieval_service import RetrievalService
+-from backend.application.synthesis_service import SynthesisService
+-from backend.application.document_processor import DocumentProcessor
+-from backend.application.segmentation_service import SegmentationService
+-from backend.application.publication_service import PublicationService
+ 
++# ============================================================
+ # 1. Inicializa├º├úo do App FastAPI
+-app = FastAPI(title="Snoopy-RAG V3 Alpha API", version="0.1.0")
++# ============================================================
++
++app = FastAPI(
++    title="Snoopy-RAG V3 Alpha API",
++    version="0.1.0",
++)
++
++
++# ============================================================
++# 2. Infraestrutura
++# ============================================================
++
++operation_repo = SupabaseOperationRepository(
++    supabase_client
++)
+ 
+-# 2. Inje├º├úo de Depend├¬ncias (Conectando as camadas)
+-operation_repo = SupabaseOperationRepository(supabase_client)
+-operation_service = OperationService(operation_repo)
+ emb_provider = GeminiEmbeddingProvider()
+-retrieval_service = RetrievalService(emb_provider, supabase_client)
+-synthesis_service = SynthesisService()
+ 
+-doc_repo = SupabaseDocumentRepository(supabase_client)
+-unit_repo = SupabaseRetrievalUnitRepository(supabase_client)
++investigation_repo = SupabaseInvestigationRepository(
++    supabase_client
++)
++
++retrieval_result_repo = SupabaseRetrievalResultRepository(
++    supabase_client
++)
++
++evidence_repo = SupabaseEvidenceRepository(
++    supabase_client
++)
++
++doc_repo = SupabaseDocumentRepository(
++    supabase_client
++)
++
++unit_repo = SupabaseRetrievalUnitRepository(
++    supabase_client
++)
++
++drive_provider = GoogleDriveProvider()
++
++
++# ============================================================
++# 3. Application Services
++# ============================================================
++
++operation_service = OperationService(
++    operation_repo
++)
++
++retrieval_service = RetrievalService(
++    emb_provider,
++    supabase_client,
++    investigation_repo,
++    retrieval_result_repo,
++)
++
++synthesis_service = SynthesisService(
++    evidence_repo,
++    investigation_repo,
++)
++
+ doc_processor = DocumentProcessor()
++
+ seg_service = SegmentationService()
+ 
+ publication_service = PublicationService(
+@@ -36,132 +128,230 @@ publication_service = PublicationService(
+     segmentation_service=seg_service,
+     document_repo=doc_repo,
+     unit_repo=unit_repo,
+-    embedding_provider=emb_provider
++    embedding_provider=emb_provider,
++)
++
++drive_sync_service = DriveSyncService(
++    client=supabase_client,
++    drive_provider=drive_provider,
++    operation_service=operation_service,
++    publication_service=publication_service,
++    document_repo=doc_repo,
++    unit_repo=unit_repo,
+ )
+ 
+-# 3. Modelos de Entrada (Contratos HTTP)
+-class StartOperationRequest(BaseModel):
+-    operation_type: str
+-    target_id: Optional[str] = None
+ 
+-# 4. Endpoints (Rotas p├║blicas)
++# ============================================================
++# 4. Modelos de Entrada
++# ============================================================
++
++class DriveSyncRequest(BaseModel):
++    folder_id: str
++    google_token: str
++
++
++class InvestigateRequest(BaseModel):
++    user_id: str
++    folder_id: str
++    query: str
++    limit: int = 5
++
++
++# ============================================================
++# 5. Endpoints ÔÇö Documents / Google Drive
++# ============================================================
+ 
+-@app.post("/operations/", tags=["Operations"])
+-def start_operation(request: StartOperationRequest):
++@app.post(
++    "/sync-drive/",
++    tags=["Documents"],
++)
++def sync_drive(
++    request: DriveSyncRequest,
++    background_tasks: BackgroundTasks,
++    authorization: str | None = Header(
++        default=None
++    ),
++):
+     """
+-    Inicia uma opera├º├úo ass├¡ncrona gen├®rica.
+-    Retorna o Operation com status PENDING ou PROCESSING e seu operation_id.
++    Inicia a sincroniza├º├úo de um acervo do Google Drive.
++
++    O JWT do Supabase identifica o usu├írio.
++    O token do Google ├® utilizado pelo DriveProvider
++    para acessar os arquivos do Drive.
++
++    O processamento acontece em background e o estado
++    autoritativo da execu├º├úo fica registrado em Operation.
+     """
++
++    if not authorization:
++        raise HTTPException(
++            status_code=401,
++            detail="Token de autentica├º├úo n├úo fornecido.",
++        )
++
++    if not authorization.startswith("Bearer "):
++        raise HTTPException(
++            status_code=401,
++            detail="Formato de autentica├º├úo inv├ílido.",
++        )
++
++    supabase_token = authorization.split(
++        " ",
++        1,
++    )[1]
++
+     try:
++        user_response = (
++            supabase_client.auth.get_user(
++                supabase_token
++            )
++        )
++
++        if not user_response.user:
++            raise HTTPException(
++                status_code=401,
++                detail="Sess├úo Supabase inv├ílida.",
++            )
++
++        user_id = user_response.user.id
++
+         operation = operation_service.start_operation(
+-            operation_type=request.operation_type,
+-            target_id=request.target_id
++            operation_type="DRIVE_SYNC",
++            target_id=request.folder_id,
++        )
++
++        background_tasks.add_task(
++            drive_sync_service.sync_folder,
++            operation.operation_id,
++            request.folder_id,
++            user_id,
++            request.google_token,
+         )
+-        return operation
+-    except Exception as e:
+-        raise HTTPException(status_code=500, detail=str(e))
+ 
+-@app.get("/operations/{operation_id}", tags=["Operations"])
+-def get_operation(operation_id: str):
++        return {
++            "operation_id": operation.operation_id,
++            "status": operation.status,
++        }
++
++    except HTTPException:
++        raise
++
++    except Exception as error:
++        raise HTTPException(
++            status_code=500,
++            detail=str(error),
++        )
++
++
++# ============================================================
++# 6. Endpoints ÔÇö Operations
++# ============================================================
++
++@app.get(
++    "/operations/{operation_id}",
++    tags=["Operations"],
++)
++def get_operation(
++    operation_id: str,
++):
+     """
+-    Retorna o estado autoritativo de uma opera├º├úo (├Ütil para revalida├º├úo 
+-    caso a conex├úo SSE do frontend caia).
++    Retorna o estado autoritativo de uma opera├º├úo.
++
++    ├Ütil para revalida├º├úo caso a conex├úo SSE do frontend
++    seja perdida.
+     """
+-    operation = operation_service.get_operation_state(operation_id)
++
++    operation = operation_service.get_operation_state(
++        operation_id
++    )
++
+     if not operation:
+-        raise HTTPException(status_code=404, detail="Opera├º├úo n├úo encontrada.")
++        raise HTTPException(
++            status_code=404,
++            detail="Opera├º├úo n├úo encontrada.",
++        )
++
+     return operation
+ 
+-class InvestigateRequest(BaseModel):
+-    user_id: str
+-    folder_id: str
+-    query: str
+-    limit: int = 5
+ 
+-# --- Nova Rota (Adicione no final do arquivo) ---
+-@app.post("/investigate/", tags=["Investigation"])
+-def investigate(request: InvestigateRequest):
++# ============================================================
++# 7. Endpoints ÔÇö Investigation
++# ============================================================
++
++@app.post(
++    "/investigate/",
++    tags=["Investigation"],
++)
++def investigate(
++    request: InvestigateRequest,
++):
+     """
+-    Executa o fluxo completo do LPP-Acervo: Recupera├º├úo H├¡brida + S├¡ntese LLM.
+-    Retorna a investiga├º├úo, a resposta estruturada e as evid├¬ncias exatas utilizadas.
++    Executa o fluxo completo de investiga├º├úo:
++
++    Recupera├º├úo H├¡brida
++        Ôåô
++    RetrievalResults
++        Ôåô
++    Evid├¬ncias
++        Ôåô
++    S├¡ntese LLM
++        Ôåô
++    StructuredResponse
+     """
++
+     try:
+-        # 1. Recupera├º├úo H├¡brida (Busca no Supabase)
+-        investigation, results = retrieval_service.search(
+-            user_id=request.user_id,
+-            folder_id=request.folder_id,
+-            query=request.query,
+-            limit=request.limit
++
++        # ----------------------------------------------------
++        # 1. Recupera├º├úo H├¡brida
++        # ----------------------------------------------------
++
++        investigation, results = (
++            retrieval_service.search(
++                user_id=request.user_id,
++                folder_id=request.folder_id,
++                query=request.query,
++                limit=request.limit,
++            )
+         )
+-        
+-        # Se o banco n├úo achar nada, abortamos antes de gastar cota do Gemini
++
++        # ----------------------------------------------------
++        # 2. Nenhum resultado
++        # ----------------------------------------------------
++
+         if not results:
+             return {
+-                "message": "Nenhuma evid├¬ncia encontrada no acervo para esta busca.",
++                "message": (
++                    "Nenhuma evid├¬ncia encontrada no acervo "
++                    "para esta busca."
++                ),
+                 "investigation": investigation,
+                 "response": None,
+-                "evidences": []
++                "evidences": [],
+             }
+-            
+-        # 2. S├¡ntese Baseada em Evid├¬ncias (Prompt Estruturado no LLM)
+-        structured_response, evidences = synthesis_service.synthesize(
+-            investigation=investigation,
+-            results=results
++
++        # ----------------------------------------------------
++        # 3. S├¡ntese baseada em evid├¬ncias
++        # ----------------------------------------------------
++
++        structured_response, evidences = (
++            synthesis_service.synthesize(
++                investigation=investigation,
++                results=results,
++            )
+         )
+-        
+-        # 3. Retorno do Contrato Completo
++
++        # ----------------------------------------------------
++        # 4. Retorno
++        # ----------------------------------------------------
++
+         return {
+             "investigation": investigation,
+             "response": structured_response,
+-            "evidences": evidences
++            "evidences": evidences,
+         }
+-        
+-    except Exception as e:
+-        raise HTTPException(status_code=500, detail=str(e))
+-
+-class PublishDriveDocumentRequest(BaseModel):
+-    document_id: str
+-    title: str
+-    folder_id: str
+-    user_id: str
+-    drive_file_id: str
+ 
+-@app.post("/publish/", tags=["Documents"])
+-def publish_document_from_drive(request: PublishDriveDocumentRequest):
+-    """
+-    Orquestra a publica├º├úo de um documento a partir do Google Drive.
+-    Descarrega o PDF usando o drive_file_id, executa a pipeline at├│mica 
+-    e limpa os vest├¡gios locais.
+-    """
+-    os.makedirs("data/temp", exist_ok=True)
+-    temp_file_path = f"data/temp/{request.document_id}.pdf"
+-
+-    try:
+-        # 1. Simula ou executa o descarregamento via DriveProvider
+-        # (Aqui instanciar├¡amos o GoogleDriveProvider para baixar o PDF para temp_file_path)
+-        
+-        # Valida├º├úo de seguran├ºa para garantir que o ficheiro f├¡sico existe antes de processar
+-        if not os.path.exists(temp_file_path):
+-            # Fallback tempor├írio para testes caso o ID do Drive ainda seja um mock local
+-            with open(temp_file_path, "wb") as f:
+-                f.write(b"%PDF-1.4 Mock content for testing pipeline")
+-
+-        # 2. Aciona o motor de publica├º├úo at├│mica (Fase 4)
+-        publication_service.process_and_publish(
+-            file_path=temp_file_path,
+-            document_id=request.document_id,
+-            title=request.title,
+-            folder_id=request.folder_id,
+-            user_id=request.user_id,
+-            drive_file_id=request.drive_file_id
+-        )
+-        
+-        return {
+-            "status": "success", 
+-            "message": f"Documento '{request.title}' sincronizado do Drive e publicado com status ACTIVE."
+-        }
+-        
+-    except Exception as e:
+-        if os.path.exists(temp_file_path):
+-            os.remove(temp_file_path)
+-        raise HTTPException(status_code=500, detail=str(e))
+\ No newline at end of file
++    except Exception as error:
++        raise HTTPException(
++            status_code=500,
++            detail=str(error),
++        )
+\ No newline at end of file

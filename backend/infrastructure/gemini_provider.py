@@ -16,6 +16,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
     def __init__(self):
         self.model = settings.gemini_embedding_model
+        self.batch_size = settings.gemini_embedding_batch_size
 
         self.client = genai.Client(
             api_key=settings.gemini_api_key
@@ -29,45 +30,85 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         if not texts:
             return []
 
+        all_embeddings: List[List[float]] = []
+
+        for start in range(
+            0,
+            len(texts),
+            self.batch_size,
+        ):
+            batch = texts[
+                start:start + self.batch_size
+            ]
+
+            embeddings = self._embed_batch(batch)
+
+            if len(embeddings) != len(batch):
+                raise RuntimeError(
+                    "Quantidade de embeddings não corresponde "
+                    "à quantidade de textos do lote."
+                )
+
+            all_embeddings.extend(embeddings)
+
+        return all_embeddings
+
+    def _embed_batch(
+        self,
+        texts: List[str],
+    ) -> List[List[float]]:
+
+        contents = [
+            types.Content(
+                parts=[
+                    types.Part.from_text(
+                        text=text
+                    )
+                ]
+            )
+            for text in texts
+        ]
+
         max_retries = 5
 
         for attempt in range(max_retries):
             try:
                 response = self.client.models.embed_content(
                     model=self.model,
-                    contents=texts,
+                    contents=contents,
                     config=types.EmbedContentConfig(
-                        output_dimensionality=768
+                        output_dimensionality=768,
                     ),
                 )
 
                 return [
-                    emb.values
-                    for emb in response.embeddings
+                    embedding.values
+                    for embedding in response.embeddings
                 ]
 
-            except Exception as e:
-                error_msg = str(e).lower()
+            except Exception as api_err:
 
-                if (
-                    "429" in error_msg
-                    or "too many requests" in error_msg
-                    or "quota" in error_msg
-                ):
-                    if attempt == max_retries - 1:
-                        raise RuntimeError(
-                            "Falha crítica: Limite de taxa da API "
-                            "Gemini excedido repetidamente."
-                        )
+                error_text = str(api_err).lower()
 
-                    sleep_time = 2 * (2 ** attempt)
+                rate_limited = (
+                    "429" in error_text
+                    or "too many requests" in error_text
+                    or "quota" in error_text
+                )
 
-                    print(
-                        "[API LIMIT] Cota da IA quase excedida. "
-                        f"Em pausa por {sleep_time}s..."
-                    )
-
-                    time.sleep(sleep_time)
-
-                else:
+                if not rate_limited:
                     raise
+
+                if attempt == max_retries - 1:
+                    raise RuntimeError(
+                        "Falha crítica: limite de taxa "
+                        "excedido repetidamente."
+                    ) from api_err
+
+                sleep_time = 2 * (2 ** attempt)
+
+                time.sleep(sleep_time)
+
+        raise RuntimeError(
+            "Falha inesperada ao gerar embeddings."
+        )

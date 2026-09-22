@@ -75,6 +75,13 @@ class Settings:
             )
         )
 
+        self.gemini_embedding_batch_size = int(
+            os.getenv(
+                "GEMINI_EMBEDDING_BATCH_SIZE",
+                "5",
+            )
+        )
+
     @staticmethod
     def _required(name: str) -> str:
         value = os.getenv(name)
