@@ -142,7 +142,98 @@ drive_sync_service = DriveSyncService(
 
 
 # ============================================================
-# 4. Modelos de Entrada
+# 4. Autenticação e autorização
+# ============================================================
+
+def get_authenticated_user_id(
+    authorization: str | None,
+) -> str:
+    """
+    Valida o JWT do Supabase e retorna o ID do usuário
+    autenticado.
+
+    O identificador do usuário nunca deve ser confiado
+    quando fornecido pelo cliente no corpo da requisição.
+    """
+
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="Token de autenticação não fornecido.",
+        )
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Formato de autenticação inválido.",
+        )
+
+    supabase_token = authorization.split(
+        " ",
+        1,
+    )[1].strip()
+
+    if not supabase_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Token de autenticação inválido.",
+        )
+
+    try:
+        user_response = (
+            supabase_client.auth.get_user(
+                supabase_token
+            )
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail="Sessão Supabase inválida.",
+        )
+
+    if not user_response.user:
+        raise HTTPException(
+            status_code=401,
+            detail="Sessão Supabase inválida.",
+        )
+
+    return user_response.user.id
+
+
+def ensure_folder_access(
+    folder_id: str,
+    user_id: str,
+):
+    """
+    Verifica se o acervo existe, está ativo e pertence
+    ao usuário autenticado.
+
+    O acervo é a fronteira de autorização da V3 Alpha.
+    """
+
+    folder = (
+        supabase_client
+        .table("folders")
+        .select("id")
+        .eq("id", folder_id)
+        .eq("user_id", user_id)
+        .eq("is_active", True)
+        .limit(1)
+        .execute()
+    )
+
+    if not folder.data:
+        raise HTTPException(
+            status_code=404,
+            detail="Acervo não encontrado.",
+        )
+
+    return folder.data[0]
+
+
+# ============================================================
+# 5. Modelos de Entrada
 # ============================================================
 
 class DriveSyncRequest(BaseModel):
@@ -151,14 +242,13 @@ class DriveSyncRequest(BaseModel):
 
 
 class InvestigateRequest(BaseModel):
-    user_id: str
     folder_id: str
     query: str
     limit: int = 5
 
 
 # ============================================================
-# 5. Endpoints — Documents / Google Drive
+# 6. Endpoints — Documents / Google Drive
 # ============================================================
 
 @app.post(
@@ -183,38 +273,16 @@ def sync_drive(
     autoritativo da execução fica registrado em Operation.
     """
 
-    if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Token de autenticação não fornecido.",
-        )
+    user_id = get_authenticated_user_id(
+        authorization
+    )
 
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail="Formato de autenticação inválido.",
-        )
-
-    supabase_token = authorization.split(
-        " ",
-        1,
-    )[1]
+    ensure_folder_access(
+        request.folder_id,
+        user_id,
+    )
 
     try:
-        user_response = (
-            supabase_client.auth.get_user(
-                supabase_token
-            )
-        )
-
-        if not user_response.user:
-            raise HTTPException(
-                status_code=401,
-                detail="Sessão Supabase inválida.",
-            )
-
-        user_id = user_response.user.id
-
         operation = operation_service.start_operation(
             operation_type="DRIVE_SYNC",
             target_id=request.folder_id,
@@ -244,7 +312,7 @@ def sync_drive(
 
 
 # ============================================================
-# 6. Endpoints — Operations
+# 7. Endpoints — Operations
 # ============================================================
 
 @app.get(
@@ -253,13 +321,24 @@ def sync_drive(
 )
 def get_operation(
     operation_id: str,
+    authorization: str | None = Header(
+        default=None
+    ),
 ):
     """
     Retorna o estado autoritativo de uma operação.
 
+    O acesso é autorizado a partir do acervo associado
+    à operação, evitando exposição de operações de outros
+    usuários.
+
     Útil para revalidação caso a conexão SSE do frontend
     seja perdida.
     """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
 
     operation = operation_service.get_operation_state(
         operation_id
@@ -271,11 +350,16 @@ def get_operation(
             detail="Operação não encontrada.",
         )
 
+    ensure_folder_access(
+        operation.target_id,
+        user_id,
+    )
+
     return operation
 
 
 # ============================================================
-# 7. Endpoints — Investigation
+# 8. Endpoints — Investigation
 # ============================================================
 
 @app.post(
@@ -284,6 +368,9 @@ def get_operation(
 )
 def investigate(
     request: InvestigateRequest,
+    authorization: str | None = Header(
+        default=None
+    ),
 ):
     """
     Executa o fluxo completo de investigação:
@@ -297,7 +384,18 @@ def investigate(
     Síntese LLM
         ↓
     StructuredResponse
+
+    O usuário é obtido exclusivamente do JWT autenticado.
     """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    ensure_folder_access(
+        request.folder_id,
+        user_id,
+    )
 
     try:
 
@@ -307,7 +405,7 @@ def investigate(
 
         investigation, results = (
             retrieval_service.search(
-                user_id=request.user_id,
+                user_id=user_id,
                 folder_id=request.folder_id,
                 query=request.query,
                 limit=request.limit,
@@ -349,6 +447,9 @@ def investigate(
             "response": structured_response,
             "evidences": evidences,
         }
+
+    except HTTPException:
+        raise
 
     except Exception as error:
         raise HTTPException(
