@@ -961,10 +961,8 @@ function normalizeReadingText(
     return String(
         text || ""
     )
-        .replace(
-            /\s+/g,
-            ""
-        )
+        .replace(/\s+/g, " ")
+        .trim()
         .toLowerCase();
 }
 
@@ -1104,6 +1102,9 @@ function renderDocumentRepresentation(
             evidence?.content
         );
 
+    let lastSection =
+        null;
+
     for (
         const page of
         representation.pages
@@ -1143,6 +1144,45 @@ function renderDocumentRepresentation(
             chunkDiv.className =
                 "reading-chunk";
 
+            /*
+             * A representação pode trazer a seção
+             * no próprio bloco ou na página.
+             *
+             * Não assumimos que ela exista:
+             * se não existir, o Reading continua
+             * exatamente como antes.
+             */
+            const section =
+                block.section ||
+                page.section ||
+                null;
+
+            if (
+                section &&
+                section !== lastSection
+            ) {
+                const sectionElement =
+                    document.createElement(
+                        "span"
+                    );
+
+                sectionElement.className =
+                    "reading-chunk-section";
+
+                sectionElement.textContent =
+                    section;
+
+                chunkDiv.appendChild(
+                    sectionElement
+                );
+
+                lastSection =
+                    section;
+            }
+
+            const originalText =
+                block.text || "";
+
             const textSpan =
                 document.createElement(
                     "span"
@@ -1151,38 +1191,43 @@ function renderDocumentRepresentation(
             textSpan.className =
                 "chunk-text-content";
 
-            const originalText =
-                block.text || "";
-
             textSpan.textContent =
                 originalText;
 
             textSpan.style.whiteSpace =
                 "pre-wrap";
 
-            textSpan.style.lineHeight =
-                "1.7";
-
             chunkDiv.appendChild(
                 textSpan
             );
 
+            /*
+             * Localização da evidência.
+             *
+             * Primeiro tenta o casamento completo,
+             * como na V2.
+             */
             const blockText =
                 normalizeReadingText(
                     originalText
                 );
 
-            if (
-                evidenceText &&
-                blockText &&
-                (
-                    blockText.includes(
-                        evidenceText
-                    ) ||
-                    evidenceText.includes(
-                        blockText
+            const matchesEvidence =
+                Boolean(
+                    evidenceText &&
+                    blockText &&
+                    (
+                        blockText.includes(
+                            evidenceText
+                        ) ||
+                        evidenceText.includes(
+                            blockText
+                        )
                     )
-                )
+                );
+
+            if (
+                matchesEvidence
             ) {
                 chunkDiv.style.borderLeft =
                     "4px solid var(--primary)";
@@ -1198,6 +1243,10 @@ function renderDocumentRepresentation(
                     chunkDiv;
             }
 
+            /*
+             * A tradução continua totalmente
+             * encapsulada em translation.js.
+             */
             addTranslationControl(
                 chunkDiv,
                 textSpan,
@@ -1218,6 +1267,10 @@ function renderDocumentRepresentation(
         lucide.createIcons();
     }
 
+    /*
+     * Leva o usuário diretamente para a
+     * evidência que originou a leitura.
+     */
     if (target) {
         setTimeout(
             () => {
@@ -1232,6 +1285,81 @@ function renderDocumentRepresentation(
         );
     }
 }
+
+
+/* ============================================================
+   Reading — comportamento da topbar
+   ============================================================ */
+
+let lastReadingScrollTop =
+    0;
+
+dom.readingView?.addEventListener(
+    "scroll",
+    () => {
+        const currentScroll =
+            dom.readingView.scrollTop;
+
+        const readingTopbar =
+            dom.readingView.querySelector(
+                ".reading-topbar"
+            );
+
+        if (!readingTopbar) {
+            return;
+        }
+
+        if (
+            currentScroll <= 60
+        ) {
+            readingTopbar.classList.remove(
+                "hidden-on-scroll"
+            );
+
+            dom.btnMobileMenu?.classList.remove(
+                "menu-hidden"
+            );
+
+            lastReadingScrollTop =
+                currentScroll;
+
+            return;
+        }
+
+        if (
+            currentScroll >
+            lastReadingScrollTop
+        ) {
+            /*
+             * Descendo:
+             * esconde a barra para liberar
+             * espaço de leitura.
+             */
+            readingTopbar.classList.add(
+                "hidden-on-scroll"
+            );
+
+            dom.btnMobileMenu?.classList.add(
+                "menu-hidden"
+            );
+        } else {
+            /*
+             * Subindo:
+             * mostra novamente.
+             */
+            readingTopbar.classList.remove(
+                "hidden-on-scroll"
+            );
+
+            dom.btnMobileMenu?.classList.remove(
+                "menu-hidden"
+            );
+        }
+
+        lastReadingScrollTop =
+            currentScroll;
+    }
+);
 
 
 dom.btnCloseReading?.addEventListener(
