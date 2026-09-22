@@ -7,6 +7,9 @@ from backend.domain.entities import (
     DocumentStatus,
     RetrievalUnit,
     DocumentRepresentation,
+    Investigation,
+    RetrievalResult,
+    Evidence,
 )
 
 
@@ -92,4 +95,75 @@ class EmbeddingProvider(ABC):
         self,
         texts: List[str],
     ) -> List[List[float]]:
+        pass
+
+
+class InvestigationRepository(ABC):
+
+    @abstractmethod
+    def create(self, investigation: Investigation) -> Investigation:
+        pass
+
+    @abstractmethod
+    def get_by_id(
+        self,
+        investigation_id: str,
+    ) -> Optional[Investigation]:
+        pass
+
+    @abstractmethod
+    def update_status(
+        self,
+        investigation_id: str,
+        status: str,
+    ) -> Investigation:
+        pass
+
+    @abstractmethod
+    def save_structured_response(
+        self,
+        investigation_id: str,
+        response: dict,
+    ) -> None:
+        pass
+
+
+class RetrievalResultRepository(ABC):
+
+    @abstractmethod
+    def save_batch(
+        self,
+        results: List[RetrievalResult],
+    ) -> List[RetrievalResult]:
+        pass
+
+    @abstractmethod
+    def get_by_investigation(
+        self,
+        investigation_id: str,
+    ) -> List[RetrievalResult]:
+        pass
+
+
+class EvidenceRepository(ABC):
+
+    @abstractmethod
+    def save_batch(
+        self,
+        evidences: List[Evidence],
+    ) -> List[Evidence]:
+        pass
+
+    @abstractmethod
+    def get_by_investigation(
+        self,
+        investigation_id: str,
+    ) -> List[Evidence]:
+        pass
+
+    @abstractmethod
+    def get_by_id(
+        self,
+        evidence_id: str,
+    ) -> Optional[Evidence]:
         pass
