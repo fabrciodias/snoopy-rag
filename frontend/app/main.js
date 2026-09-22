@@ -39,6 +39,10 @@ import {
     renderEvidencePanel,
 } from "../components/EvidencePanel.js";
 
+import {
+    addTranslationControl,
+} from "../features/reading/translation.js";
+
 
 const investigation =
     createInvestigationController();
@@ -127,35 +131,70 @@ async function loadFolders() {
         await fetchFolders();
 
     appState.folders =
-        folders;
+        Array.isArray(folders)
+            ? folders
+            : [];
 
     const selectedExists =
-        folders.some(
+        appState.folders.some(
             folder =>
                 folder.id ===
                 appState.folderId
         );
 
+    /*
+     * Ao restaurar uma sessão, o estado inicial da V3
+     * aponta para o acervo público.
+     *
+     * Se o usuário possui um acervo privado ativo,
+     * /folders/ já o devolveu do Supabase.
+     *
+     * Restauramos esse acervo automaticamente,
+     * reproduzindo o comportamento da V2.
+     */
     if (
+        appState.folderId ===
+            PUBLIC_FOLDER_ID &&
         !selectedExists
     ) {
+        const privateFolder =
+            appState.folders.find(
+                folder =>
+                    folder.id !==
+                    PUBLIC_FOLDER_ID
+            );
+
+        if (privateFolder) {
+            appState.folderId =
+                privateFolder.id;
+        }
+    }
+
+    const selected =
+        appState.folders.find(
+            folder =>
+                folder.id ===
+                appState.folderId
+        );
+
+    if (!selected) {
         appState.folderId =
             PUBLIC_FOLDER_ID;
     }
 
-    const selected =
-        folders.find(
+    const finalSelected =
+        appState.folders.find(
             folder =>
                 folder.id ===
                 appState.folderId
         );
 
     appState.folderName =
-        selected?.name ||
+        finalSelected?.name ||
         "Acervo Público";
 
     renderFolders(
-        folders,
+        appState.folders,
         appState.folderId
     );
 
@@ -1021,6 +1060,7 @@ async function openReading(
     }
 }
 
+
 function renderDocumentRepresentation(
     documentData,
     evidence
@@ -1059,12 +1099,6 @@ function renderDocumentRepresentation(
     let target =
         null;
 
-    /*
-     * Remove espaços e quebras de linha e
-     * normaliza capitalização para que a evidência
-     * consiga localizar o bloco correspondente
-     * na representação canônica.
-     */
     const evidenceText =
         normalizeReadingText(
             evidence?.content
@@ -1101,26 +1135,41 @@ function renderDocumentRepresentation(
             const block of
             page.blocks || []
         ) {
-            const paragraph =
+            const chunkDiv =
                 document.createElement(
-                    "p"
+                    "div"
                 );
 
-            paragraph.className =
+            chunkDiv.className =
                 "reading-chunk";
 
-            paragraph.textContent =
+            const textSpan =
+                document.createElement(
+                    "span"
+                );
+
+            textSpan.className =
+                "chunk-text-content";
+
+            const originalText =
                 block.text || "";
 
-            paragraph.style.whiteSpace =
+            textSpan.textContent =
+                originalText;
+
+            textSpan.style.whiteSpace =
                 "pre-wrap";
 
-            paragraph.style.lineHeight =
+            textSpan.style.lineHeight =
                 "1.7";
+
+            chunkDiv.appendChild(
+                textSpan
+            );
 
             const blockText =
                 normalizeReadingText(
-                    block.text
+                    originalText
                 );
 
             if (
@@ -1135,22 +1184,38 @@ function renderDocumentRepresentation(
                     )
                 )
             ) {
-                paragraph.classList.add(
+                chunkDiv.style.borderLeft =
+                    "4px solid var(--primary)";
+
+                chunkDiv.style.paddingLeft =
+                    "16px";
+
+                chunkDiv.classList.add(
                     "reading-evidence-target"
                 );
 
                 target =
-                    paragraph;
+                    chunkDiv;
             }
 
+            addTranslationControl(
+                chunkDiv,
+                textSpan,
+                originalText
+            );
+
             pageElement.appendChild(
-                paragraph
+                chunkDiv
             );
         }
 
         dom.readingContent.appendChild(
             pageElement
         );
+    }
+
+    if (window.lucide) {
+        lucide.createIcons();
     }
 
     if (target) {

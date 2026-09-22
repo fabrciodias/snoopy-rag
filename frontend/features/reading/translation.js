@@ -3,193 +3,83 @@ import {
 } from "../../infrastructure/api.js";
 
 
-const translatedBlocks =
-    new WeakMap();
-
-
-function createButton(
-    text
-) {
-    const button =
-        document.createElement(
-            "button"
-        );
-
-    button.type =
-        "button";
-
-    button.className =
-        "btn-outline reading-translation-button";
-
-    button.textContent =
-        text;
-
-    button.style.width =
-        "fit-content";
-
-    button.style.padding =
-        "4px 10px";
-
-    button.style.fontSize =
-        "0.75rem";
-
-    button.style.marginTop =
-        "8px";
-
-    return button;
-}
-
-
-function addTranslationControl(
-    paragraph
+export function addTranslationControl(
+    chunkDiv,
+    textSpan,
+    originalText
 ) {
     if (
-        !paragraph ||
-        paragraph.dataset.translationReady ===
-            "true"
+        !chunkDiv ||
+        !textSpan ||
+        !originalText?.trim()
     ) {
         return;
     }
 
-    const originalText =
-        paragraph.textContent?.trim();
+    const btnTranslate =
+        document.createElement("button");
 
-    if (!originalText) {
-        return;
-    }
+    btnTranslate.type =
+        "button";
 
-    paragraph.dataset.translationReady =
-        "true";
+    btnTranslate.className =
+        "btn-translate-chunk";
 
-    const wrapper =
-        document.createElement(
-            "div"
-        );
+    btnTranslate.title =
+        "Traduzir este parágrafo";
 
-    wrapper.className =
-        "reading-translation-controls";
+    btnTranslate.innerHTML =
+        `<i data-lucide="languages"
+            style="width: 15px; height: 15px;">
+        </i>`;
 
-    wrapper.style.display =
-        "flex";
-
-    wrapper.style.gap =
-        "8px";
-
-    wrapper.style.alignItems =
-        "center";
-
-    const translateButton =
-        createButton(
-            "Traduzir"
-        );
-
-    const status =
-        document.createElement(
-            "span"
-        );
-
-    status.className =
-        "evidence-subtitle";
-
-    status.textContent =
-        "";
-
-    wrapper.append(
-        translateButton,
-        status
+    chunkDiv.appendChild(
+        btnTranslate
     );
 
-    paragraph.insertAdjacentElement(
-        "afterend",
-        wrapper
-    );
-
-    translatedBlocks.set(
-        paragraph,
-        {
-            original:
-                originalText,
-            translated:
-                null,
-            showingTranslation:
-                false,
-        }
-    );
-
-    translateButton.addEventListener(
+    btnTranslate.addEventListener(
         "click",
-        async () => {
-            const state =
-                translatedBlocks.get(
-                    paragraph
-                );
-
-            if (!state) {
-                return;
-            }
+        async event => {
+            event.stopPropagation();
 
             if (
-                state.showingTranslation
+                chunkDiv.classList.contains(
+                    "translating-pulse"
+                )
             ) {
-                paragraph.textContent =
-                    state.original;
-
-                state.showingTranslation =
-                    false;
-
-                translateButton.textContent =
-                    "Traduzir";
-
-                status.textContent =
-                    "";
-
                 return;
             }
 
-            if (
-                state.translated
-            ) {
-                paragraph.textContent =
-                    state.translated;
+            chunkDiv.classList.add(
+                "translating-pulse"
+            );
 
-                state.showingTranslation =
-                    true;
-
-                translateButton.textContent =
-                    "Ver original";
-
-                status.textContent =
-                    "Tradução";
-
-                return;
-            }
-
-            translateButton.disabled =
-                true;
-
-            status.textContent =
-                "Traduzindo...";
+            btnTranslate.style.opacity =
+                "0";
 
             try {
                 const translation =
                     await translateText(
-                        state.original
+                        originalText
                     );
 
-                state.translated =
-                    translation;
+                const translatedClean =
+                    String(
+                        translation || ""
+                    ).replace(
+                        /\*\*(.*?)\*\*/g,
+                        "<strong>$1</strong>"
+                    );
 
-                state.showingTranslation =
-                    true;
+                textSpan.innerHTML =
+                    `<strong style="color: var(--primary);">
+                        [Tradução Original]:
+                    </strong>
 
-                paragraph.textContent =
-                    translation;
+                    ${translatedClean}`;
 
-                translateButton.textContent =
-                    "Ver original";
-
-                status.textContent =
-                    "Tradução";
+                textSpan.style.color =
+                    "var(--text-main)";
 
             } catch (error) {
                 console.error(
@@ -197,82 +87,22 @@ function addTranslationControl(
                     error
                 );
 
-                status.textContent =
-                    `Erro: ${error.message}`;
+                alert(
+                    "Incapaz de obter tradução da inteligência central. Tente novamente."
+                );
+
+                btnTranslate.style.opacity =
+                    "1";
 
             } finally {
-                translateButton.disabled =
-                    false;
+                chunkDiv.classList.remove(
+                    "translating-pulse"
+                );
             }
         }
     );
-}
 
-
-function scanReadingBlocks() {
-    const readingContent =
-        document.getElementById(
-            "reading-content"
-        );
-
-    if (!readingContent) {
-        return;
+    if (window.lucide) {
+        window.lucide.createIcons();
     }
-
-    const paragraphs =
-        readingContent.querySelectorAll(
-            ".reading-chunk"
-        );
-
-    paragraphs.forEach(
-        addTranslationControl
-    );
-}
-
-
-function initializeTranslationObserver() {
-    scanReadingBlocks();
-
-    const readingContent =
-        document.getElementById(
-            "reading-content"
-        );
-
-    if (!readingContent) {
-        return;
-    }
-
-    const observer =
-        new MutationObserver(
-            () => {
-                scanReadingBlocks();
-            }
-        );
-
-    observer.observe(
-        readingContent,
-        {
-            childList:
-                true,
-            subtree:
-                true,
-        }
-    );
-}
-
-
-if (
-    document.readyState ===
-    "loading"
-) {
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeTranslationObserver,
-        {
-            once:
-                true,
-        }
-    );
-} else {
-    initializeTranslationObserver();
 }

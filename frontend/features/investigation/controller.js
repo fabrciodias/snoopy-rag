@@ -30,7 +30,8 @@ export function createInvestigationController() {
 
 
     async function execute(query) {
-        const normalized = query.trim();
+        const normalized =
+            String(query || "").trim();
 
         if (!normalized) {
             return;
@@ -60,29 +61,40 @@ export function createInvestigationController() {
 
         busy = true;
 
-        startInvestigation(normalized);
+        startInvestigation(
+            normalized
+        );
 
-        showInvestigation(normalized);
+        showInvestigation(
+            normalized
+        );
 
         try {
-            const result = await investigate(
-                appState.folderId,
-                normalized,
-                5
-            );
+            const result =
+                await investigate(
+                    appState.folderId,
+                    normalized,
+                    5
+                );
 
             await enrichEvidenceMetadata(
                 result.evidences || []
             );
 
-            completeInvestigation(result);
+            completeInvestigation(
+                result
+            );
 
-            renderResult(result);
+            renderResult(
+                result
+            );
 
             return result;
 
         } catch (error) {
-            failInvestigation(error.message);
+            failInvestigation(
+                error.message
+            );
 
             showInvestigationError(
                 error.message
@@ -95,92 +107,103 @@ export function createInvestigationController() {
         }
     }
 
+
     async function enrichEvidenceMetadata(
         evidences
     ) {
-        const documentCache =
+        const cache =
             new Map();
 
         for (
             const evidence of evidences
         ) {
-            if (
-                !evidence.document_id
-            ) {
+            const documentId =
+                evidence.document_id;
+
+            if (!documentId) {
                 continue;
             }
 
-            if (
-                !documentCache.has(
-                    evidence.document_id
-                )
-            ) {
+            if (!cache.has(documentId)) {
                 try {
-                    const document =
+                    cache.set(
+                        documentId,
                         await fetchDocument(
-                            evidence.document_id
-                        );
-
-                    documentCache.set(
-                        evidence.document_id,
-                        document
+                            documentId
+                        )
                     );
                 } catch {
-                    documentCache.set(
-                        evidence.document_id,
-                        null 
+                    cache.set(
+                        documentId,
+                        null
                     );
                 }
             }
 
             const document =
-                documentCache.get(
-                    evidence.document_id
-                );
+                cache.get(documentId);
 
-            if (document) {
-                evidence.document_title =
-                    document.title ||
-                    "Documento";
+            if (!document) {
+                continue;
             }
+
+            evidence.document_title =
+                document.title ||
+                "Documento";
+
+            evidence.document =
+                document;
         }
 
         return evidences;
     }
 
 
-    function renderResult(result) {
+    function renderResult(
+        result
+    ) {
         dom.loadingState.classList.add(
             "hidden"
         );
-
-        if (!result.response) {
-            dom.answerBox.classList.remove(
-                "hidden"
-            );
-
-            dom.answerText.textContent =
-                "Nenhuma resposta foi produzida.";
-
-            return;
-        }
 
         dom.answerBox.classList.remove(
             "hidden"
         );
 
+        dom.sourcesContainer.innerHTML =
+            "";
+
+        dom.chunksContainer.innerHTML =
+            "";
+
+        const response =
+            result.response;
+
+        if (!response) {
+            dom.answerText.textContent =
+                "Nenhuma evidência encontrada no acervo para esta busca.";
+
+            return;
+        }
+
+        /*
+         * Mantém o texto da síntese V3.
+         *
+         * Não transformamos o conteúdo da resposta em
+         * HTML arbitrariamente, porque ele vem do backend.
+         */
+        dom.answerText.textContent =
+            response.content || "";
+
         dom.answerText.className =
             "";
 
-        dom.answerText.textContent =
-            result.response.content || "";
-
         renderSources(
-            result.response,
+            response,
             result.evidences || []
         );
 
-        renderChunks(
+        renderEvidenceList(
             result.evidences || []
         );
     }
@@ -194,18 +217,34 @@ export function createInvestigationController() {
             "";
 
         const evidenceMap =
-            new Map(
-                evidences.map(
-                    evidence => [
-                        evidence.evidence_id ||
-                        evidence.id,
-                        evidence
-                    ]
-                )
-            );
+            new Map();
+
+        for (
+            const evidence of evidences
+        ) {
+            const id =
+                evidence.evidence_id ||
+                evidence.id;
+
+            if (id) {
+                evidenceMap.set(
+                    id,
+                    evidence
+                );
+            }
+        }
 
         const references =
             response.evidence_refs || [];
+
+        if (!references.length) {
+            dom.sourcesContainer.innerHTML =
+                `<p class="no-sources-msg">
+                    Nenhuma fonte direta indexada.
+                </p>`;
+
+            return;
+        }
 
         for (
             const reference of references
@@ -219,48 +258,71 @@ export function createInvestigationController() {
                 continue;
             }
 
-            const button =
+            const card =
                 document.createElement(
                     "button"
                 );
 
+            card.type =
+                "button";
+
+            card.className =
+                "source-card";
+
+            const title =
+                document.createElement(
+                    "h4"
+                );
+
+            title.style.fontSize =
+                "0.85rem";
+
+            title.textContent =
+                evidence.document_title ||
+                "Documento";
+
+            const meta =
+                document.createElement(
+                    "p"
+                );
+
+            meta.className =
+                "source-meta";
+
             const location =
                 evidence.location || {};
 
-            const page = 
+            const page =
                 location.page ??
                 location.page_number;
 
-            button.type =
-                "button";
-
-            button.className =
-                "source-card";
-
-            button.textContent =
+            meta.textContent =
                 page
-                    ? `${evidence.document_title || "Documento"} · p. ${page}`
-                    : (
-                        evidence.document_title ||
-                        "Documento"
-                    );
+                    ? `Página ${page}`
+                    : "Localização não informada";
 
-            button.addEventListener(
+            card.append(
+                title,
+                meta
+            );
+
+            card.addEventListener(
                 "click",
-                () =>
+                () => {
                     selectEvidence(
                         evidence
-                    )
+                    );
+                }
             );
 
             dom.sourcesContainer.appendChild(
-                button
+                card
             );
         }
     }
 
 
-    function renderChunks(
+    function renderEvidenceList(
         evidences
     ) {
         dom.chunksContainer.innerHTML =
@@ -271,52 +333,149 @@ export function createInvestigationController() {
         ) {
             const card =
                 document.createElement(
-                    "article"
+                    "div"
                 );
 
             card.className =
                 "chunk-card";
 
-            const content =
+            const header =
+                document.createElement(
+                    "div"
+                );
+
+            header.style.display =
+                "flex";
+
+            header.style.justifyContent =
+                "space-between";
+
+            header.style.alignItems =
+                "center";
+
+            header.style.marginBottom =
+                "10px";
+
+            const title =
+                document.createElement(
+                    "h4"
+                );
+
+            title.style.margin =
+                "0";
+
+            title.textContent =
+                "Evidência";
+
+            const readButton =
+                document.createElement(
+                    "button"
+                );
+
+            readButton.type =
+                "button";
+
+            readButton.className =
+                "btn-outline";
+
+            readButton.style.width =
+                "fit-content";
+
+            readButton.style.padding =
+                "4px 10px";
+
+            readButton.style.fontSize =
+                "0.75rem";
+
+            readButton.style.minHeight =
+                "unset";
+
+            readButton.innerHTML =
+                `Ler no Contexto
+                 <i data-lucide="book-open"
+                    class="icon-sm"
+                    style="margin-left: 6px;">
+                 </i>`;
+
+            readButton.addEventListener(
+                "click",
+                event => {
+                    event.stopPropagation();
+
+                    selectEvidence(
+                        evidence
+                    );
+
+                    onReadEvidence(
+                        evidence
+                    );
+                }
+            );
+
+            header.append(
+                title,
+                readButton
+            );
+
+            const text =
                 document.createElement(
                     "p"
                 );
 
-            content.textContent =
+            text.textContent =
                 evidence.content || "";
 
-            card.appendChild(
-                content
-            );
+            text.style.whiteSpace =
+                "pre-wrap";
+
+            text.style.lineHeight =
+                "1.6";
 
             const location =
-                evidence.provenance?.location;
+                evidence.location || {};
 
-            if (location) {
-                const meta =
-                    document.createElement(
-                        "small"
+            const page =
+                location.page ??
+                location.page_number;
+
+            const meta =
+                document.createElement(
+                    "p"
+                );
+
+            meta.className =
+                "source-meta";
+
+            meta.textContent =
+                page
+                    ? `${evidence.document_title || "Documento"} · Página ${page}`
+                    : (
+                        evidence.document_title ||
+                        "Documento"
                     );
 
-                meta.textContent =
-                    `Localização: ${location}`;
-
-                card.appendChild(
-                    meta
-                );
-            }
+            card.append(
+                header,
+                text,
+                meta
+            );
 
             card.addEventListener(
                 "click",
-                () =>
+                () => {
                     selectEvidence(
                         evidence
-                    )
+                    );
+                }
             );
 
             dom.chunksContainer.appendChild(
                 card
             );
+        }
+
+        if (window.lucide) {
+            window.lucide.createIcons();
         }
     }
 
@@ -341,7 +500,8 @@ export function createInvestigationController() {
             new CustomEvent(
                 "snoopy:open-reading",
                 {
-                    detail: evidence,
+                    detail:
+                        evidence,
                 }
             )
         );
