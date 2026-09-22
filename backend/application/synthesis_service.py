@@ -1,11 +1,11 @@
 import json
-import os
 import uuid
 from typing import List
 
 from google import genai
 from google.genai import types
 
+from backend.config import settings
 from backend.domain.entities import (
     Investigation,
     RetrievalResult,
@@ -43,20 +43,12 @@ class SynthesisService:
         self.evidence_repo = evidence_repo
         self.investigation_repo = investigation_repo
 
-        api_key = os.environ.get("GEMINI_API_KEY")
+        self.model = settings.gemini_llm_model
 
-        if not api_key:
-            raise RuntimeError(
-                "GEMINI_API_KEY não configurada no ambiente."
-            )
-
-        self.model = os.environ.get(
-            "GEMINI_LLM_MODEL",
-            "gemini-3.5-flash",
+        self.client = genai.Client(
+            api_key=settings.gemini_api_key
         )
-
-        self.client = genai.Client(api_key=api_key)
-
+        
     def synthesize(
         self,
         investigation: Investigation,
