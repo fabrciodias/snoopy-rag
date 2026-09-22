@@ -1,174 +1,402 @@
-// 1. IMPORTAÇÕES
 import { appState } from './auth.js';
 
-// 2. OPERAÇÕES DE HISTÓRICO (Supabase)
-export async function fetchHistory() {
-    if (!appState.userToken || !appState.supabaseClient) return [];
-    
-    try {
-        const { data: { user } } = await appState.supabaseClient.auth.getUser();
-        const { data: history, error } = await appState.supabaseClient
-            .from('search_history')
-            .select('query')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(15);
 
-        if (error) throw error;
-        
-        // Retorna apenas queries únicas (remove duplicados do array)
-        return history ? [...new Set(history.map(item => item.query))] : [];
+// ============================================================
+// 1. Histórico
+// ============================================================
+
+export async function fetchHistory() {
+    if (!appState.userToken || !appState.supabaseClient) {
+        return [];
+    }
+
+    try {
+        const {
+            data: { user },
+            error: userError
+        } = await appState.supabaseClient.auth.getUser();
+
+        if (userError || !user) {
+            return [];
+        }
+
+        const { data: history, error } =
+            await appState.supabaseClient
+                .from('search_history')
+                .select('query')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(15);
+
+        if (error) {
+            throw error;
+        }
+
+        return history
+            ? [...new Set(history.map(item => item.query))]
+            : [];
+
     } catch (error) {
-        console.error("[API] Erro ao carregar histórico da nuvem:", error);
+        console.error(
+            '[API] Erro ao carregar histórico:',
+            error
+        );
+
         return [];
     }
 }
+
 
 export async function saveHistory(query) {
-    if (!appState.userToken || !appState.supabaseClient) return; 
-    
+    if (
+        !appState.userToken ||
+        !appState.supabaseClient ||
+        !query
+    ) {
+        return;
+    }
+
     try {
-        const { data: { user } } = await appState.supabaseClient.auth.getUser();
-        await appState.supabaseClient
+        const {
+            data: { user },
+            error: userError
+        } = await appState.supabaseClient.auth.getUser();
+
+        if (userError || !user) {
+            return;
+        }
+
+        const { error } = await appState.supabaseClient
             .from('search_history')
-            .insert([{ user_id: user.id, query: query }]);
+            .insert([
+                {
+                    user_id: user.id,
+                    query
+                }
+            ]);
+
+        if (error) {
+            throw error;
+        }
+
     } catch (error) {
-        console.error("[API] Erro ao salvar histórico na nuvem:", error);
+        console.error(
+            '[API] Erro ao salvar histórico:',
+            error
+        );
     }
 }
 
 
-// 3. SERVIÇOS DE STREAMING (Node.js / Python)
+// ============================================================
+// 2. Headers da API
+// ============================================================
+
+function getAuthHeaders() {
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+
+    if (appState.userToken) {
+        headers.Authorization =
+            `Bearer ${appState.userToken}`;
+    }
+
+    return headers;
+}
+
+
+// ============================================================
+// 3. Investigação V3
+// ============================================================
+
 export async function streamSearch(query, callbacks) {
-    const { onLog, onResult, onError } = callbacks;
-    
+    const {
+        onLog = () => {},
+        onResult = () => {},
+        onError = () => {}
+    } = callbacks;
+
+    if (!query?.trim()) {
+        onError('A pergunta não pode estar vazia.');
+        return;
+    }
+
+    if (!appState.userToken) {
+        onError('Sessão não autenticada.');
+        return;
+    }
+
     try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (appState.userToken) headers['Authorization'] = `Bearer ${appState.userToken}`;
+        onLog('Consultando o acervo...');
 
-        const response = await fetch('/api/search', {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ query, folder_id: appState.folderId })
-        });
+        const response = await fetch(
+            '/api/v3/investigate',
+            {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    folder_id: appState.folderId,
+                    query: query.trim(),
+                    limit: 5
+                })
+            }
+        );
 
-        await readStream(response, onLog, onResult, onError);
+        const payload = await parseJsonResponse(response);
+
+        if (!response.ok) {
+            throw new Error(
+                payload?.detail ||
+                payload?.error ||
+                'Falha na investigação.'
+            );
+        }
+
+        onLog('Investigação concluída.');
+
+        onResult(payload);
+
     } catch (error) {
+        console.error(
+            '[API V3] Falha na investigação:',
+            error
+        );
+
         onError(error.message);
     }
 }
+
+
+// ============================================================
+// 4. Sincronização V3
+// ============================================================
 
 export async function streamSync(callbacks) {
-    const { onLog, onResult, onError } = callbacks;
-    
+    const {
+        onLog = () => {},
+        onResult = () => {},
+        onError = () => {}
+    } = callbacks;
+
+    if (!appState.userToken) {
+        onError('Sessão não autenticada.');
+        return;
+    }
+
+    if (!appState.googleToken) {
+        onError(
+            'Token do Google indisponível. Faça login novamente.'
+        );
+        return;
+    }
+
     try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (appState.userToken) headers['Authorization'] = `Bearer ${appState.userToken}`;
+        onLog('Iniciando sincronização do acervo...');
 
-        const response = await fetch('/api/sync', {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ folder_id: appState.folderId, google_token: appState.googleToken })
-        });
+        const response = await fetch(
+            '/api/v3/sync-drive',
+            {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    folder_id: appState.folderId,
+                    google_token: appState.googleToken
+                })
+            }
+        );
 
-        await readStream(response, onLog, () => onResult("Sincronização Finalizada!"), onError);
+        const payload = await parseJsonResponse(response);
+
+        if (!response.ok) {
+            throw new Error(
+                payload?.detail ||
+                payload?.error ||
+                'Falha ao iniciar sincronização.'
+            );
+        }
+
+        const operationId = payload.operation_id;
+
+        if (!operationId) {
+            throw new Error(
+                'A API não retornou o identificador da operação.'
+            );
+        }
+
+        onLog(
+            `Sincronização iniciada (${operationId}).`
+        );
+
+        const finalOperation =
+            await waitForOperation(
+                operationId,
+                {
+                    onUpdate: (operation) => {
+                        onLog(
+                            formatOperationStatus(operation)
+                        );
+                    }
+                }
+            );
+
+        onResult(finalOperation);
+
     } catch (error) {
+        console.error(
+            '[API V3] Falha na sincronização:',
+            error
+        );
+
         onError(error.message);
     }
 }
 
 
-// 4. FUNÇÕES UTILITÁRIAS (Parser de SSE)
-async function readStream(response, onLog, onResult, onError) {
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let done = false;
-    let buffer = "";
+// ============================================================
+// 5. Consulta do estado da operação
+// ============================================================
 
-    while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        
-        if (value) {
-            buffer += decoder.decode(value, { stream: true });
-            
-            // Separa as mensagens pelo padrão duplo \n\n do SSE
-            const messages = buffer.split('\n\n');
-            
-            // O último elemento pode estar incompleto, volta pro buffer
-            buffer = messages.pop();
+export async function fetchOperation(operationId) {
+    if (!operationId) {
+        throw new Error(
+            'Identificador da operação não fornecido.'
+        );
+    }
 
-            for (const msg of messages) {
-                if (msg.startsWith('data: ')) {
-                    const jsonStr = msg.replace('data: ', '');
-                    if(!jsonStr.trim()) continue;
-                    
-                    try {
-                        const payload = JSON.parse(jsonStr);
-                        
-                        if (payload.type === 'log') {
-                            onLog(payload.message);
-                        } else if (payload.type === 'result') {
-                            onResult(payload.data || payload.status);
-                        } else if (payload.type === 'error') {
-                            throw new Error(payload.message);
-                        }
-                    } catch (e) {
-                        console.error("[API] Erro no parser do stream:", e, jsonStr);
-                    }
-                }
-            }
+    const response = await fetch(
+        `/api/v3/operations/${encodeURIComponent(operationId)}`,
+        {
+            method: 'GET',
+            headers: getAuthHeaders()
         }
+    );
+
+    const payload = await parseJsonResponse(response);
+
+    if (!response.ok) {
+        throw new Error(
+            payload?.detail ||
+            payload?.error ||
+            'Falha ao consultar operação.'
+        );
+    }
+
+    return payload;
+}
+
+
+// ============================================================
+// 6. Polling de operação
+// ============================================================
+
+async function waitForOperation(
+    operationId,
+    {
+        onUpdate = () => {},
+        intervalMs = 1500,
+        timeoutMs = 15 * 60 * 1000
+    } = {}
+) {
+    const startedAt = Date.now();
+
+    while (true) {
+        if (
+            Date.now() - startedAt >
+            timeoutMs
+        ) {
+            throw new Error(
+                'Tempo limite excedido ao acompanhar a operação.'
+            );
+        }
+
+        const operation =
+            await fetchOperation(operationId);
+
+        onUpdate(operation);
+
+        const status =
+            String(operation.status || '').toUpperCase();
+
+        if (status === 'COMPLETED') {
+            return operation;
+        }
+
+        if (
+            status === 'FAILED' ||
+            status === 'CANCELLED'
+        ) {
+            throw new Error(
+                operation.error ||
+                `A operação terminou com estado: ${status}.`
+            );
+        }
+
+        await sleep(intervalMs);
     }
 }
 
-// 5. WEBSOCKETS (REALTIME)
-let syncChannel = null;
 
-export async function fetchActiveJobs() {
-    if (!appState.userToken || !appState.supabaseClient || !appState.folderId) return [];
-    
+// ============================================================
+// 7. Formatação de estado
+// ============================================================
+
+function formatOperationStatus(operation) {
+    const status =
+        String(operation?.status || '')
+            .toUpperCase();
+
+    switch (status) {
+        case 'PENDING':
+            return 'Sincronização aguardando processamento...';
+
+        case 'PROCESSING':
+            return 'Processando documentos do acervo...';
+
+        case 'COMPLETED':
+            return 'Sincronização concluída.';
+
+        case 'FAILED':
+            return 'Sincronização falhou.';
+
+        case 'CANCELLED':
+            return 'Sincronização cancelada.';
+
+        default:
+            return `Estado da operação: ${
+                operation?.status || 'desconhecido'
+            }`;
+    }
+}
+
+
+// ============================================================
+// 8. Parser HTTP
+// ============================================================
+
+async function parseJsonResponse(response) {
+    const text = await response.text();
+
+    if (!text) {
+        return {};
+    }
+
     try {
-        const { data, error } = await appState.supabaseClient
-            .from('jobs')
-            .select('id, file_name, status, progress, drive_file_id')
-            .eq('folder_id', appState.folderId)
-            .in('status', ['pending', 'processing'])
-            .order('created_at', { ascending: true });
-
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error("[API] Erro ao carregar fila de processamento:", error);
-        return [];
+        return JSON.parse(text);
+    } catch {
+        return {
+            error: text
+        };
     }
 }
 
-export function listenToSyncQueue(onQueueUpdate) {
-    if (!appState.supabaseClient || !appState.folderId) return;
 
-    // Se já estivermos a escutar outro acervo, desliga o rádio antigo
-    if (syncChannel) {
-        appState.supabaseClient.removeChannel(syncChannel);
-    }
+// ============================================================
+// 9. Utilidades
+// ============================================================
 
-    console.log(`[REALTIME] A sintonizar atualizações do acervo: ${appState.folderId}`);
-
-    syncChannel = appState.supabaseClient
-        .channel(`jobs_channel_${appState.folderId}`)
-        .on(
-            'postgres_changes',
-            {
-                event: '*', // Escuta tudo: INSERT, UPDATE, DELETE
-                schema: 'public',
-                table: 'jobs',
-                filter: `folder_id=eq.${appState.folderId}`
-            },
-            async (payload) => {
-                // Sempre que o motor Python ou o Node mexerem na tabela, isto dispara!
-                const currentQueue = await fetchActiveJobs();
-                onQueueUpdate(currentQueue);
-            }
-        )
-        .subscribe();
+function sleep(ms) {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    });
 }

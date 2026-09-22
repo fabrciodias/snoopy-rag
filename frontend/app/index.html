@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LPP-Acervo | Pesquisa Acadêmica</title>
+    <link rel="stylesheet" href="/app/style.css">
+    <link rel="icon" href="data:,">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div id="mobile-overlay" class="mobile-overlay"></div>
+    <button id="btn-mobile-menu" class="btn-mobile-menu btn-icon" title="Menu">
+        <i data-lucide="menu"></i>
+    </button>
+
+    <div id="app" class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-top">
+                <div class="sidebar-header">
+                    <div id="logo-btn" class="logo-area" title="Página Inicial">
+                        <i data-lucide="microscope" class="icon-brand logo-default"></i>
+                        <i data-lucide="panel-left-open" class="icon-brand logo-hover hidden"></i>
+                        <h2 class="logo-small">LPP-Acervo</h2>
+                    </div>
+                    <button id="btn-sidebar-toggle" class="btn-icon" title="Recolher menu">
+                        <i data-lucide="panel-left-close"></i>
+                    </button>
+                </div>
+                <button id="btn-sidebar-new" class="btn-primary-full">
+                    <i data-lucide="plus" class="icon-sm"></i> <span>Nova Pesquisa</span>
+                </button>
+            </div>
+            
+            <div class="sidebar-middle">
+                <div id="auth-section" class="auth-box">
+                    <div id="folder-container" class="folder-box hidden" style="display: flex; flex-direction: column;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span class="folder-label" style="margin-bottom: 0; line-height: 1;">Acervo Atual</span>
+                            <button id="btn-sync" class="btn-icon hidden" title="Sincronizar Acervo" style="padding: 2px; transform: translateY(3px);">
+                                <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
+                            </button>
+                        </div>
+
+                        <select id="folder-selector" class="folder-dropdown">
+                            <option value="f7faf7d9-ec80-46c6-9572-174865bf1e62">GEPAFOR (Público)</option>
+                        </select>
+
+                        <button id="btn-drive" class="btn-outline w-full hidden" style="margin-top: 10px; font-size: 0.8rem; padding: 6px; justify-content: center;">
+                            <i data-lucide="folder-plus" class="icon-sm"></i> Conectar Pasta Privada
+                        </button>
+                        
+                        <div id="sync-logs" style="font-size: 0.75rem; color: var(--primary); margin-top: 6px; text-align: center; min-height: 14px;"></div>
+                        <div id="sync-progress-container" class="sync-accordion hidden">
+                            <div class="sync-accordion-header" id="btn-toggle-sync">
+                                <span id="sync-global-status" class="sync-status-text">Processando arquivos...</span>
+                                <i data-lucide="chevron-down" class="sync-chevron icon-sm"></i>
+                            </div>
+                            <div id="sync-jobs-list" class="sync-accordion-body">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <div class="nav-title-box" id="btn-nav-folder" title="Gerenciar Acervos">
+                        <i data-lucide="folder" class="icon-sm"></i>
+                        <h3 class="nav-title">Acervos</h3>
+                    </div>
+
+                    <div class="nav-title-box" id="btn-nav-history" title="Histórico Recente">
+                        <i data-lucide="history" class="icon-sm"></i>
+                        <h3 class="nav-title">Histórico Recente</h3>
+                    </div>
+                    <div id="history-list"></div>
+                </nav>
+            </div>
+
+            <div class="sidebar-bottom">
+                <button id="btn-theme-toggle" class="btn-icon" style="margin-bottom: 8px; width: 100%; justify-content: flex-start;" title="Alternar Tema">
+                    <i data-lucide="moon" class="icon-sm"></i>
+                    <span class="nav-title" style="font-size: 0.85rem;">Tema</span>
+                </button>
+
+                <button id="btn-login" class="btn-primary-full hidden" style="padding: 10px 12px; margin-top: 4px; min-height: 44px;">
+                    <i data-lucide="log-in" class="icon-sm"></i>
+                    <span style="font-size: 0.85rem; font-weight: 500;">Entrar</span>
+                </button>
+                
+                <div id="user-info" class="user-profile hidden" style="display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-app); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                        <img id="user-avatar" src="" alt="Avatar" class="avatar-img">
+                        <span class="user-name" style="font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Usuário</span>
+                    </div>
+
+                    <button id="btn-settings" class="btn-icon" title="Configurações">
+                        <i data-lucide="settings" style="width: 18px; height: 18px;"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <div id="main-content" class="main-area">
+            <div id="home-view" class="view active">
+                <div class="hero">
+                    <h1 class="logo">LPP-Acervo</h1>
+                    <p class="subtitle">Memória Institucional e Recuperação Semântica Documental</p>
+                    <form id="search-home" class="search-box">
+                        <input type="text" id="input-home" placeholder="Pesquisar" required autocomplete="off">
+                        <button type="submit">→</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="result-view" class="view">
+                <header class="topbar">
+                    <h2 id="query-title" class="sticky-query"></h2>
+
+                </header>
+
+                <main class="layout-grid">
+                    <section class="answer-section">
+                        <h3 style="font-size: 1.8rem; font-weight: 600; color: var(--text-main); margin-bottom: 20px;">Síntese:</h3>
+
+                        <div id="loading-state" class="hidden">
+                            <div class="spinner"></div>
+                            <p id="live-logs" class="live-logs">Iniciando motor...</p>
+                        </div>
+
+                        <div id="answer-box" class="hidden">
+                            <div id="answer-text"></div>
+                            <div id="sources-section" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                                <h3 style="font-size: 1.1rem; color: var(--text-main); font-weight: 600; margin-bottom: 15px;">Referências do Acervo</h3>
+                                <div id="sources-container"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <aside class="evidence-section">
+                        <div class="bottom-sheet-handle"></div>
+                        
+                        <div class="evidence-sticky-header" style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: -24px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border-color); z-index: 10; padding: 24px 24px 10px 24px; margin: -24px -24px 15px -24px;">
+                            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-main); margin: 0;">Trecho Original</h3>
+                            <button id="btn-close-evidence" class="btn-icon" title="Fechar painel" style="margin-right: -8px;">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                        
+                        <div id="chunks-container"></div>
+                        
+                        <p id="chunk-abnt" class="evidence-subtitle" style="font-size: 0.82rem; color: var(--text-muted); font-family: monospace; margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px;">Aguardando metadados da fonte...</p>
+                    </aside>
+                </main>
+            </div>
+
+            <div id="reading-view" class="view">
+                <header class="topbar reading-topbar">
+                    <div class="topbar-side">
+                        <button id="btn-close-reading" class="btn-icon btn-reading-action" title="Voltar para a pesquisa">
+                            <i data-lucide="arrow-left"></i> <span class="hide-mobile">Voltar</span>
+                        </button>
+                    </div>
+                    
+                    <div class="topbar-center">
+                        <h2 id="reading-title" class="sticky-query">Título do Documento</h2>
+                    </div>
+
+                    <div class="topbar-side right">
+                        <a id="reading-original-link" href="#" target="_blank" class="btn-outline btn-reading-action" title="Abrir PDF Original">
+                            <i data-lucide="external-link" class="icon-sm"></i> <span class="hide-mobile">PDF</span>
+                        </a>
+                    </div>
+                </header>
+
+                <main class="reading-layout">
+                    <div id="reading-content" class="reading-container">
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="settings" class="icon-sm"></i> Configurações
+                </h3>
+                <button id="btn-close-modal" class="btn-icon" title="Fechar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="setting-group">
+                    <h4>Gerenciamento de Acervo</h4>
+                    <p class="setting-desc">Gerencie a conexão com seu Google Drive.</p>
+                    
+                    <button id="btn-remove-folder" class="btn-danger w-full hidden">
+                        <i data-lucide="trash-2" class="icon-sm"></i> Desconectar Acervo Privado
+                    </button>
+                    
+                    <button class="btn-outline w-full" disabled title="Em breve" style="margin-top: 10px; opacity: 0.5; cursor: not-allowed;">
+                        <i data-lucide="upload-cloud" class="icon-sm"></i> Upload Manual (Em breve)
+                    </button>
+                </div>
+
+                <div class="setting-group" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                    <h4>Sessão</h4>
+                    <button id="btn-logout" class="btn-outline w-full" style="color: var(--text-main);">
+                        <i data-lucide="log-out" class="icon-sm"></i> Sair da Conta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="/app/main.js"></script>
+</body>
+</html>

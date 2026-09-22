@@ -17,6 +17,7 @@ data/
 .pytest_cache/
 *.log
 
+
 # Arquivos de Sistema e Editor
 node_modules/
 .vscode/

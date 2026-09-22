@@ -1,10 +1,20 @@
+from pathlib import Path
+
 from fastapi import (
     FastAPI,
     HTTPException,
     BackgroundTasks,
     Header,
 )
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 from pydantic import BaseModel
+
+
+from backend.config import settings
+
 
 from backend.infrastructure.supabase_repositories import (
     SupabaseOperationRepository,
@@ -15,41 +25,51 @@ from backend.infrastructure.supabase_repositories import (
     SupabaseEvidenceRepository,
 )
 
+
 from backend.infrastructure.gemini_provider import (
     GeminiEmbeddingProvider,
 )
+
 
 from backend.infrastructure.database import (
     supabase_client,
 )
 
+
 from backend.infrastructure.drive_provider import (
     GoogleDriveProvider,
 )
+
 
 from backend.application.drive_sync_service import (
     DriveSyncService,
 )
 
+
 from backend.application.operation_service import (
     OperationService,
 )
+
 
 from backend.application.retrieval_service import (
     RetrievalService,
 )
 
+
 from backend.application.synthesis_service import (
     SynthesisService,
 )
+
 
 from backend.application.document_processor import (
     DocumentProcessor,
 )
 
+
 from backend.application.segmentation_service import (
     SegmentationService,
 )
+
 
 from backend.application.publication_service import (
     PublicationService,
@@ -67,7 +87,16 @@ app = FastAPI(
 
 
 # ============================================================
-# 2. Infraestrutura
+# 2. Constantes da aplicação
+# ============================================================
+
+PUBLIC_FOLDER_ID = (
+    "f7faf7d9-ec80-46c6-9572-174865bf1e62"
+)
+
+
+# ============================================================
+# 3. Infraestrutura
 # ============================================================
 
 operation_repo = SupabaseOperationRepository(
@@ -100,7 +129,7 @@ drive_provider = GoogleDriveProvider()
 
 
 # ============================================================
-# 3. Application Services
+# 4. Application Services
 # ============================================================
 
 operation_service = OperationService(
@@ -142,7 +171,7 @@ drive_sync_service = DriveSyncService(
 
 
 # ============================================================
-# 4. Autenticação e autorização
+# 5. Autenticação e autorização
 # ============================================================
 
 def get_authenticated_user_id(
@@ -206,18 +235,25 @@ def ensure_folder_access(
     user_id: str,
 ):
     """
-    Verifica se o acervo existe, está ativo e pertence
-    ao usuário autenticado.
+    Verifica se o acervo existe, está ativo e pode ser
+    acessado pelo usuário autenticado.
 
-    O acervo é a fronteira de autorização da V3 Alpha.
+    Acesso permitido quando:
+
+    1. o acervo pertence ao usuário autenticado; ou
+    2. o acervo é o acervo público GEPAFOR.
+
+    O acervo continua sendo a fronteira de autorização
+    da V3 Alpha.
     """
 
     folder = (
         supabase_client
         .table("folders")
-        .select("id")
+        .select(
+            "id, user_id, name, drive_id, is_active"
+        )
         .eq("id", folder_id)
-        .eq("user_id", user_id)
         .eq("is_active", True)
         .limit(1)
         .execute()
@@ -229,11 +265,47 @@ def ensure_folder_access(
             detail="Acervo não encontrado.",
         )
 
-    return folder.data[0]
+    record = folder.data[0]
+
+    if (
+        record["id"] != PUBLIC_FOLDER_ID
+        and record.get("user_id") != user_id
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="Acervo não encontrado.",
+        )
+
+    return record
 
 
 # ============================================================
-# 5. Modelos de Entrada
+# 6. Configuração pública do Frontend
+# ============================================================
+
+@app.get(
+    "/config",
+    tags=["Frontend"],
+)
+def frontend_config():
+    """
+    Retorna somente as configurações públicas necessárias
+    para inicializar o cliente frontend.
+
+    Nunca expõe SUPABASE_SERVICE_KEY ou qualquer segredo
+    do backend.
+    """
+
+    return {
+        "url": settings.supabase_url,
+        "key": settings.supabase_key,
+        "googleApiKey": settings.google_api_key,
+        "googleAppId": settings.google_app_id,
+    }
+
+
+# ============================================================
+# 7. Modelos de Entrada
 # ============================================================
 
 class DriveSyncRequest(BaseModel):
@@ -247,8 +319,267 @@ class InvestigateRequest(BaseModel):
     limit: int = 5
 
 
+class FolderCreateRequest(BaseModel):
+    drive_id: str
+    name: str
+
+
 # ============================================================
-# 6. Endpoints — Documents / Google Drive
+# 8. Endpoints — Folders / Acervos
+# ============================================================
+
+@app.get(
+    "/folders/",
+    tags=["Folders"],
+)
+def list_folders(
+    authorization: str | None = Header(
+        default=None
+    ),
+):
+    """
+    Retorna os acervos disponíveis para o usuário.
+
+    Inclui:
+
+    - o acervo público GEPAFOR;
+    - os acervos privados pertencentes ao usuário.
+    """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    response = (
+        supabase_client
+        .table("folders")
+        .select(
+            "id, user_id, name, drive_id, is_active, created_at"
+        )
+        .eq("is_active", True)
+        .or_(
+            f"user_id.eq.{user_id},"
+            f"id.eq.{PUBLIC_FOLDER_ID}"
+        )
+        .order("created_at")
+        .execute()
+    )
+
+    return response.data
+
+
+@app.post(
+    "/folders/",
+    tags=["Folders"],
+)
+def create_folder(
+    request: FolderCreateRequest,
+    authorization: str | None = Header(
+        default=None
+    ),
+):
+    """
+    Registra um acervo selecionado pelo Google Picker.
+
+    A pasta do Drive pertence ao usuário autenticado.
+    O frontend nunca escolhe o user_id.
+
+    Se a pasta já estiver registrada para esse usuário,
+    ela é reativada e seu nome é atualizado.
+    """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    drive_id = request.drive_id.strip()
+    name = request.name.strip()
+
+    if not drive_id:
+        raise HTTPException(
+            status_code=400,
+            detail="drive_id não pode ser vazio.",
+        )
+
+    if not name:
+        raise HTTPException(
+            status_code=400,
+            detail="name não pode ser vazio.",
+        )
+
+    try:
+        response = (
+            supabase_client
+            .table("folders")
+            .upsert(
+                {
+                    "user_id": user_id,
+                    "drive_id": drive_id,
+                    "name": name,
+                    "is_active": True,
+                },
+                on_conflict="user_id,drive_id",
+            )
+            .execute()
+        )
+
+        if not response.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Falha ao registrar o acervo.",
+            )
+
+        return response.data[0]
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=str(error),
+        )
+
+
+@app.delete(
+    "/folders/{folder_id}",
+    tags=["Folders"],
+)
+def delete_folder(
+    folder_id: str,
+    authorization: str | None = Header(
+        default=None
+    ),
+):
+    """
+    Desativa logicamente um acervo privado.
+
+    O acervo público GEPAFOR não pode ser removido.
+    """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    if folder_id == PUBLIC_FOLDER_ID:
+        raise HTTPException(
+            status_code=403,
+            detail="O acervo público não pode ser removido.",
+        )
+
+    folder = (
+        supabase_client
+        .table("folders")
+        .select("id, user_id, is_active")
+        .eq("id", folder_id)
+        .eq("is_active", True)
+        .limit(1)
+        .execute()
+    )
+
+    if not folder.data:
+        raise HTTPException(
+            status_code=404,
+            detail="Acervo não encontrado.",
+        )
+
+    record = folder.data[0]
+
+    if record.get("user_id") != user_id:
+        raise HTTPException(
+            status_code=404,
+            detail="Acervo não encontrado.",
+        )
+
+    response = (
+        supabase_client
+        .table("folders")
+        .update({
+            "is_active": False,
+        })
+        .eq("id", folder_id)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Falha ao desativar o acervo.",
+        )
+
+    return {
+        "id": folder_id,
+        "is_active": False,
+    }
+
+
+# ============================================================
+# 9. Endpoints — Documents / Reading
+# ============================================================
+
+@app.get(
+    "/documents/{document_id}",
+    tags=["Documents"],
+)
+def get_document(
+    document_id: str,
+    authorization: str | None = Header(
+        default=None
+    ),
+):
+    """
+    Retorna os dados necessários para a leitura de um
+    documento no frontend.
+
+    A autorização é realizada através do acervo ao qual
+    o documento pertence.
+
+    O frontend não acessa diretamente o banco.
+    """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    response = (
+        supabase_client
+        .table("documents")
+        .select(
+            """
+            id,
+            folder_id,
+            title,
+            authors,
+            publication_year,
+            drive_file_id,
+            drive_link,
+            status,
+            representation
+            """
+        )
+        .eq("id", document_id)
+        .limit(1)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=404,
+            detail="Documento não encontrado.",
+        )
+
+    document = response.data[0]
+
+    ensure_folder_access(
+        document["folder_id"],
+        user_id,
+    )
+
+    return document
+
+
+# ============================================================
+# 10. Endpoints — Google Drive / Document Processing
 # ============================================================
 
 @app.post(
@@ -312,7 +643,7 @@ def sync_drive(
 
 
 # ============================================================
-# 7. Endpoints — Operations
+# 11. Endpoints — Operations
 # ============================================================
 
 @app.get(
@@ -332,8 +663,8 @@ def get_operation(
     à operação, evitando exposição de operações de outros
     usuários.
 
-    Útil para revalidação caso a conexão SSE do frontend
-    seja perdida.
+    O frontend pode utilizar este endpoint para polling
+    e revalidação após perda de comunicação.
     """
 
     user_id = get_authenticated_user_id(
@@ -359,7 +690,7 @@ def get_operation(
 
 
 # ============================================================
-# 8. Endpoints — Investigation
+# 12. Endpoints — Investigation
 # ============================================================
 
 @app.post(
@@ -456,3 +787,32 @@ def investigate(
             status_code=500,
             detail=str(error),
         )
+
+
+# ============================================================
+# 13. Frontend V3
+# ============================================================
+
+FRONTEND_DIR = (
+    Path(__file__).resolve().parents[2]
+    / "frontend"
+)
+
+
+@app.get(
+    "/",
+    include_in_schema=False,
+)
+def frontend_index():
+    return FileResponse(
+        FRONTEND_DIR / "app" / "index.html"
+    )
+
+
+app.mount(
+    "/",
+    StaticFiles(
+        directory=FRONTEND_DIR,
+    ),
+    name="frontend",
+)
