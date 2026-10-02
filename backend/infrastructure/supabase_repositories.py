@@ -1,31 +1,36 @@
-from typing import Optional, List
+from datetime import datetime, timezone
+from typing import List, Optional
 
 from supabase import Client
 
 from backend.domain.entities import (
+    Document,
+    DocumentRepresentation,
+    DocumentStatus,
+    Evidence,
+    Investigation,
+    InvestigationStatus,
     Operation,
     OperationStatus,
-    DocumentStatus,
-    DocumentRepresentation,
-    RetrievalUnit,
-    Investigation,
     RetrievalResult,
-    Evidence,
+    RetrievalUnit,
+    StructuredResponse,
 )
 
 from backend.domain.repositories import (
-    OperationRepository,
     DocumentRepository,
-    RetrievalUnitRepository,
-    InvestigationRepository,
-    RetrievalResultRepository,
     EvidenceRepository,
+    InvestigationRepository,
+    OperationRepository,
+    RetrievalResultRepository,
+    RetrievalUnitRepository,
 )
 
 
 # ============================================================
 # Operations
 # ============================================================
+
 
 class SupabaseOperationRepository(OperationRepository):
 
@@ -58,10 +63,7 @@ class SupabaseOperationRepository(OperationRepository):
                 "Falha ao persistir a operação."
             )
 
-        record = response.data[0]
-        record["operation_id"] = record.pop("id")
-
-        return Operation(**record)
+        return self._to_entity(response.data[0])
 
     def get_by_id(
         self,
@@ -73,16 +75,14 @@ class SupabaseOperationRepository(OperationRepository):
             .table(self.table_name)
             .select("*")
             .eq("id", operation_id)
+            .limit(1)
             .execute()
         )
 
         if not response.data:
             return None
 
-        record = response.data[0]
-        record["operation_id"] = record.pop("id")
-
-        return Operation(**record)
+        return self._to_entity(response.data[0])
 
     def update_status(
         self,
@@ -101,8 +101,6 @@ class SupabaseOperationRepository(OperationRepository):
             OperationStatus.FAILED,
             OperationStatus.CANCELLED,
         ):
-            from datetime import datetime, timezone
-
             payload["finished_at"] = (
                 datetime.now(timezone.utc).isoformat()
             )
@@ -120,15 +118,24 @@ class SupabaseOperationRepository(OperationRepository):
                 f"Operação '{operation_id}' não encontrada."
             )
 
-        record = response.data[0]
-        record["operation_id"] = record.pop("id")
+        return self._to_entity(response.data[0])
 
-        return Operation(**record)
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> Operation:
+
+        data = dict(record)
+
+        data["operation_id"] = data.pop("id")
+
+        return Operation(**data)
 
 
 # ============================================================
 # Documents
 # ============================================================
+
 
 class SupabaseDocumentRepository(DocumentRepository):
 
@@ -138,21 +145,20 @@ class SupabaseDocumentRepository(DocumentRepository):
 
     def create_or_update(
         self,
-        document_id: str,
-        title: str,
-        folder_id: str,
-        user_id: str,
-        drive_file_id: str,
-        document_hash: str,
-    ) -> None:
+        document: Document,
+    ) -> Document:
 
         payload = {
-            "id": document_id,
-            "title": title,
-            "folder_id": folder_id,
-            "user_id": user_id,
-            "drive_file_id": drive_file_id,
-            "document_hash": document_hash,
+            "id": document.document_id,
+            "folder_id": document.folder_id,
+            "user_id": document.user_id,
+            "title": document.title,
+            "authors": document.authors,
+            "publication_year": document.publication_year,
+            "drive_file_id": document.drive_file_id,
+            "drive_link": document.drive_link,
+            "document_hash": document.document_hash,
+            "status": document.status.value,
         }
 
         response = (
@@ -170,11 +176,32 @@ class SupabaseDocumentRepository(DocumentRepository):
                 "Falha ao criar ou atualizar o documento."
             )
 
+        return self._to_entity(response.data[0])
+
+    def get_by_id(
+        self,
+        document_id: str,
+    ) -> Optional[Document]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq("id", document_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        return self._to_entity(response.data[0])
+
     def update_status(
         self,
         document_id: str,
         status: DocumentStatus,
-    ) -> None:
+    ) -> Document:
 
         response = (
             self.client
@@ -191,11 +218,13 @@ class SupabaseDocumentRepository(DocumentRepository):
                 f"Documento '{document_id}' não encontrado."
             )
 
+        return self._to_entity(response.data[0])
+
     def save_representation(
         self,
         document_id: str,
         representation: DocumentRepresentation,
-    ) -> None:
+    ) -> Document:
 
         response = (
             self.client
@@ -214,6 +243,8 @@ class SupabaseDocumentRepository(DocumentRepository):
                 f"Documento '{document_id}' não encontrado."
             )
 
+        return self._to_entity(response.data[0])
+
     def get_representation(
         self,
         document_id: str,
@@ -224,6 +255,7 @@ class SupabaseDocumentRepository(DocumentRepository):
             .table(self.table_name)
             .select("representation")
             .eq("id", document_id)
+            .limit(1)
             .execute()
         )
 
@@ -239,10 +271,32 @@ class SupabaseDocumentRepository(DocumentRepository):
 
         return DocumentRepresentation(**representation)
 
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> Document:
+
+        data = dict(record)
+
+        representation = data.pop(
+            "representation",
+            None,
+        )
+
+        data["document_id"] = data.pop("id")
+
+        if representation:
+            data["representation"] = (
+                DocumentRepresentation(**representation)
+            )
+
+        return Document(**data)
+
 
 # ============================================================
 # Retrieval Units
 # ============================================================
+
 
 class SupabaseRetrievalUnitRepository(
     RetrievalUnitRepository
@@ -256,8 +310,6 @@ class SupabaseRetrievalUnitRepository(
         self,
         units: List[RetrievalUnit],
         embeddings: List[List[float]],
-        user_id: str,
-        folder_id: str,
     ) -> List[RetrievalUnit]:
 
         if not units:
@@ -277,14 +329,16 @@ class SupabaseRetrievalUnitRepository(
         ):
             payload.append({
                 "document_id": unit.document_id,
-                "folder_id": folder_id,
-                "user_id": user_id,
                 "content": unit.content,
                 "section": unit.section,
                 "embedding": embedding,
                 "unit_index": unit.unit_index,
-                "location": unit.location,
-                "representation_id": unit.representation_id,
+                "location": unit.location.model_dump(
+                    mode="json"
+                ),
+                "representation_id": (
+                    unit.representation_id
+                ),
             })
 
         response = (
@@ -296,7 +350,8 @@ class SupabaseRetrievalUnitRepository(
 
         if len(response.data) != len(units):
             raise RuntimeError(
-                "Nem todas as RetrievalUnits foram persistidas."
+                "Nem todas as RetrievalUnits "
+                "foram persistidas."
             )
 
         for unit, record in zip(
@@ -324,6 +379,7 @@ class SupabaseRetrievalUnitRepository(
 # ============================================================
 # Investigations
 # ============================================================
+
 
 class SupabaseInvestigationRepository(
     InvestigationRepository
@@ -358,10 +414,7 @@ class SupabaseInvestigationRepository(
                 "Falha ao persistir a investigação."
             )
 
-        record = response.data[0]
-        record["investigation_id"] = record.pop("id")
-
-        return Investigation(**record)
+        return self._to_entity(response.data[0])
 
     def get_by_id(
         self,
@@ -373,60 +426,93 @@ class SupabaseInvestigationRepository(
             .table(self.table_name)
             .select("*")
             .eq("id", investigation_id)
+            .limit(1)
             .execute()
         )
 
         if not response.data:
             return None
 
-        record = response.data[0]
-        record["investigation_id"] = record.pop("id")
-
-        return Investigation(**record)
+        return self._to_entity(response.data[0])
 
     def update_status(
         self,
         investigation_id: str,
-        status: str,
+        status: InvestigationStatus,
     ) -> Investigation:
 
         response = (
             self.client
             .table(self.table_name)
-            .update({"status": status})
+            .update({
+                "status": status.value,
+            })
             .eq("id", investigation_id)
             .execute()
         )
 
         if not response.data:
             raise RuntimeError(
-                f"Investigação '{investigation_id}' não encontrada."
+                f"Investigação '{investigation_id}' "
+                "não encontrada."
             )
 
-        record = response.data[0]
-        record["investigation_id"] = record.pop("id")
-
-        return Investigation(**record)
+        return self._to_entity(response.data[0])
 
     def save_structured_response(
         self,
         investigation_id: str,
-        response: dict,
-    ) -> None:
+        response: StructuredResponse,
+    ) -> Investigation:
 
-        self.client \
-            .table(self.table_name) \
-            .update({
-                "structured_response": response,
-                "status": "COMPLETED",
-            }) \
-            .eq("id", investigation_id) \
+        payload = {
+            "structured_response": response.model_dump(
+                mode="json"
+            ),
+            "status": InvestigationStatus.COMPLETED.value,
+        }
+
+        result = (
+            self.client
+            .table(self.table_name)
+            .update(payload)
+            .eq("id", investigation_id)
             .execute()
+        )
+
+        if not result.data:
+            raise RuntimeError(
+                f"Investigação '{investigation_id}' "
+                "não encontrada."
+            )
+
+        return self._to_entity(result.data[0])
+
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> Investigation:
+
+        data = dict(record)
+
+        data["investigation_id"] = data.pop("id")
+
+        structured_response = data.get(
+            "structured_response"
+        )
+
+        if structured_response:
+            data["structured_response"] = (
+                structured_response
+            )
+
+        return Investigation(**data)
 
 
 # ============================================================
 # Retrieval Results
 # ============================================================
+
 
 class SupabaseRetrievalResultRepository(
     RetrievalResultRepository
@@ -449,10 +535,25 @@ class SupabaseRetrievalResultRepository(
         for result in results:
             payload.append({
                 "id": result.result_id,
-                "investigation_id": result.investigation_id,
+                "investigation_id": (
+                    result.investigation_id
+                ),
                 "unit_id": result.unit_id,
+                "document_id": result.document_id,
                 "rank": result.rank,
-                "retrieval_score": result.retrieval_score,
+                "retrieval_score": (
+                    result.retrieval_score
+                ),
+                "semantic_score": (
+                    result.semantic_score
+                ),
+                "lexical_score": (
+                    result.lexical_score
+                ),
+                "content": result.content,
+                "location": result.location.model_dump(
+                    mode="json"
+                ),
                 "metadata": result.metadata,
             })
 
@@ -469,7 +570,10 @@ class SupabaseRetrievalResultRepository(
                 "foram persistidos."
             )
 
-        return results
+        return [
+            self._to_entity(record)
+            for record in response.data
+        ]
 
     def get_by_investigation(
         self,
@@ -480,27 +584,43 @@ class SupabaseRetrievalResultRepository(
             self.client
             .table(self.table_name)
             .select("*")
-            .eq("investigation_id", investigation_id)
+            .eq(
+                "investigation_id",
+                investigation_id,
+            )
             .order("rank")
             .execute()
         )
 
         return [
-            RetrievalResult(
-                result_id=row["id"],
-                investigation_id=row["investigation_id"],
-                unit_id=row["unit_id"],
-                rank=row["rank"],
-                retrieval_score=row["retrieval_score"],
-                metadata=row.get("metadata") or {},
-            )
-            for row in response.data
+            self._to_entity(record)
+            for record in response.data
         ]
+
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> RetrievalResult:
+
+        data = dict(record)
+
+        data["result_id"] = data.pop("id")
+
+        data["location"] = (
+            data.get("location") or {}
+        )
+
+        data["metadata"] = (
+            data.get("metadata") or {}
+        )
+
+        return RetrievalResult(**data)
 
 
 # ============================================================
 # Evidences
 # ============================================================
+
 
 class SupabaseEvidenceRepository(
     EvidenceRepository
@@ -523,13 +643,21 @@ class SupabaseEvidenceRepository(
         for evidence in evidences:
             payload.append({
                 "id": evidence.evidence_id,
-                "investigation_id": evidence.investigation_id,
+                "investigation_id": (
+                    evidence.investigation_id
+                ),
                 "unit_id": evidence.unit_id,
                 "document_id": evidence.document_id,
-                "location": evidence.location,
+                "location": evidence.location.model_dump(
+                    mode="json"
+                ),
                 "content": evidence.content,
                 "context": evidence.context,
-                "provenance": evidence.provenance,
+                "provenance": (
+                    evidence.provenance.model_dump(
+                        mode="json"
+                    )
+                ),
             })
 
         response = (
@@ -541,10 +669,14 @@ class SupabaseEvidenceRepository(
 
         if len(response.data) != len(evidences):
             raise RuntimeError(
-                "Nem todas as evidências foram persistidas."
+                "Nem todas as evidências "
+                "foram persistidas."
             )
 
-        return evidences
+        return [
+            self._to_entity(record)
+            for record in response.data
+        ]
 
     def get_by_investigation(
         self,
@@ -555,23 +687,17 @@ class SupabaseEvidenceRepository(
             self.client
             .table(self.table_name)
             .select("*")
-            .eq("investigation_id", investigation_id)
+            .eq(
+                "investigation_id",
+                investigation_id,
+            )
             .order("created_at")
             .execute()
         )
 
         return [
-            Evidence(
-                evidence_id=row["id"],
-                investigation_id=row["investigation_id"],
-                unit_id=row["unit_id"],
-                document_id=row["document_id"],
-                location=row.get("location") or {},
-                content=row["content"],
-                context=row.get("context") or "",
-                provenance=row.get("provenance") or {},
-            )
-            for row in response.data
+            self._to_entity(record)
+            for record in response.data
         ]
 
     def get_by_id(
@@ -584,21 +710,32 @@ class SupabaseEvidenceRepository(
             .table(self.table_name)
             .select("*")
             .eq("id", evidence_id)
+            .limit(1)
             .execute()
         )
 
         if not response.data:
             return None
 
-        row = response.data[0]
-
-        return Evidence(
-            evidence_id=row["id"],
-            investigation_id=row["investigation_id"],
-            unit_id=row["unit_id"],
-            document_id=row["document_id"],
-            location=row.get("location") or {},
-            content=row["content"],
-            context=row.get("context") or "",
-            provenance=row.get("provenance") or {},
+        return self._to_entity(
+            response.data[0]
         )
+
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> Evidence:
+
+        data = dict(record)
+
+        data["evidence_id"] = data.pop("id")
+
+        data["location"] = (
+            data.get("location") or {}
+        )
+
+        data["provenance"] = (
+            data.get("provenance") or {}
+        )
+
+        return Evidence(**data)

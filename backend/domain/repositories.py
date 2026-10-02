@@ -1,26 +1,40 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List, Optional
 
 from backend.domain.entities import (
+    Document,
+    DocumentRepresentation,
+    DocumentStatus,
+    EmbeddingProvider,
+    Evidence,
+    Investigation,
+    InvestigationStatus,
     Operation,
     OperationStatus,
-    DocumentStatus,
-    RetrievalUnit,
-    DocumentRepresentation,
-    Investigation,
     RetrievalResult,
-    Evidence,
+    RetrievalUnit,
+    StructuredResponse,
 )
 
+
+# ============================================================
+# Operation Repository
+# ============================================================
 
 class OperationRepository(ABC):
 
     @abstractmethod
-    def create(self, operation: Operation) -> Operation:
+    def create(
+        self,
+        operation: Operation,
+    ) -> Operation:
         pass
 
     @abstractmethod
-    def get_by_id(self, operation_id: str) -> Optional[Operation]:
+    def get_by_id(
+        self,
+        operation_id: str,
+    ) -> Optional[Operation]:
         pass
 
     @abstractmethod
@@ -33,18 +47,30 @@ class OperationRepository(ABC):
         pass
 
 
+# ============================================================
+# Document Repository
+# ============================================================
+
 class DocumentRepository(ABC):
 
     @abstractmethod
     def create_or_update(
         self,
+        document: Document,
+    ) -> Document:
+        """
+        Cria ou atualiza a entidade documental.
+
+        A identidade e os metadados persistentes do documento
+        pertencem ao próprio contrato Document.
+        """
+        pass
+
+    @abstractmethod
+    def get_by_id(
+        self,
         document_id: str,
-        title: str,
-        folder_id: str,
-        user_id: str,
-        drive_file_id: str,
-        document_hash: str,
-    ) -> None:
+    ) -> Optional[Document]:
         pass
 
     @abstractmethod
@@ -52,7 +78,7 @@ class DocumentRepository(ABC):
         self,
         document_id: str,
         status: DocumentStatus,
-    ) -> None:
+    ) -> Document:
         pass
 
     @abstractmethod
@@ -60,7 +86,7 @@ class DocumentRepository(ABC):
         self,
         document_id: str,
         representation: DocumentRepresentation,
-    ) -> None:
+    ) -> Document:
         pass
 
     @abstractmethod
@@ -71,6 +97,10 @@ class DocumentRepository(ABC):
         pass
 
 
+# ============================================================
+# Retrieval Unit Repository
+# ============================================================
+
 class RetrievalUnitRepository(ABC):
 
     @abstractmethod
@@ -78,15 +108,27 @@ class RetrievalUnitRepository(ABC):
         self,
         units: List[RetrievalUnit],
         embeddings: List[List[float]],
-        user_id: str,
-        folder_id: str,
     ) -> List[RetrievalUnit]:
+        """
+        Persiste RetrievalUnits e seus vetores associados.
+
+        user_id e folder_id não fazem parte da identidade da
+        RetrievalUnit; são contexto de autorização/persistência
+        derivado do documento e do acervo.
+        """
         pass
 
     @abstractmethod
-    def delete_by_document(self, document_id: str) -> None:
+    def delete_by_document(
+        self,
+        document_id: str,
+    ) -> None:
         pass
 
+
+# ============================================================
+# Embedding Provider
+# ============================================================
 
 class EmbeddingProvider(ABC):
 
@@ -98,10 +140,17 @@ class EmbeddingProvider(ABC):
         pass
 
 
+# ============================================================
+# Investigation Repository
+# ============================================================
+
 class InvestigationRepository(ABC):
 
     @abstractmethod
-    def create(self, investigation: Investigation) -> Investigation:
+    def create(
+        self,
+        investigation: Investigation,
+    ) -> Investigation:
         pass
 
     @abstractmethod
@@ -115,7 +164,7 @@ class InvestigationRepository(ABC):
     def update_status(
         self,
         investigation_id: str,
-        status: str,
+        status: InvestigationStatus,
     ) -> Investigation:
         pass
 
@@ -123,10 +172,14 @@ class InvestigationRepository(ABC):
     def save_structured_response(
         self,
         investigation_id: str,
-        response: dict,
-    ) -> None:
+        response: StructuredResponse,
+    ) -> Investigation:
         pass
 
+
+# ============================================================
+# Retrieval Result Repository
+# ============================================================
 
 class RetrievalResultRepository(ABC):
 
@@ -144,6 +197,10 @@ class RetrievalResultRepository(ABC):
     ) -> List[RetrievalResult]:
         pass
 
+
+# ============================================================
+# Evidence Repository
+# ============================================================
 
 class EvidenceRepository(ABC):
 

@@ -1,6 +1,7 @@
 from fastapi import (
     APIRouter,
     Header,
+    HTTPException,
 )
 
 from backend.api.dependencies import (
@@ -62,8 +63,6 @@ def get_document(
     )
 
     if not response.data:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=404,
             detail="Documento não encontrado.",
