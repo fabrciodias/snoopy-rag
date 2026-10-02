@@ -86,6 +86,12 @@ class DocumentRepository(ABC):
         document_id: str,
         representation: DocumentRepresentation,
     ) -> Document:
+        """
+        Persiste uma nova representação histórica do documento
+        e a associa como representação corrente.
+
+        A representação anterior não deve ser sobrescrita.
+        """
         pass
 
     @abstractmethod

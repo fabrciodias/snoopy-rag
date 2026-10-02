@@ -78,6 +78,7 @@ class SynthesisService:
                     result_id=result.result_id,
                     unit_id=result.unit_id,
                     document_id=result.document_id,
+                    representation_id=result.representation_id,
                     location=result.location,
                 ),
             )

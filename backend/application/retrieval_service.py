@@ -163,6 +163,7 @@ class RetrievalService:
             ):
                 result = RetrievalResult(
                     result_id=str(uuid.uuid4()),
+                    investigation_id=investigation.investigation_id,
                     investigation_id=(
                         investigation.investigation_id
                     ),

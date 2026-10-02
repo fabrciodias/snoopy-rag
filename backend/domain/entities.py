@@ -41,6 +41,7 @@ class Document(BaseModel):
 
     status: DocumentStatus = DocumentStatus.PENDING
 
+    current_representation_id: Optional[str] = None
     representation: Optional["DocumentRepresentation"] = None
 
 
@@ -50,20 +51,35 @@ class Document(BaseModel):
 
 class DocumentBlock(BaseModel):
     """
-    Unidade textual elementar extraída de uma página do documento.
+    Unidade elementar da representação documental.
+
+    Mantém o conteúdo textual e a posição espacial do bloco
+    dentro da página original.
     """
 
     block_index: int
     text: str
-    block_type: str = "paragraph"
+    block_type: str = "text"
+
+    x0: Optional[float] = None
+    y0: Optional[float] = None
+    x1: Optional[float] = None
+    y1: Optional[float] = None
 
 
 class DocumentPage(BaseModel):
     """
     Página da representação canônica do documento.
+
+    As dimensões permitem interpretar as coordenadas dos blocos
+    no sistema espacial original da página.
     """
 
     page_number: int
+
+    width: Optional[float] = None
+    height: Optional[float] = None
+
     blocks: List[DocumentBlock] = Field(
         default_factory=list
     )
@@ -73,8 +89,8 @@ class DocumentRepresentation(BaseModel):
     """
     Representação canônica derivada da fonte documental.
 
-    Não é o documento lógico em si. É uma versão estruturada
-    da fonte física utilizada pelo restante do pipeline.
+    Preserva a estrutura necessária para reconstruir a localização
+    de uma unidade de recuperação dentro da fonte original.
     """
 
     representation_id: str
@@ -97,15 +113,26 @@ class DocumentLocation(BaseModel):
     """
     Localização de uma unidade dentro da representação documental.
 
-    O contrato atual trabalha com página e bloco.
-    Coordenadas geométricas poderão ser adicionadas na
-    consolidação da representação na Passada 4.
+    Página e bloco identificam a posição estrutural.
+    Bounding boxes identificam a região espacial correspondente
+    na página quando essa informação estiver disponível.
     """
 
     start_page: Optional[int] = None
     end_page: Optional[int] = None
+
     start_block: Optional[int] = None
     end_block: Optional[int] = None
+
+    start_x0: Optional[float] = None
+    start_y0: Optional[float] = None
+    start_x1: Optional[float] = None
+    start_y1: Optional[float] = None
+
+    end_x0: Optional[float] = None
+    end_y0: Optional[float] = None
+    end_x1: Optional[float] = None
+    end_y1: Optional[float] = None
 
 
 # ============================================================
@@ -195,6 +222,7 @@ class RetrievalResult(BaseModel):
 
     unit_id: int
     document_id: str
+    representation_id: str
 
     rank: int
     retrieval_score: float
@@ -229,6 +257,7 @@ class EvidenceProvenance(BaseModel):
     result_id: str
     unit_id: int
     document_id: str
+    representation_id: str
 
     location: DocumentLocation = Field(
         default_factory=DocumentLocation

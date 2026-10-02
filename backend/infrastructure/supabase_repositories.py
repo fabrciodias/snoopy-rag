@@ -226,24 +226,52 @@ class SupabaseDocumentRepository(DocumentRepository):
         representation: DocumentRepresentation,
     ) -> Document:
 
-        response = (
+        representation_payload = {
+            "id": representation.representation_id,
+            "document_id": document_id,
+            "representation": representation.model_dump(
+            mode="json"
+            ),
+        }
+
+        history_response = (
+            self.client
+            .table("document_representations")
+            .insert(representation_payload)
+            .execute()
+        )
+
+        if not history_response.data:
+            raise RuntimeError(
+                "Falha ao persistir a representação documental."
+            )
+
+        document_response = (
             self.client
             .table(self.table_name)
             .update({
-                "representation": representation.model_dump(
-                    mode="json"
+                "current_representation_id": (
+                    representation.representation_id
+                ),
+                "representation": (
+                    representation.model_dump(
+                        mode="json"
+                    )
                 ),
             })
             .eq("id", document_id)
             .execute()
         )
 
-        if not response.data:
+        if not document_response.data:
             raise RuntimeError(
                 f"Documento '{document_id}' não encontrado."
             )
 
-        return self._to_entity(response.data[0])
+        return self._to_entity(
+            document_response.data[0]
+        )
+
 
     def get_representation(
         self,
@@ -540,6 +568,7 @@ class SupabaseRetrievalResultRepository(
                 ),
                 "unit_id": result.unit_id,
                 "document_id": result.document_id,
+                "representation_id": result.representation_id,
                 "rank": result.rank,
                 "retrieval_score": (
                     result.retrieval_score

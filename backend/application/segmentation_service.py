@@ -1,87 +1,163 @@
-from typing import List
-from backend.domain.entities import DocumentRepresentation, RetrievalUnit
+from typing import List, Optional
+
+from backend.domain.entities import (
+    DocumentBlock,
+    DocumentLocation,
+    DocumentRepresentation,
+    RetrievalUnit,
+)
+
 
 class SegmentationService:
     """
-    Serviço responsável por fatiar a Representação Canônica do documento
-    em Unidades de Recuperação (RetrievalUnits).
-    Substitui a lógica frágil baseada em regex do antigo chunker.py, 
-    garantindo que cada fragmento mantenha sua rastreabilidade espacial exata
-    (página e bloco) de volta à fonte original.
-    """
-    
-    def __init__(self, max_words_per_unit: int = 250):
-        # 250 palavras é um bom padrão heurístico para manter a densidade
-        # semântica alta para o modelo de embeddings (geralmente ~350 a 500 tokens).
-        self.max_words_per_unit = max_words_per_unit
+    Converte uma DocumentRepresentation em RetrievalUnits.
 
-    def segment(self, representation: DocumentRepresentation) -> List[RetrievalUnit]:
-        units = []
-        current_text = []
+    A segmentação continua sendo heurística nesta etapa.
+    O objetivo aqui é preservar corretamente a proveniência
+    estrutural e espacial de cada unidade.
+    """
+
+    def __init__(
+        self,
+        max_words_per_unit: int = 250,
+    ):
+        self.max_words_per_unit = (
+            max_words_per_unit
+        )
+
+    @staticmethod
+    def _location_from_blocks(
+        start_page: int,
+        start_block: DocumentBlock,
+        end_page: int,
+        end_block: DocumentBlock,
+    ) -> DocumentLocation:
+
+        return DocumentLocation(
+            start_page=start_page,
+            end_page=end_page,
+            start_block=start_block.block_index,
+            end_block=end_block.block_index,
+            start_x0=start_block.x0,
+            start_y0=start_block.y0,
+            start_x1=start_block.x1,
+            start_y1=start_block.y1,
+            end_x0=end_block.x0,
+            end_y0=end_block.y0,
+            end_x1=end_block.x1,
+            end_y1=end_block.y1,
+        )
+
+    def segment(
+        self,
+        representation: DocumentRepresentation,
+    ) -> List[RetrievalUnit]:
+
+        units: List[RetrievalUnit] = []
+
+        current_text: List[str] = []
         current_word_count = 0
-        
-        # Rastreadores de proveniência espacial
-        start_page = None
-        start_block = None
+
+        start_page: Optional[int] = None
+        start_block: Optional[DocumentBlock] = None
+
+        last_page: Optional[int] = None
+        last_block: Optional[DocumentBlock] = None
+
         unit_index = 0
-        
+
         for page in representation.pages:
+
             for block in page.blocks:
-                # Marca a origem se estivermos abrindo uma nova unidade
+
                 if start_page is None:
                     start_page = page.page_number
-                    start_block = block.block_index
-                    
-                words = block.text.split()
+                    start_block = block
+
                 current_text.append(block.text)
-                current_word_count += len(words)
-                
-                # Se o "balde" encheu, empacotamos a RetrievalUnit
-                if current_word_count >= self.max_words_per_unit:
+
+                current_word_count += len(
+                    block.text.split()
+                )
+
+                last_page = page.page_number
+                last_block = block
+
+                if (
+                    current_word_count
+                    >= self.max_words_per_unit
+                ):
                     units.append(
                         RetrievalUnit(
-                            document_id=representation.document_id,
-                            representation_id=representation.representation_id,
+                            document_id=(
+                                representation.document_id
+                            ),
+                            representation_id=(
+                                representation.representation_id
+                            ),
                             unit_index=unit_index,
-                            content="\n\n".join(current_text),
-                            location={
-                                "start_page": start_page,
-                                "end_page": page.page_number,
-                                "start_block": start_block,
-                                "end_block": block.block_index
-                            },
-                            section="Geral", # Ponto de evolução: detectar blocos do tipo "heading"
-                            metadata=representation.metadata
+                            content="\n\n".join(
+                                current_text
+                            ),
+                            location=(
+                                self._location_from_blocks(
+                                    start_page,
+                                    start_block,
+                                    last_page,
+                                    last_block,
+                                )
+                            ),
+                            section="Geral",
+                            metadata=(
+                                representation.metadata
+                            ),
                         )
                     )
-                    
-                    # Reseta o balde para o próximo bloco
+
                     unit_index += 1
+
                     current_text = []
                     current_word_count = 0
+
                     start_page = None
                     start_block = None
-                    
-        # Recolhe o fragmento residual (o finalzinho do documento que não encheu o balde)
-        if current_text:
-            end_page = representation.pages[-1].page_number if representation.pages else 1
-            end_block = representation.pages[-1].blocks[-1].block_index if representation.pages and representation.pages[-1].blocks else 0
-            
+                    last_page = None
+                    last_block = None
+
+        # ========================================================
+        # Fragmento residual
+        # ========================================================
+
+        if (
+            current_text
+            and start_page is not None
+            and start_block is not None
+            and last_page is not None
+            and last_block is not None
+        ):
             units.append(
                 RetrievalUnit(
-                    document_id=representation.document_id,
-                    representation_id=representation.representation_id,
+                    document_id=(
+                        representation.document_id
+                    ),
+                    representation_id=(
+                        representation.representation_id
+                    ),
                     unit_index=unit_index,
-                    content="\n\n".join(current_text),
-                    location={
-                        "start_page": start_page,
-                        "end_page": end_page,
-                        "start_block": start_block,
-                        "end_block": end_block
-                    },
+                    content="\n\n".join(
+                        current_text
+                    ),
+                    location=(
+                        self._location_from_blocks(
+                            start_page,
+                            start_block,
+                            last_page,
+                            last_block,
+                        )
+                    ),
                     section="Geral",
-                    metadata=representation.metadata
+                    metadata=representation.metadata,
                 )
             )
-            
+
         return units
