@@ -1,210 +1,73 @@
-/* ==========================================================================
-   SNOOPY-RAG V3 — STYLE SYSTEM
-   ==========================================================================
-
-   Organização:
-
-   01. Tokens / Cores
-   02. Reset / Utilitários
-   03. Layout global
-   04. Sidebar
-   05. Sidebar colapsada
-   06. Topbar
-   07. Home / Pesquisa
-   08. Investigation / Resultados
-   09. Evidências
-   10. Estados de carregamento
-   11. Modal / Settings
-   12. Reading
-   13. Tradução
-   14. Responsividade
-   ========================================================================== */
-
-
-/* ==========================================================================
-   01. TOKENS — CONFIGURAÇÃO VISUAL
-   ========================================================================== */
-
+/* --------------------------------------------------------------------------
+   1. FUNDAÇÃO (VARIÁVEIS, RESETS & UTILITÁRIOS)
+   -------------------------------------------------------------------------- */
 :root {
+    /* Cores Base - Paleta Terminal Lo-Fi */
+    --bg-app: #121513;
+    --bg-panel: #1a1e1b;
+    --bg-hover: #232925;
 
-    /* ----------------------------------------------------------------------
-       CORES — ALTERE AQUI
-       ---------------------------------------------------------------------- */
+    /* Tipografia e Contrastes */
+    --text-main: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border-color: #2d332f;
 
-    --color-bg-app: #121513;
-    --color-bg-panel: #1a1e1b;
-    --color-bg-hover: #232925;
+    /* Identidade Visual (Verde Sálvia) */
+    --primary: #6a8465;
+    --primary-hover: #546a51;
 
-    --color-text-main: #e5e7eb;
-    --color-text-muted: #9ca3af;
-
-    --color-border: #2d332f;
-
-    --color-primary: #6a8465;
-    --color-primary-hover: #546a51;
-
-    --color-danger: #ef4444;
-
-    --color-white: #ffffff;
-    --color-black: #000000;
-
-    /* ----------------------------------------------------------------------
-   Compatibilidade com HTML existente / legado V2
-   ---------------------------------------------------------------------- */
-
-    --bg-app: var(--color-bg-app);
-    --bg-panel: var(--color-bg-panel);
-    --bg-hover: var(--color-bg-hover);
-
-    --text-main: var(--color-text-main);
-    --text-muted: var(--color-text-muted);
-
-    --border-color: var(--color-border);
-
-    --primary: var(--color-primary);
-    --primary-hover: var(--color-primary-hover);
-
-    --danger: var(--color-danger);
-
-    /*
-     * Componentes que utilizam rgba().
-     *
-     * Se alterar --color-primary, altere também
-     * --primary-rgb para manter os efeitos visuais.
-     */
-    --primary-rgb: 106, 132, 101;
-    --black-rgb: 0, 0, 0;
-    --danger-rgb: 239, 68, 68;
-
-
-    /* ----------------------------------------------------------------------
-       TIPOGRAFIA
-       ---------------------------------------------------------------------- */
-
-    --font-family:
-        "Inter",
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-
-
-    /* ----------------------------------------------------------------------
-       ESPAÇAMENTO
-       ---------------------------------------------------------------------- */
-
+    /* Box Model e Espaçamentos */
     --space-xs: 4px;
     --space-sm: 8px;
     --space-md: 16px;
     --space-lg: 24px;
-    --space-xl: 40px;
 
-
-    /* ----------------------------------------------------------------------
-       BORDAS
-       ---------------------------------------------------------------------- */
-
+    /* Arredondamentos */
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 16px;
-    --radius-xl: 24px;
 
+    /* Física de Transições */
+    --trans-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --trans-med: 250ms ease;
 
-    /* ----------------------------------------------------------------------
-       TRANSIÇÕES
-       ---------------------------------------------------------------------- */
-
-    --trans-fast:
-        150ms cubic-bezier(0.4, 0, 0.2, 1);
-
-    --trans-med:
-        250ms ease;
-
-    --trans-layout:
-        400ms cubic-bezier(0.25, 1, 0.5, 1);
-
-
-    /* ----------------------------------------------------------------------
-       SIDEBAR
-       ---------------------------------------------------------------------- */
-
+    /* Grid e Chassis */
     --sidebar-width: 280px;
     --sidebar-collapsed: 70px;
-
-
-    /* ----------------------------------------------------------------------
-       LAYOUT
-       ---------------------------------------------------------------------- */
-
-    --topbar-height: 56px;
-}
-
-
-/* ==========================================================================
-   TEMA CLARO
-   ========================================================================== */
+    --font-family: 'Inter', -apple-system, sans-serif;
+} 
 
 body.light-theme {
-    --color-bg-app: #f9fafb;
-    --color-bg-panel: #ffffff;
-    --color-bg-hover: #f3f4f6;
+    --bg-app: #f9fafb;
+    --bg-panel: #ffffff;
+    --bg-hover: #f3f4f6;
 
-    --color-text-main: #1f2937;
-    --color-text-muted: #6b7280;
+    --text-main: #1f2937;
+    --text-muted: #6b7280;
 
-    --color-border: #e5e7eb;
+    --border-color: #e5e7eb;
 
-    --color-primary: #4b6347;
-    --color-primary-hover: #374a34;
-
-    --primary-rgb: 75, 99, 71;
+    --primary: #4b6347; 
+    --primary-hover: #374a34;
 }
 
-/* ==========================================================================
-   02. RESET / UTILITÁRIOS
-   ========================================================================== */
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-html,
-body {
-    width: 100%;
-    height: 100%;
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
 }
 
 body {
     font-family: var(--font-family);
-    background-color: var(--color-bg-app);
-    color: var(--color-text-main);
+    background-color: var(--bg-app);
+    color: var(--text-main);
     line-height: 1.6;
     overflow: hidden;
 }
 
-button,
-input,
-select {
-    font-family: inherit;
-}
-
-button,
-a {
-    -webkit-tap-highlight-color: transparent;
-}
-
-button {
-    cursor: pointer;
-}
-
-.hidden {
-    display: none !important;
-}
-
-.w-full {
-    width: 100%;
+/* Utilitários Globais */
+.hidden { 
+    display: none !important; 
 }
 
 .avatar-img {
@@ -214,642 +77,274 @@ button {
     object-fit: cover;
 }
 
-.icon-sm {
-    width: 16px;
-    height: 16px;
-}
 
-.icon-brand {
-    width: 22px;
-    height: 22px;
-}
-
-
-/* ==========================================================================
-   SCROLLBAR
-   ========================================================================== */
-
-::-webkit-scrollbar {
-    width: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
-    border-radius: var(--radius-lg);
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-primary);
-}
-
-
-/* ==========================================================================
-   ANIMAÇÕES
-   ========================================================================== */
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-@keyframes pulse-text {
-    0% {
-        opacity: 0.5;
-    }
-
-    100% {
-        opacity: 1;
-        color: var(--color-primary);
-    }
-}
-
-
-/* ==========================================================================
-   03. LAYOUT GLOBAL
-   ========================================================================== */
-
+/* --------------------------------------------------------------------------
+   2. LAYOUT GLOBAL (ESTRUTURA COMPARTILHADA)
+   -------------------------------------------------------------------------- */
 .app-container {
     display: flex;
-    width: 100vw;
     height: 100vh;
     height: 100dvh;
+    width: 100vw;
 }
 
 .main-area {
-    position: relative;
-
     flex: 1;
-
     display: flex;
     flex-direction: column;
-
-    width: 100%;
     height: 100vh;
     height: 100dvh;
-
     overflow: hidden;
-
-    background-color: var(--color-bg-app);
+    background-color: var(--bg-app);
+    position: relative;
 }
 
-.view {
-    display: none;
-    width: 100%;
-    height: 100%;
+/* Sistema de Views Chaveadas */
+.view { 
+    display: none; 
 }
 
-.view.active {
-    display: block;
-    animation: fadeIn var(--trans-med);
+.view.active { 
+    display: block; 
+    animation: fadeIn var(--trans-med); 
 }
 
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
-/* ==========================================================================
-   RESULTADO — GRID INVESTIGAÇÃO + EVIDÊNCIA
-   ========================================================================== */
-
+/* Grid de Telas Divididas (Modo Duelo de Telas) */
 .layout-grid {
     display: grid;
-
-    grid-template-columns:
-        minmax(0, 800px);
-
+    grid-template-columns: minmax(0, 800px); 
     justify-content: center;
-
-    gap: var(--space-xl);
-
-    height:
-        calc(100vh - var(--topbar-height));
-
-    padding: var(--space-xl);
-
+    gap: 40px;
+    padding: 40px;
+    height: calc(100vh - 56px);
     overflow: hidden;
-
-    transition:
-        grid-template-columns
-        var(--trans-layout);
+    transition: grid-template-columns 400ms cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: grid-template-columns; 
 }
 
 .layout-grid.evidence-active {
-    grid-template-columns:
-        minmax(0, 1.5fr)
-        minmax(0, 1fr);
-
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); 
     justify-content: stretch;
 }
 
 
-/* ==========================================================================
-   04. SIDEBAR
-   ========================================================================== */
-
+/* --------------------------------------------------------------------------
+   3. SIDEBAR (CHASSI LATERAL - VISÃO EXPANDIDA PADRÃO)
+   -------------------------------------------------------------------------- */
 .sidebar {
     width: var(--sidebar-width);
-
-    flex-shrink: 0;
-
+    background-color: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-
-    background-color: var(--color-bg-panel);
-
-    border-right:
-        1px solid var(--color-border);
-
-    transition:
-        width var(--trans-fast);
+    transition: width var(--trans-fast);
 }
 
-.sidebar-top,
-.sidebar-middle,
-.sidebar-bottom {
-    align-items: stretch;
+.sidebar-top, .sidebar-middle, .sidebar-bottom {
     padding: var(--space-md);
-
     display: flex;
     flex-direction: column;
-
     gap: var(--space-md);
 }
 
 .sidebar-middle {
-    align-items: stretch;
-    flex: 1;
-
+    flex-grow: 1;
     overflow-y: auto;
-
     -webkit-overflow-scrolling: touch;
 }
 
-
-/* --------------------------------------------------------------------------
-   Sidebar — Cabeçalho
-   -------------------------------------------------------------------------- */
-
+/* 3.1. Top-Level (Cabeçalho da Sidebar) */
 .sidebar-header {
     display: flex;
-
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
 }
 
 .logo-area {
     display: flex;
-
     align-items: center;
-
     gap: var(--space-sm);
-
     cursor: pointer;
-
-    color: var(--color-primary);
+    color: var(--primary);
 }
 
 .logo-small {
-    color: var(--color-text-main);
-
     font-size: 1.2rem;
     font-weight: 600;
-
     letter-spacing: -0.5px;
+    color: var(--text-main);
 }
 
-.logo-hover {
-    display: none !important;
+.logo-hover { 
+    display: none !important; 
 }
 
-
-/* --------------------------------------------------------------------------
-   Sidebar — Botões
-   -------------------------------------------------------------------------- */
-
+/* Botões de Ação Primária e Ícones */
 .btn-primary-full {
     width: 100%;
-
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    gap: var(--space-sm);
-
     padding: 10px;
-
-    background-color: var(--color-primary);
-    color: var(--color-white);
-
+    background-color: var(--primary);
+    color: #fff;
     border: none;
     border-radius: var(--radius-md);
-
     font-weight: 500;
-
-    transition:
-        background-color var(--trans-fast);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    transition: background-color var(--trans-fast);
 }
 
 .btn-primary-full:hover {
-    background-color:
-        var(--color-primary-hover);
+    background-color: var(--primary-hover);
 }
 
+/* Botão Secundário (Outline) */
 .btn-outline {
     width: 100%;
-
+    padding: 10px;
+    background-color: transparent;
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    cursor: pointer;
     display: flex;
-
     align-items: center;
     justify-content: center;
-
     gap: var(--space-sm);
-
-    padding: 10px;
-
-    background-color: transparent;
-
-    color: var(--color-text-main);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius: var(--radius-md);
-
-    font-weight: 500;
-
-    text-decoration: none;
-
-    transition:
-        background-color var(--trans-fast),
-        border-color var(--trans-fast),
-        color var(--trans-fast);
+    transition: all var(--trans-fast);
 }
 
 .btn-outline:hover {
-    background-color:
-        var(--color-bg-hover);
-
-    border-color:
-        var(--color-primary);
-
-    color:
-        var(--color-primary);
+    border-color: var(--primary);
+    color: var(--primary);
+    background-color: var(--bg-hover);
 }
 
 .btn-icon {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    gap: var(--space-sm);
-
-    padding: var(--space-xs);
-
     background: transparent;
-
-    color: var(--color-text-muted);
-
     border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: var(--space-xs);
     border-radius: var(--radius-sm);
-
-    transition:
-        background-color var(--trans-fast),
-        color var(--trans-fast);
+    transition: background-color var(--trans-fast), color var(--trans-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
 }
 
 .btn-icon:hover {
-    background-color:
-        var(--color-bg-hover);
-
-    color:
-        var(--color-text-main);
+    background-color: var(--bg-hover);
+    color: var(--text-main);
 }
 
-
-/* --------------------------------------------------------------------------
-   Sidebar — Acervo
-   -------------------------------------------------------------------------- */
-
-.auth-box {
-    width: 100%;
-}
-
-.folder-box {
-    width: 100%;
-}
-
-.folder-label {
-    display: block;
-
-    margin-bottom: 4px;
-
-    color:
-        var(--color-text-muted);
-
-    font-size: 0.75rem;
-
-    text-transform: uppercase;
-
-    letter-spacing: 0.5px;
+/* 3.2. Mid-Level (Seletores de Acervo e Lista de Histórico) */
+.folder-label { 
+    font-size: 0.75rem; 
+    color: var(--text-muted); 
+    text-transform: uppercase; 
+    letter-spacing: 0.5px; 
+    margin-bottom: 4px; 
+    display: block; 
 }
 
 .folder-dropdown {
     width: 100%;
-
     padding: 8px;
-
-    background-color:
-        var(--color-bg-app);
-
-    color:
-        var(--color-text-main);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius:
-        var(--radius-sm);
-
+    background-color: var(--bg-app);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    border-radius: var(--radius-sm);
     outline: none;
-
+    font-family: inherit;
     font-size: 0.85rem;
 }
 
-.folder-dropdown:focus {
-    border-color:
-        var(--color-primary);
-}
-
-
-/* --------------------------------------------------------------------------
-   Sidebar — Navegação
-   -------------------------------------------------------------------------- */
-
-.sidebar-nav {
-    width: 100%;
-    align-items: stretch;
-    display: flex;
-    flex-direction: column;
-
-    gap: var(--space-xs);
-}
-
+/* Títulos de Navegação e Ícones de Seção */
 .nav-title-box {
     display: flex;
-
     align-items: center;
-
     gap: 10px;
-
+    color: var(--text-muted);
     margin-bottom: var(--space-sm);
-
-    color:
-        var(--color-text-muted);
-
     cursor: pointer;
-
-    transition:
-        color var(--trans-fast);
+    transition: color var(--trans-fast);
 }
 
 .nav-title-box:hover {
-    color:
-        var(--color-primary);
+    color: var(--primary);
 }
 
-.nav-title {
-    font-size: 0.9rem;
-}
-
-
-/* O título de Acervos reaparece apenas como ícone
-   quando a sidebar está colapsada. */
+/* Regra de UX: Oculta o título redundante da pasta na visão expandida */
 #btn-nav-folder {
     display: none;
 }
 
-
-/* --------------------------------------------------------------------------
-   Sidebar — Histórico
-   -------------------------------------------------------------------------- */
-
-.history-item {
-    display: flex;
-
-    align-items: center;
-
-    gap: var(--space-sm);
-
-    width: 100%;
-
-    padding:
-        var(--space-sm);
-
-    overflow: hidden;
-
-    color:
-        var(--color-text-muted);
-
-    border-radius:
-        var(--radius-sm);
-
-    font-size: 0.85rem;
-
-    white-space: nowrap;
-
-    text-overflow: ellipsis;
-
-    cursor: pointer;
-
-    transition:
-        background-color var(--trans-fast),
-        color var(--trans-fast);
-}
-
-.history-item:hover {
-    background-color:
-        var(--color-bg-hover);
-
-    color:
-        var(--color-text-main);
-}
-
-.history-icon {
-    flex-shrink: 0;
-}
-
-.history-empty {
-    padding:
-        var(--space-sm);
-
-    color:
-        var(--color-text-muted);
-
-    font-size: 0.85rem;
-
-    font-style: italic;
-}
-
-
-/* --------------------------------------------------------------------------
-   Sidebar — Usuário
-   -------------------------------------------------------------------------- */
-
-.user-profile {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    gap: var(--space-sm);
-
-    width: 100%;
-
-    padding:
-        var(--space-sm)
-        12px;
-
-    background-color:
-        var(--color-bg-app);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius:
-        var(--radius-md);
-}
-
-.user-profile > div {
-    min-width: 0;
-}
-
-.user-name {
-    display: block;
-
-    overflow: hidden;
-
-    color:
-        var(--color-text-main);
-
-    font-size: 0.85rem;
-    font-weight: 500;
-
-    white-space: nowrap;
-
-    text-overflow: ellipsis;
-}
-
-
-/* ==========================================================================
-   SINCRONIZAÇÃO — ACCORDION
-   ========================================================================== */
-
+/* --- SANFONA DE SINCRONIZAÇÃO (ACCORDION) --- */
 .sync-accordion {
     margin-top: 10px;
-
-    overflow: hidden;
-
-    background-color:
-        var(--color-bg-app);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius:
-        var(--radius-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-app);
+    overflow: hidden; 
 }
 
 .sync-accordion-header {
     display: flex;
-
-    align-items: center;
     justify-content: space-between;
-
-    padding:
-        8px 10px;
-
-    background-color:
-        var(--color-bg-panel);
-
+    align-items: center;
+    padding: 8px 10px;
     cursor: pointer;
-
-    transition:
-        background-color var(--trans-fast);
+    background-color: var(--bg-panel);
+    transition: background-color var(--trans-fast);
 }
 
 .sync-accordion-header:hover {
-    background-color:
-        var(--color-bg-hover);
+    background-color: var(--bg-hover);
 }
 
 .sync-status-text {
-    overflow: hidden;
-
-    color:
-        var(--color-primary);
-
     font-size: 0.75rem;
     font-weight: 500;
-
+    color: var(--primary);
     white-space: nowrap;
-
+    overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .sync-chevron {
-    flex-shrink: 0;
-
-    color:
-        var(--color-text-muted);
-
-    transition:
-        transform var(--trans-fast);
+    transition: transform var(--trans-fast);
+    color: var(--text-muted);
 }
 
-.sync-accordion.expanded
-.sync-chevron {
-    transform:
-        rotate(180deg);
+/* Quando adicionarmos a classe 'expanded' no JS, a setinha vira pra cima */
+.sync-accordion.expanded .sync-chevron {
+    transform: rotate(180deg);
 }
 
 .sync-accordion-body {
     display: none;
-
-    max-height: 160px;
-
     padding: 10px;
-
-    overflow-y: auto;
-
-    border-top:
-        1px solid var(--color-border);
+    border-top: 1px solid var(--border-color);
+    max-height: 160px;
+    overflow-y: auto; /* Se tiver 50 arquivos pendentes, ele cria uma rolagem interna e não quebra a tela */
 }
 
-.sync-accordion.expanded
-.sync-accordion-body {
+.sync-accordion.expanded .sync-accordion-body {
     display: block;
-
-    animation:
-        fadeIn 0.2s ease;
+    animation: fadeIn 0.2s ease;
 }
 
+/* --- BARRAS DE PROGRESSO INDIVIDUAIS --- */
 .sync-job-item {
     margin-bottom: 12px;
 }
@@ -860,89 +355,85 @@ button {
 
 .sync-job-info {
     display: flex;
-
     justify-content: space-between;
-
-    gap: var(--space-sm);
-
-    margin-bottom: 4px;
-
-    color:
-        var(--color-text-muted);
-
     font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
 }
 
 .sync-job-filename {
-    overflow: hidden;
-
-    max-width: 140px;
-
     white-space: nowrap;
-
+    overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 140px; /* Corta o nome do arquivo se for gigante */
 }
 
 .sync-job-percentage {
-    flex-shrink: 0;
-
-    color:
-        var(--color-text-main);
-
     font-weight: 600;
+    color: var(--text-main);
 }
 
 .sync-progress-track {
     width: 100%;
     height: 4px;
-
+    background-color: var(--border-color);
+    border-radius: 2px;
     overflow: hidden;
-
-    background-color:
-        var(--color-border);
-
-    border-radius: 2px;
 }
 
+/* A barra que enche */
 .sync-progress-fill {
-    width: 0%;
     height: 100%;
-
-    background-color:
-        var(--color-primary);
-
+    background-color: var(--primary);
+    width: 0%; /* O JavaScript vai mexer nisso aqui ao vivo */
+    transition: width 0.3s ease-out; 
     border-radius: 2px;
-
-    transition:
-        width 0.3s ease-out;
-
-    box-shadow:
-        0 0 5px
-        rgba(
-            var(--primary-rgb),
-            0.5
-        );
+    box-shadow: 0 0 5px rgba(106, 132, 101, 0.5); /* Efeito neon sutil do motor trabalhando */
 }
 
-.sync-job-item.pending
-.sync-progress-fill {
+/* Se o arquivo tá esperando na fila, a barra fica neutra */
+.sync-job-item.pending .sync-progress-fill {
     width: 0%;
-
     background-color: transparent;
-
     box-shadow: none;
 }
 
-
-/* ==========================================================================
-   05. SIDEBAR COLAPSADA
-   ========================================================================== */
-
-.sidebar.collapsed {
-    width:
-        var(--sidebar-collapsed);
+.history-item {
+    padding: 8px var(--space-sm);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    transition: background var(--trans-fast), color var(--trans-fast);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
+.history-item:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-main);
+}
+
+.history-empty {
+    padding: 8px var(--space-sm);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+
+/* --------------------------------------------------------------------------
+   4. SIDEBAR COLAPSADA (MODO MINI / FOCO IMERSIVO)
+   -------------------------------------------------------------------------- */
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed);
+}
+
+/* Ocultação de elementos textuais em lote */
 .sidebar.collapsed .logo-small,
 .sidebar.collapsed .btn-primary-full span,
 .sidebar.collapsed .nav-title,
@@ -953,84 +444,76 @@ button {
 .sidebar.collapsed .user-name,
 .sidebar.collapsed #btn-drive,
 .sidebar.collapsed #btn-sync,
-.sidebar.collapsed #sync-logs,
-.sidebar.collapsed .sync-accordion {
+.sidebar.collapsed #sync-logs {
     display: none !important;
 }
 
+/* Ajustes de Alinhamento Central no Cabeçalho */
 .sidebar.collapsed .sidebar-header {
     justify-content: center;
 }
 
-.sidebar.collapsed .logo-area {
+.sidebar.collapsed .logo-area i {
     margin: 0;
-
-    padding: var(--space-sm);
-
-    border-radius:
-        var(--radius-sm);
 }
 
-.sidebar.collapsed .logo-area:hover {
-    background-color:
-        var(--color-bg-hover);
+.sidebar.collapsed #btn-sidebar-toggle { 
+    display: none; 
 }
 
-.sidebar.collapsed .logo-area:hover .logo-default {
-    display: none !important;
+/* A Mágica de Transformação da Logo em Botão de Expansão */
+.sidebar.collapsed .logo-area {
+    cursor: pointer;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    transition: background var(--trans-fast);
+    margin: 0;
 }
 
-.sidebar.collapsed .logo-area:hover .logo-hover {
-    display: block !important;
-
-    color:
-        var(--color-text-main);
+.sidebar.collapsed .logo-area:hover { 
+    background-color: var(--bg-hover); 
 }
 
-.sidebar.collapsed #btn-sidebar-toggle {
-    display: none;
+.sidebar.collapsed .logo-area:hover .logo-default { 
+    display: none !important; 
 }
 
-.sidebar.collapsed .nav-title-box {
-    justify-content: center;
-
-    margin-bottom:
-        var(--space-md);
-
-    transition:
-        transform var(--trans-fast);
+.sidebar.collapsed .logo-area:hover .logo-hover { 
+    display: block !important; 
+    color: var(--text-main); 
 }
 
+/* Exibição e comportamento dinâmico dos ícones de atalho na navegação mini */
+.sidebar.collapsed .nav-title-box { 
+    justify-content: center; 
+    margin-bottom: var(--space-md);
+    transition: transform var(--trans-fast);
+}
+
+/* Regra de UX: Faz o ícone de pasta reaparecer na barra colapsada como atalho rápido */
 .sidebar.collapsed #btn-nav-folder {
     display: flex;
 }
 
-.sidebar.collapsed .nav-title-box i {
-    color:
-        var(--color-text-main);
-}
-
 .sidebar.collapsed .nav-title-box:hover i {
-    color:
-        var(--color-primary);
-
-    transform:
-        scale(1.1);
+    color: var(--primary);
+    transform: scale(1.1);
 }
 
+.sidebar.collapsed .nav-title-box i { 
+    color: var(--text-main); 
+}
+
+/* Desestruturação da caixinha de perfil do usuário para visual limpo */
 .sidebar.collapsed #user-info {
-    justify-content: center !important;
-
-    padding: 0 !important;
-
-    background:
-        transparent !important;
-
     border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    justify-content: center !important;
 }
 
 .sidebar.collapsed #user-info .avatar-img {
-    display: none;
+    display: none; 
 }
 
 .sidebar.collapsed #btn-settings {
@@ -1045,53 +528,31 @@ button {
     display: none;
 }
 
-
-/* ==========================================================================
-   06. TOPBAR
-   ========================================================================== */
-
+/* --------------------------------------------------------------------------
+   5. HEADER / TOPBAR (MOLDURA FIXA DE LEITURA)
+   -------------------------------------------------------------------------- */
 .topbar {
-    position: sticky;
-
-    top: 0;
-
-    z-index: 10;
-
     display: flex;
-
     align-items: center;
     justify-content: space-between;
-
-    height:
-        var(--topbar-height);
-
-    padding:
-        var(--space-md)
-        var(--space-lg);
-
-    background-color:
-        var(--color-bg-panel);
-
-    border-bottom:
-        1px solid var(--color-border);
+    padding: var(--space-md) var(--space-lg);
+    background-color: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color); 
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 56px;
 }
 
 .sticky-query {
-    max-width: 90%;
-
-    overflow: hidden;
-
-    margin: 0;
-
-    color:
-        var(--color-text-main);
-
     font-size: 1.05rem;
     font-weight: 500;
-
+    color: var(--text-main);
     white-space: nowrap;
-
+    overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 90%;
+    margin: 0;
 }
 
 #btn-new-search {
@@ -1099,798 +560,386 @@ button {
 }
 
 
-/* ==========================================================================
-   07. HOME / PESQUISA
-   ========================================================================== */
-
+/* --------------------------------------------------------------------------
+   6. HOME VIEW (PAINEL CENTRAL DE PESQUISA)
+   -------------------------------------------------------------------------- */
 .hero {
+    height: 100vh;
     display: flex;
-
     flex-direction: column;
-
     align-items: center;
     justify-content: center;
-
-    height: 100vh;
-
-    padding:
-        var(--space-lg);
+    padding: var(--space-lg);
 }
 
 .hero .logo {
-    margin-bottom:
-        var(--space-xs);
-
     font-size: 3.5rem;
     font-weight: 600;
-
     letter-spacing: -1.5px;
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--color-text-main),
-            var(--color-primary)
-        );
-
+    margin-bottom: var(--space-xs);
+    background: linear-gradient(135deg, var(--text-main), var(--primary));
     -webkit-background-clip: text;
     background-clip: text;
-
     -webkit-text-fill-color: transparent;
 }
 
 .hero .subtitle {
-    margin-bottom:
-        var(--space-xl);
-
-    color:
-        var(--color-text-muted);
-
+    color: var(--text-muted);
     font-size: 1.1rem;
-
+    margin-bottom: 40px;
     text-align: center;
 }
 
+/* Caixa de Pesquisa Principal (Foco Semântico) */
 .search-box {
-    display: flex;
-
-    align-items: center;
-
     width: 100%;
     max-width: 650px;
-
-    padding:
-        6px 12px;
-
-    background-color:
-        var(--color-bg-panel);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius:
-        var(--radius-xl);
-
-    box-shadow:
-        0 4px 20px
-        rgba(var(--black-rgb), 0.2);
-
-    transition:
-        border-color var(--trans-fast),
-        box-shadow var(--trans-fast);
+    position: relative;
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 6px 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    transition: border-color var(--trans-fast), box-shadow var(--trans-fast);
 }
 
 .search-box:focus-within {
-    border-color:
-        var(--color-primary);
-
-    box-shadow:
-        0 4px 25px
-        rgba(var(--primary-rgb), 0.15);
+    border-color: var(--primary);
+    box-shadow: 0 4px 25px rgba(106, 132, 101, 0.15); 
 }
 
 .search-box input {
     flex: 1;
-
-    padding:
-        12px 15px;
-
     background: transparent;
-
-    color:
-        var(--color-text-main);
-
     border: none;
-
-    outline: none;
-
+    color: var(--text-main);
     font-size: 1.1rem;
+    padding: 12px 15px;
+    outline: none;
+    font-family: inherit;
 }
 
-.search-box input::placeholder {
-    color:
-        var(--color-text-muted);
+.search-box input::placeholder { 
+    color: var(--text-muted); 
 }
 
 .search-box button {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
+    background-color: var(--bg-hover);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
     width: 40px;
     height: 40px;
-
-    background-color:
-        var(--color-bg-hover);
-
-    color:
-        var(--color-text-muted);
-
-    border:
-        1px solid var(--color-border);
-
     border-radius: 50%;
-
-    transition:
-        background-color var(--trans-fast),
-        border-color var(--trans-fast),
-        color var(--trans-fast);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--trans-fast);
 }
 
 .search-box:focus-within button {
-    background-color:
-        var(--color-primary);
-
-    color:
-        var(--color-white);
-
-    border-color:
-        var(--color-primary);
-}
-
-
-/* ==========================================================================
-   08. INVESTIGATION / RESULTADOS
-   ========================================================================== */
-
-.answer-section {
-    display: flex;
-
-    flex-direction: column;
-
-    height: 100%;
-
-    padding-right: 15px;
-
-    overflow-y: auto;
-
-    -webkit-overflow-scrolling: touch;
-}
-
-#answer-text {
-    color:
-        var(--color-text-main);
-
-    font-size: 1.05rem;
-
-    line-height: 1.85;
-
-    text-align: left;
-}
-
-#answer-text br {
-    display: block;
-
-    margin-top:
-        var(--space-md);
-
-    content: "";
-}
-
-#answer-box {
-    width: 100%;
-}
-
-#sources-section {
-    margin-top: 40px;
-
-    padding-top: 20px;
-
-    border-top:
-        1px solid var(--color-border);
-}
-
-#sources-section h3 {
-    margin-bottom: 15px;
-
-    color:
-        var(--color-text-main);
-
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-.trecho-highlight {
-    display: inline-block;
-
-    padding:
-        2px 8px;
-
-    background-color:
-        rgba(var(--primary-rgb), 0.12);
-
-    color:
-        var(--color-primary);
-
-    border:
-        1px solid
-        rgba(var(--primary-rgb), 0.25);
-
-    border-radius:
-        var(--radius-sm);
-
-    font-size: 0.88rem;
-    font-weight: 500;
-
-    cursor: pointer;
-
-    user-select: none;
-
-    transition:
-        background-color var(--trans-fast),
-        border-color var(--trans-fast),
-        color var(--trans-fast),
-        transform var(--trans-fast);
-}
-
-.trecho-highlight:hover {
-    background-color:
-        var(--color-primary);
-
-    color:
-        var(--color-white);
-
-    border-color:
-        var(--color-primary);
-
-    transform:
-        translateY(-1px);
-}
-
-
-/* ==========================================================================
-   09. EVIDÊNCIAS
-   ========================================================================== */
-
-.evidence-section {
-    display: none;
-
-    flex-direction: column;
-
-    gap: var(--space-lg);
-
-    height: 100%;
-
-    padding: var(--space-lg);
-
-    overflow-y: auto;
-
-    background-color:
-        var(--color-bg-panel);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius:
-        var(--radius-lg);
-
-    -webkit-overflow-scrolling: touch;
-}
-
-.layout-grid.evidence-active
-.evidence-section {
-    display: flex;
-
-    animation:
-        fadeIn 0.4s ease;
-}
-
-.evidence-sticky-header {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    position: sticky;
-
-    top: -24px;
-
-    z-index: 10;
-
-    margin:
-        -24px -24px 15px -24px;
-
-    padding:
-        24px 24px 10px 24px;
-
-    background-color:
-        var(--color-bg-panel);
-
-    border-bottom:
-        1px solid var(--color-border);
-}
-
-.evidence-section h3 {
-    color:
-        var(--color-text-main);
-
-    font-size: 1.05rem;
-    font-weight: 600;
-}
-
-.evidence-subtitle {
-    margin-bottom:
-        var(--space-sm);
-
-    color:
-        var(--color-text-muted);
-
-    font-size: 0.82rem;
-}
-
-.chunk-card {
-    display: none;
-
-    margin-bottom:
-        var(--space-md);
-
-    padding:
-        var(--space-md);
-
-    background-color:
-        var(--color-bg-app);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius:
-        var(--radius-md);
-
-    transition:
-        border-color var(--trans-fast),
-        box-shadow var(--trans-fast),
-        transform var(--trans-fast);
-}
-
-.chunk-card.active-chunk {
-    display: block;
-
-    animation:
-        fadeIn 0.3s ease;
-}
-
-.chunk-card.highlight-active {
-    border-color:
-        var(--color-primary);
-
-    box-shadow:
-        0 4px 20px
-        rgba(var(--primary-rgb), 0.12);
-
-    transform:
-        scale(1.01);
-}
-
-.chunk-card p {
-    color:
-        var(--color-text-main);
-
-    line-height: 1.6;
-
-    white-space: pre-wrap;
-}
-
-.chunk-badge {
-    display: inline-block;
-
-    margin-bottom:
-        var(--space-sm);
-
-    padding:
-        2px 6px;
-
-    color:
-        var(--color-primary);
-
-    background-color:
-        rgba(var(--primary-rgb), 0.1);
-
-    border-radius:
-        var(--radius-sm);
-
-    font-size: 0.72rem;
-    font-weight: 600;
-
-    letter-spacing: 0.5px;
-
-    text-transform: uppercase;
-}
-
-.chunk-card q {
-    display: block;
-
-    color:
-        var(--color-text-main);
-
-    font-size: 0.92rem;
-
-    line-height: 1.6;
-
-    font-style: normal;
-
-    quotes: none;
+    background-color: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
 }
 
 
 /* --------------------------------------------------------------------------
-   Referências
+   7. RESULT VIEW (SÍNTESE DA IA & LEITURA CRÍTICA)
    -------------------------------------------------------------------------- */
-
-.source-card {
-    display: block;
-
-    width: 100%;
-
-    margin-bottom:
-        var(--space-sm);
-
-    padding:
-        var(--space-sm)
-        var(--space-md);
-
-    overflow: hidden;
-
-    background-color:
-        var(--color-bg-app);
-
-    color:
-        var(--color-text-main);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius:
-        var(--radius-md);
-
-    font-size: 0.88rem;
-
-    text-align: left;
-
-    transition:
-        background-color var(--trans-fast),
-        border-color var(--trans-fast),
-        color var(--trans-fast);
-}
-
-.source-card:hover {
-    background-color:
-        var(--color-bg-hover);
-
-    border-color:
-        var(--color-primary);
-}
-
-.source-meta {
-    margin-top:
-        var(--space-xs);
-
-    color:
-        var(--color-text-muted);
-}
-
-
-/* ==========================================================================
-   10. ESTADOS DE CARREGAMENTO / ERRO
-   ========================================================================== */
-
-#loading-state {
+.answer-section {
     display: flex;
-
     flex-direction: column;
-
-    align-items: flex-start;
-
-    gap: var(--space-sm);
+    height: 100%;
+    overflow-y: auto;
+    padding-right: 15px;
+    -webkit-overflow-scrolling: touch;
 }
 
+#answer-text {
+    font-size: 1.05rem;
+    line-height: 1.85; 
+    color: var(--text-main);
+    text-align: left;
+}
+
+#answer-text br {
+    content: "";
+    margin-top: var(--space-md);
+    display: block;
+}
+
+/* Os Gatilhos de Auditoria: Badges do [TRECHO X] */
+.trecho-highlight {
+    background-color: rgba(106, 132, 101, 0.12);
+    color: var(--primary);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    font-size: 0.88rem;
+    cursor: pointer;
+    border: 1px solid rgba(106, 132, 101, 0.25);
+    transition: all var(--trans-fast);
+    display: inline-block;
+    user-select: none;
+}
+
+.trecho-highlight:hover {
+    background-color: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+/* Estados de Carregamento e Streaming Semântico */
 .spinner {
     width: 28px;
     height: 28px;
-
-    margin-bottom:
-        var(--space-md);
-
-    border:
-        2px solid var(--color-border);
-
-    border-top-color:
-        var(--color-primary);
-
+    border: 2px solid var(--border-color);
+    border-top-color: var(--primary);
     border-radius: 50%;
-
-    animation:
-        spin 0.8s linear infinite;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: var(--space-md);
 }
 
 .live-logs {
-    color:
-        var(--color-primary);
-
-    font-family:
-        monospace;
-
+    font-family: monospace;
     font-size: 0.85rem;
-
+    color: var(--primary);
     opacity: 0.8;
 }
 
-.error-text {
-    color:
-        var(--color-danger);
+::-webkit-scrollbar {
+    width: 6px;
+}
 
-    line-height: 1.7;
+::-webkit-scrollbar-track {
+    background: transparent; 
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--border-color); 
+    border-radius: var(--radius-lg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--primary); 
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 
-/* ==========================================================================
-   11. MODAL / SETTINGS
-   ========================================================================== */
+/* --------------------------------------------------------------------------
+   8. RESULT VIEW (EVIDÊNCIAS BRUTAS & FONTES CONSULTADAS)
+   -------------------------------------------------------------------------- */
+.evidence-section {
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    height: 100%;
+     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;   
+    display: none; 
+}
 
+.layout-grid.evidence-active .evidence-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    animation: fadeIn 0.4s ease;
+}
+
+.evidence-section h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-main);
+    letter-spacing: -0.3px;
+}
+
+.evidence-subtitle {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-sm);
+}
+
+/* Chunks de Evidência e Cards de Texto Original */
+.chunk-card {
+    display: none; /* Ocultação do Modo Foco: exibe apenas o alvo ativo */
+    background-color: var(--bg-app);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+    transition: all var(--trans-fast);
+}
+
+.chunk-card.active-chunk {
+    display: block; 
+    animation: fadeIn 0.3s ease;
+}
+
+.chunk-card.highlight-active {
+    border-color: var(--primary);
+    box-shadow: 0 4px 20px rgba(106, 132, 101, 0.12);
+    transform: scale(1.01);
+}
+
+.chunk-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--primary);
+    background-color: rgba(106, 132, 101, 0.1);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-sm);
+    letter-spacing: 0.5px;
+}
+
+.chunk-card q {
+    display: block;
+    font-size: 0.92rem;
+    color: var(--text-main);
+    line-height: 1.6;
+    font-style: normal;
+    quotes: none;
+}
+
+/* Painel de Fontes Diretas (Rodapé do Dossiê) */
+.source-card {
+    background-color: var(--bg-app);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-sm);
+    transition: all var(--trans-fast);
+}
+
+.source-card:hover {
+    border-color: var(--primary);
+    background-color: var(--bg-hover);
+}
+
+.source-meta {
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* --------------------------------------------------------------------------
+   9. MODAIS E SOBREPOSIÇÕES
+   -------------------------------------------------------------------------- */
 .modal-overlay {
     position: fixed;
-
-    inset: 0;
-
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
     z-index: 2000;
-
     display: flex;
-
     align-items: center;
     justify-content: center;
-
-    background:
-        rgba(var(--black-rgb), 0.6);
-
-    backdrop-filter:
-        blur(4px);
-
     opacity: 0;
-
     visibility: hidden;
-
-    transition:
-        opacity 0.25s ease,
-        visibility 0.25s ease;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
 }
 
 .modal-overlay.active {
     opacity: 1;
-
     visibility: visible;
 }
 
 .modal-content {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
     width: 90%;
     max-width: 420px;
-
-    padding:
-        var(--space-lg);
-
-    background-color:
-        var(--color-bg-panel);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius:
-        var(--radius-lg);
-
-    box-shadow:
-        0 10px 40px
-        rgba(var(--black-rgb), 0.5);
-
-    transform:
-        translateY(20px)
-        scale(0.95);
-
-    transition:
-        transform
-        0.25s
-        cubic-bezier(0.25, 1, 0.5, 1);
+    padding: var(--space-lg);
+    transform: translateY(20px) scale(0.95);
+    transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
 }
 
-.modal-overlay.active
-.modal-content {
-    transform:
-        translateY(0)
-        scale(1);
+.modal-overlay.active .modal-content {
+    transform: translateY(0) scale(1);
 }
 
 .modal-header {
     display: flex;
-
-    align-items: center;
     justify-content: space-between;
-
-    margin-bottom:
-        var(--space-lg);
-
-    padding-bottom:
-        var(--space-md);
-
-    border-bottom:
-        1px solid var(--color-border);
-}
-
-.modal-header h3 {
-    display: flex;
-
     align-items: center;
-
-    gap: var(--space-sm);
-
-    color:
-        var(--color-text-main);
-
-    font-size: 1.15rem;
-    font-weight: 600;
+    margin-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--space-md);
 }
 
-.modal-body {
-    display: flex;
+.modal-header h3 { font-size: 1.15rem; font-weight: 600; color: var(--text-main); }
+.setting-group h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
+.setting-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; }
 
-    flex-direction: column;
-
-    gap: var(--space-lg);
-}
-
-.setting-group {
-    width: 100%;
-}
-
-.setting-group + .setting-group {
-    margin-top:
-        var(--space-lg);
-
-    padding-top:
-        20px;
-
-    border-top:
-        1px solid var(--color-border);
-}
-
-.setting-group h4 {
-    margin-bottom:
-        var(--space-xs);
-
-    color:
-        var(--color-text-main);
-
-    font-size: 0.95rem;
-    font-weight: 600;
-}
-
-.setting-desc {
-    margin-bottom:
-        12px;
-
-    color:
-        var(--color-text-muted);
-
-    font-size: 0.8rem;
-}
 
 .btn-danger {
     width: 100%;
-
+    padding: 10px;
+    background-color: transparent;
+    color: #ef4444; 
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    cursor: pointer;
     display: flex;
-
     align-items: center;
     justify-content: center;
-
     gap: var(--space-sm);
-
-    padding: 10px;
-
-    background-color: transparent;
-
-    color:
-        var(--color-danger);
-
-    border:
-        1px solid
-        rgba(var(--danger-rgb), 0.3);
-
-    border-radius:
-        var(--radius-md);
-
-    font-weight: 500;
-
-    transition:
-        background-color var(--trans-fast),
-        border-color var(--trans-fast);
+    transition: all var(--trans-fast);
 }
 
 .btn-danger:hover {
-    background-color:
-        rgba(var(--danger-rgb), 0.1);
-
-    border-color:
-        var(--color-danger);
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
 }
 
-
-/* ==========================================================================
-   12. READING
-   ========================================================================== */
-
+/* --------------------------------------------------------------------------
+   10. READING VIEW (MODO LEITURA IMERSIVO)
+   -------------------------------------------------------------------------- */
 #reading-view {
+    background-color: var(--bg-app);
     height: 100%;
-
     overflow-y: auto;
-
-    background-color:
-        var(--color-bg-app);
-
     -webkit-overflow-scrolling: touch;
 }
 
 .reading-layout {
+    padding: 60px 20px 100px 20px;
     display: flex;
-
     justify-content: center;
-
-    padding:
-        60px
-        20px
-        100px;
 }
 
 .reading-topbar {
     display: grid !important;
-
-    grid-template-columns:
-        120px
-        1fr
-        120px;
-
-    gap: 15px;
-
+    grid-template-columns: 120px 1fr 120px; 
+    padding: 0 20px;
     height: 60px;
-
-    padding:
-        0 20px;
-
-    background-color:
-        var(--color-bg-app);
-
-    transition:
-        transform
-        0.3s
-        cubic-bezier(0.25, 1, 0.5, 1);
+    gap: 15px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: var(--bg-app); 
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .reading-topbar.hidden-on-scroll {
-    transform:
-        translateY(-100%);
+    transform: translateY(-100%);
 }
 
 .topbar-side {
     display: flex;
-
     align-items: center;
-
     height: 100%;
 }
 
@@ -1900,214 +949,109 @@ button {
 
 .topbar-center {
     display: flex;
-
-    align-items: center;
     justify-content: center;
-
-    height: 100%;
-
+    align-items: center;
     overflow: hidden;
+    height: 100%;
 }
 
 .topbar-center h2 {
-    width: 100%;
-
     text-align: center;
+    width: 100%;
 }
 
 .btn-reading-action {
-    width: auto;
-
-    margin: 0;
-
-    padding:
-        6px 12px;
-
-    color:
-        var(--color-text-main);
-
-    border-color:
-        var(--color-border);
-
+    padding: 6px 12px;
     font-size: 0.85rem;
+    width: auto;
+    border-color: var(--border-color);
+    color: var(--text-main);
+    margin: 0;
 }
 
 .reading-container {
+    width: 100%;
+    max-width: 720px; /* A largura de ouro para leitura (Substack/Notion) */
     display: flex;
-
     flex-direction: column;
-
-    gap: 40px;
-
-    width: 100%;
-    max-width: 720px;
+    gap: 40px; /* Respiro gigante entre as quebras de seção */
 }
 
-.reading-page {
-    width: 100%;
-}
-
-.reading-page h4 {
-    margin:
-        32px 0 16px;
-
-    color:
-        var(--color-primary);
-
-    font-size: 0.8rem;
-
-    text-transform: uppercase;
-
-    letter-spacing: 1px;
-}
-
+/* O Bloco de Texto (Chunk) */
 .reading-chunk {
     position: relative;
-
-    margin-bottom:
-        var(--space-md);
-
-    padding-right: 45px;
-
-    color:
-        var(--color-text-main);
-
-    font-size: 1.15rem;
-
+    font-size: 1.15rem; 
     line-height: 1.85;
-
-    white-space: pre-wrap;
-
-    transition:
-        background-color var(--trans-fast),
-        border-color var(--trans-fast);
+    color: var(--text-main);
+    padding-right: 45px; /* Deixa um espaço na direita pro botão fantasma não morder o texto */
+    transition: color var(--trans-fast);
 }
 
-
-/* --------------------------------------------------------------------------
-   Evidência selecionada no Reading
-   -------------------------------------------------------------------------- */
-
-.reading-evidence-target {
-    padding-left: 16px;
-
-    border-left:
-        4px solid var(--color-primary);
-
-    background-color:
-        rgba(var(--primary-rgb), 0.06);
+.reading-chunk-section {
+    font-size: 0.8rem;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: block;
+    opacity: 0.7;
 }
 
-
-/* ==========================================================================
-   13. TRADUÇÃO
-   ========================================================================== */
-
+/* O Botão Fantasma de Tradução */
 .btn-translate-chunk {
     position: absolute;
-
     top: 0;
     right: 0;
-
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    border-radius: 50%;
     width: 36px;
     height: 36px;
-
-    background-color:
-        var(--color-bg-panel);
-
-    color:
-        var(--color-text-muted);
-
-    border:
-        1px solid var(--color-border);
-
-    border-radius: 50%;
-
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-
-    opacity: 0;
-
-    transform:
-        translateX(10px);
-
-    box-shadow:
-        0 4px 12px
-        rgba(var(--black-rgb), 0.1);
-
-    transition:
-        opacity var(--trans-fast),
-        transform var(--trans-fast),
-        background-color var(--trans-fast),
-        color var(--trans-fast),
-        border-color var(--trans-fast);
+    opacity: 0; /* Invisível por padrão */
+    transform: translateX(10px);
+    transition: all var(--trans-fast);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.reading-chunk:hover
-.btn-translate-chunk {
+/* A mágica do Hover */
+.reading-chunk:hover .btn-translate-chunk {
     opacity: 1;
-
-    transform:
-        translateX(0);
+    transform: translateX(0);
 }
 
 .btn-translate-chunk:hover {
-    background-color:
-        var(--color-primary);
-
-    color:
-        var(--color-white);
-
-    border-color:
-        var(--color-primary);
-
-    transform:
-        scale(1.1);
+    background-color: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    transform: scale(1.1);
 }
 
 .btn-translate-chunk:active {
-    transform:
-        scale(0.95);
+    transform: scale(0.95);
 }
 
+/* Animaçãozinha marota pra quando o texto estiver sendo traduzido */
 .translating-pulse {
-    animation:
-        pulse-text 1.5s infinite alternate;
+    animation: pulse-text 1.5s infinite alternate;
 }
 
-.reading-translation {
-    margin-top:
-        var(--space-md);
-
-    padding:
-        var(--space-md);
-
-    color:
-        var(--color-text-main);
-
-    background-color:
-        rgba(var(--primary-rgb), 0.06);
-
-    border-left:
-        3px solid var(--color-primary);
-
-    border-radius:
-        var(--radius-sm);
-
-    line-height: 1.7;
+@keyframes pulse-text {
+    0% { opacity: 0.5; }
+    100% { opacity: 1; color: var(--primary); }
 }
 
+/* --------------------------------------------------------------------------
+   11. RESPONSIVIDADE (MOBILE & TABLET)
+   -------------------------------------------------------------------------- */
 
-/* ==========================================================================
-   MOBILE
-   ========================================================================== */
-
+/* Esconde elementos exclusivos do mobile em telas grandes */
 @media (min-width: 851px) {
-
     .btn-mobile-menu,
     .mobile-overlay,
     .bottom-sheet-handle {
@@ -2115,284 +1059,137 @@ button {
     }
 }
 
-
 @media (max-width: 850px) {
-
-    /* ----------------------------------------------------------------------
-       Menu mobile
-       ---------------------------------------------------------------------- */
-
+    /* 1. Menu Flutuante */
     .btn-mobile-menu {
+        display: flex;
         position: fixed;
-
         top: 11px;
         left: 15px;
-
         z-index: 998;
-
-        display: flex;
-
-        background-color:
-            var(--color-bg-panel);
-
-        border:
-            1px solid var(--color-border);
-
-        border-radius:
-            var(--radius-md);
-
-        box-shadow:
-            0 4px 12px
-            rgba(var(--black-rgb), 0.3);
-
-        transition:
-            transform
-            0.3s
-            cubic-bezier(0.25, 1, 0.5, 1);
+        background-color: var(--bg-panel);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
     }
 
     .btn-mobile-menu.menu-hidden {
-        transform:
-            translateY(-150%);
+        transform: translateY(-150%);
     }
 
     #btn-new-search {
         display: flex;
     }
 
-
-    /* ----------------------------------------------------------------------
-       Overlay
-       ---------------------------------------------------------------------- */
-
-    .mobile-overlay {
+    /* 2. O Overlay (Fundo Escuro Desfocado) */
+     .mobile-overlay {
+        visibility: hidden; 
         position: fixed;
-
-        inset: 0;
-
-        z-index: 999;
-
-        visibility: hidden;
-
+        top: 0;
+        left: 0;
         width: 100vw;
         height: 100vh;
         height: 100dvh;
-
-        background:
-            rgba(var(--black-rgb), 0.6);
-
-        backdrop-filter:
-            blur(2px);
-
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(2px);
+        z-index: 999;
         opacity: 0;
-
-        transition:
-            opacity 0.3s ease,
-            visibility 0.2s ease;
+        transition: opacity 0.3s ease, visibility 0.2s ease; 
     }
 
     .mobile-overlay.active {
-        visibility: visible;
-
+        visibility: visible; 
         opacity: 1;
     }
 
-
-    /* ----------------------------------------------------------------------
-       Sidebar mobile
-       ---------------------------------------------------------------------- */
-
+    /* 3. A Sidebar (Off-Canvas na Esquerda) */
     .sidebar {
         position: fixed;
-
         top: 0;
         left: 0;
-
-        z-index: 1000;
-
-        width: 280px !important;
-
         height: 100vh;
         height: 100dvh;
-
-        transform:
-            translateX(-100%);
-
-        will-change:
-            transform;
-
-        transition:
-            transform
-            0.2s
-            cubic-bezier(0.2, 0.8, 0.2, 1);
+        z-index: 1000;
+        transform: translateX(-100%);
+        width: 280px !important;
+        will-change: transform;
+        transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
 
     .sidebar.mobile-open {
-        transform:
-            translateX(0);
-
-        box-shadow:
-            4px 0 24px
-            rgba(var(--black-rgb), 0.6);
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.6); /* Sombra de profundidade nativa */
     }
 
-
-    /* ----------------------------------------------------------------------
-       Layout
-       ---------------------------------------------------------------------- */
-
-    .layout-grid,
-    .layout-grid.evidence-active {
+    /* 4. Ajustes do Layout Central */
+    .layout-grid, .layout-grid.evidence-active {
         grid-template-columns: 1fr;
-
-        height:
-            calc(100vh - 80px);
-
-        padding:
-            80px
-            var(--space-md)
-            var(--space-md);
-
+        padding: 80px var(--space-md) var(--space-md) var(--space-md); /* Espaço pro botão do menu */
         gap: 0;
+        height: calc(100vh - 80px);
     }
 
-    .hero {
-        padding:
-            var(--space-md);
-
-        text-align: center;
-    }
-
-    .hero .logo {
-        font-size: 2.2rem;
-    }
-
+    .hero .logo { font-size: 2.2rem; }
+    .hero { padding: var(--space-md); text-align: center; }
+    
     .topbar {
         padding-left: 60px;
     }
 
-
-    /* ----------------------------------------------------------------------
-       Evidence — Bottom Sheet
-       ---------------------------------------------------------------------- */
-
+    /* 5. A BOTTOM SHEET */
     .evidence-section {
         position: fixed;
-
         bottom: 0;
         left: 0;
-
-        z-index: 1001;
-
         width: 100vw;
-        height: 85vh;
-
-        display: flex !important;
-
+        height: 85vh; 
+        border-radius: 24px 24px 0 0;
+        z-index: 1001;
+        transform: translateY(100%); 
+        display: flex !important; 
         flex-direction: column;
-
-        border-radius:
-            var(--radius-xl)
-            var(--radius-xl)
-            0
-            0;
-
-        transform:
-            translateY(100%);
-
-        box-shadow:
-            0 -10px 40px
-            rgba(var(--black-rgb), 0.5);
-
-        transition:
-            transform
-            0.4s
-            cubic-bezier(0.25, 1, 0.5, 1);
+        transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
     }
 
-    .layout-grid.evidence-active
-    .evidence-section {
-        transform:
-            translateY(0);
+    .layout-grid.evidence-active .evidence-section {
+        transform: translateY(0); 
     }
 
     .bottom-sheet-handle {
         width: 40px;
         height: 5px;
-
-        margin:
-            0 auto 15px;
-
-        background-color:
-            var(--color-border);
-
+        background-color: var(--border-color);
         border-radius: 10px;
+        margin: 0 auto 15px auto;
     }
 
-
-    /* ----------------------------------------------------------------------
-       Reading mobile
-       ---------------------------------------------------------------------- */
-
-    .reading-layout {
-        padding:
-            30px
-            15px
-            80px;
-    }
-
-    .reading-chunk {
-        padding-right: 0;
-
-        font-size: 1.05rem;
+    .reading-layout { padding: 30px 15px 80px 15px; }
+    .reading-chunk { font-size: 1.05rem; padding-right: 0; }
+    
+    .btn-translate-chunk {
+        position: relative;
+        opacity: 1;
+        transform: none;
+        float: right;
+        margin: 5px 0 10px 15px;
+        background-color: transparent;
+        border: 1px dashed var(--border-color);
+        box-shadow: none;
     }
 
     .reading-topbar {
-        grid-template-columns:
-            40px
-            1fr
-            40px;
-
+        grid-template-columns: 40px 1fr 40px; 
+        padding: 0 10px;
         gap: 10px;
-
-        padding:
-            0 10px;
     }
-
-    .btn-reading-action {
-        padding: 8px;
-    }
-
+    
     .hide-mobile {
         display: none;
     }
-
-
-    /* ----------------------------------------------------------------------
-       Tradução mobile
-       ---------------------------------------------------------------------- */
-
-    .btn-translate-chunk {
-        position: relative;
-
-        float: right;
-
-        margin:
-            5px
-            0
-            10px
-            15px;
-
-        background-color:
-            transparent;
-
-        border:
-            1px dashed var(--color-border);
-
-        box-shadow: none;
-
-        opacity: 1;
-
-        transform: none;
+    
+    .btn-reading-action {
+        padding: 8px; 
     }
 }
