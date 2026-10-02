@@ -11,6 +11,10 @@ from google.genai import types
 
 from backend.config import settings
 
+from backend.api.dependencies import (
+    get_authenticated_user_id,
+)
+
 
 router = APIRouter(
     tags=["Translation"],
@@ -24,62 +28,6 @@ client = genai.Client(
 
 class TranslationRequest(BaseModel):
     text: str
-
-
-def get_authenticated_user_id(
-    authorization: str | None,
-) -> str:
-    if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Token de autenticação não fornecido.",
-        )
-
-    if not authorization.startswith(
-        "Bearer "
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Formato de autenticação inválido.",
-        )
-
-    supabase_token = authorization.split(
-        " ",
-        1,
-    )[1].strip()
-
-    if not supabase_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Token de autenticação inválido.",
-        )
-
-    try:
-        from backend.infrastructure.database import (
-            supabase_client,
-        )
-
-        user_response = (
-            supabase_client
-            .auth
-            .get_user(
-                supabase_token
-            )
-        )
-
-    except Exception:
-        raise HTTPException(
-            status_code=401,
-            detail="Sessão Supabase inválida.",
-        )
-
-    if not user_response.user:
-        raise HTTPException(
-            status_code=401,
-            detail="Sessão Supabase inválida.",
-        )
-
-    return user_response.user.id
 
 
 @router.post(
