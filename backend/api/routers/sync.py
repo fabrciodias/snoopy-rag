@@ -18,6 +18,7 @@ from backend.api.container import (
     drive_sync_service,
 )
 
+from backend.domain.entities import OperationTargetType
 
 router = APIRouter(
     prefix="/sync-drive",
@@ -82,6 +83,7 @@ def sync_drive(
     try:
         operation = operation_service.start_operation(
             operation_type="DRIVE_SYNC",
+            target_type=OperationTargetType.FOLDER,
             target_id=request.folder_id,
         )
 

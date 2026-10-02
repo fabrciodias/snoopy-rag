@@ -5,7 +5,6 @@ from backend.domain.entities import (
     Document,
     DocumentRepresentation,
     DocumentStatus,
-    EmbeddingProvider,
     Evidence,
     Investigation,
     InvestigationStatus,

@@ -1,11 +1,12 @@
 import uuid
-from typing import List
 from datetime import datetime, timezone
+from typing import List
 
 from supabase import Client
 
 from backend.domain.entities import (
     Investigation,
+    InvestigationStatus,
     RetrievalResult,
 )
 from backend.domain.repositories import (
@@ -37,16 +38,12 @@ class RetrievalService:
         limit: int = 10,
     ) -> tuple[Investigation, List[RetrievalResult]]:
 
-        filters = {
-            "folder_id": folder_id,
-        }
-
         investigation = Investigation(
             investigation_id=str(uuid.uuid4()),
             user_id=user_id,
+            folder_id=folder_id,
             original_query=query,
-            filters=filters,
-            status="PROCESSING",
+            status=InvestigationStatus.PROCESSING,
             created_at=datetime.now(timezone.utc),
         )
 
@@ -60,10 +57,13 @@ class RetrievalService:
             )
 
             if not query_embeddings:
-                self.investigation_repo.update_status(
-                    investigation.investigation_id,
-                    "COMPLETED",
+                investigation = (
+                    self.investigation_repo.update_status(
+                        investigation.investigation_id,
+                        InvestigationStatus.COMPLETED,
+                    )
                 )
+
                 return investigation, []
 
             vector = query_embeddings[0]
@@ -83,27 +83,41 @@ class RetrievalService:
 
             semantic_sorted = sorted(
                 raw_results,
-                key=lambda x: x.get("semantic_score", 0),
+                key=lambda item: item.get(
+                    "semantic_score",
+                    0,
+                ),
                 reverse=True,
             )
 
             lexical_sorted = sorted(
                 raw_results,
-                key=lambda x: x.get("lexical_score", 0),
+                key=lambda item: item.get(
+                    "lexical_score",
+                    0,
+                ),
                 reverse=True,
             )
 
             ranks = {}
 
-            for rank, item in enumerate(semantic_sorted):
+            for rank, item in enumerate(
+                semantic_sorted,
+                start=1,
+            ):
                 ranks.setdefault(
-                    item["unit_id"], {}
-                )["semantic_rank"] = rank + 1
+                    item["unit_id"],
+                    {},
+                )["semantic_rank"] = rank
 
-            for rank, item in enumerate(lexical_sorted):
+            for rank, item in enumerate(
+                lexical_sorted,
+                start=1,
+            ):
                 ranks.setdefault(
-                    item["unit_id"], {}
-                )["lexical_rank"] = rank + 1
+                    item["unit_id"],
+                    {},
+                )["lexical_rank"] = rank
 
             k = 60
             fused_results = []
@@ -111,73 +125,84 @@ class RetrievalService:
             for item in raw_results:
 
                 unit_id = item["unit_id"]
+                item_ranks = ranks[unit_id]
 
-                semantic_rank = ranks[unit_id].get(
-                    "semantic_rank",
-                    1000,
+                semantic_rank = item_ranks.get(
+                    "semantic_rank"
+                )
+                lexical_rank = item_ranks.get(
+                    "lexical_rank"
                 )
 
-                lexical_rank = ranks[unit_id].get(
-                    "lexical_rank",
-                    1000,
-                )
+                rrf_score = 0.0
 
-                rrf_score = (
-                    1.0 / (k + semantic_rank)
-                ) + (
-                    1.0 / (k + lexical_rank)
-                )
+                if semantic_rank is not None:
+                    rrf_score += 1.0 / (
+                        k + semantic_rank
+                    )
+
+                if lexical_rank is not None:
+                    rrf_score += 1.0 / (
+                        k + lexical_rank
+                    )
 
                 item["rrf_score"] = rrf_score
                 fused_results.append(item)
 
             fused_results = sorted(
                 fused_results,
-                key=lambda x: x["rrf_score"],
+                key=lambda item: item["rrf_score"],
                 reverse=True,
             )[:limit]
 
             results = []
 
-            for idx, row in enumerate(fused_results):
-
+            for idx, row in enumerate(
+                fused_results,
+                start=1,
+            ):
                 result = RetrievalResult(
                     result_id=str(uuid.uuid4()),
-                    investigation_id=investigation.investigation_id,
+                    investigation_id=(
+                        investigation.investigation_id
+                    ),
                     unit_id=row["unit_id"],
-                    rank=idx + 1,
+                    document_id=row["document_id"],
+                    rank=idx,
                     retrieval_score=row["rrf_score"],
-                    metadata={
-                        "document_id": row["document_id"],
-                        "content": row["content"],
-                        "location": row["location"],
-                        "raw_semantic_score": row.get(
-                            "semantic_score",
-                            0,
-                        ),
-                        "raw_lexical_score": row.get(
-                            "lexical_score",
-                            0,
-                        ),
-                    },
+                    semantic_score=row.get(
+                        "semantic_score"
+                    ),
+                    lexical_score=row.get(
+                        "lexical_score"
+                    ),
+                    content=row["content"],
+                    location=row.get(
+                        "location",
+                        {},
+                    ),
+                    metadata=row.get(
+                        "metadata",
+                        {},
+                    ),
                 )
 
                 results.append(result)
 
             self.result_repo.save_batch(results)
 
-            self.investigation_repo.update_status(
-                investigation.investigation_id,
-                "COMPLETED",
+            investigation = (
+                self.investigation_repo.update_status(
+                    investigation.investigation_id,
+                    InvestigationStatus.COMPLETED,
+                )
             )
-
-            investigation.status = "COMPLETED"
 
             return investigation, results
 
         except Exception:
             self.investigation_repo.update_status(
                 investigation.investigation_id,
-                "FAILED",
+                InvestigationStatus.FAILED,
             )
             raise

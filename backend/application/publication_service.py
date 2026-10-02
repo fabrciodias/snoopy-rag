@@ -1,11 +1,18 @@
-from backend.application.document_processor import DocumentProcessor
-from backend.application.segmentation_service import SegmentationService
+from backend.application.document_processor import (
+    DocumentProcessor,
+)
+from backend.application.segmentation_service import (
+    SegmentationService,
+)
+from backend.domain.entities import (
+    Document,
+    DocumentStatus,
+)
 from backend.domain.repositories import (
     DocumentRepository,
-    RetrievalUnitRepository,
     EmbeddingProvider,
+    RetrievalUnitRepository,
 )
-from backend.domain.entities import DocumentStatus
 
 
 class PublicationService:
@@ -26,16 +33,12 @@ class PublicationService:
 
     def process_and_publish(
         self,
-        document_id: str,
-        title: str,
-        folder_id: str,
-        user_id: str,
-        drive_file_id: str,
+        document: Document,
         file_path: str,
     ):
 
         self.document_repo.update_status(
-            document_id,
+            document.document_id,
             DocumentStatus.PROCESSING,
         )
 
@@ -43,10 +46,10 @@ class PublicationService:
             # 1. Fonte física → representação canônica
             representation = self.processor.process_pdf(
                 file_path=file_path,
-                document_id=document_id,
+                document_id=document.document_id,
                 metadata={
-                    "title": title,
-                    "drive_file_id": drive_file_id,
+                    "title": document.title,
+                    "drive_file_id": document.drive_file_id,
                 },
             )
 
@@ -57,7 +60,7 @@ class PublicationService:
 
             # 2. Persistência da representação
             self.document_repo.save_representation(
-                document_id,
+                document.document_id,
                 representation,
             )
 
@@ -72,10 +75,14 @@ class PublicationService:
                 )
 
             # 4. RetrievalUnits → embeddings
-            texts = [unit.content for unit in units]
+            texts = [
+                unit.content
+                for unit in units
+            ]
 
-            embeddings = self.embedding_provider.generate_embeddings(
-                texts
+            embeddings = (
+                self.embedding_provider
+                .generate_embeddings(texts)
             )
 
             if len(embeddings) != len(units):
@@ -88,31 +95,40 @@ class PublicationService:
             self.unit_repo.save_batch(
                 units=units,
                 embeddings=embeddings,
-                user_id=user_id,
-                folder_id=folder_id,
             )
 
             # 6. Só agora o documento pode ser publicado
-            self.document_repo.update_status(
-                document_id,
-                DocumentStatus.ACTIVE,
+            published_document = (
+                self.document_repo.update_status(
+                    document.document_id,
+                    DocumentStatus.ACTIVE,
+                )
             )
 
             return {
-                "document_id": document_id,
-                "representation_id": representation.representation_id,
+                "document_id": (
+                    published_document.document_id
+                ),
+                "representation_id": (
+                    representation.representation_id
+                ),
                 "unit_count": len(units),
-                "status": DocumentStatus.ACTIVE.value,
+                "status": (
+                    DocumentStatus.ACTIVE.value
+                ),
             }
 
         except Exception:
-            # Compensação: nenhuma unidade parcialmente produzida
-            # permanece associada a um documento que falhou.
+            # A compensação continua existindo neste estágio.
+            # A estratégia de atualização segura será refinada
+            # posteriormente na Passada 4.
             try:
-                self.unit_repo.delete_by_document(document_id)
+                self.unit_repo.delete_by_document(
+                    document.document_id
+                )
             finally:
                 self.document_repo.update_status(
-                    document_id,
+                    document.document_id,
                     DocumentStatus.FAILED,
                 )
 

@@ -5,9 +5,16 @@ from typing import Dict, List
 
 from supabase import Client
 
-from backend.application.operation_service import OperationService
-from backend.application.publication_service import PublicationService
-from backend.domain.entities import DocumentStatus
+from backend.application.operation_service import (
+    OperationService,
+)
+from backend.application.publication_service import (
+    PublicationService,
+)
+from backend.domain.entities import (
+    Document,
+    DocumentStatus,
+)
 from backend.domain.repositories import (
     DocumentRepository,
     RetrievalUnitRepository,
@@ -44,6 +51,7 @@ class DriveSyncService:
     ):
 
         temp_dir = "data/raw_pdfs"
+
         os.makedirs(
             temp_dir,
             exist_ok=True,
@@ -138,13 +146,18 @@ class DriveSyncService:
                         continue
 
                     if existing_document:
-                        document_id = existing_document["id"]
+                        document_id = (
+                            existing_document["id"]
+                        )
 
-                        # Remove derivados antigos, inclusive
-                        # chunks legadas da V2.
+                        # A remoção dos derivados antigos
+                        # permanece temporariamente aqui.
+                        # A estratégia segura de atualização
+                        # será consolidada na Passada 4.
                         self.unit_repo.delete_by_document(
                             document_id
                         )
+
                     else:
                         document_id = str(
                             uuid.uuid4()
@@ -165,21 +178,23 @@ class DriveSyncService:
                         temp_path
                     )
 
-                    self.document_repo.create_or_update(
+                    document = Document(
                         document_id=document_id,
-                        title=title,
                         folder_id=folder_id,
                         user_id=user_id,
+                        title=title,
                         drive_file_id=drive_file_id,
                         document_hash=document_hash,
+                        status=DocumentStatus.PENDING,
+                    )
+
+                    document = (
+                        self.document_repo
+                        .create_or_update(document)
                     )
 
                     self.publication_service.process_and_publish(
-                        document_id=document_id,
-                        title=title,
-                        folder_id=folder_id,
-                        user_id=user_id,
-                        drive_file_id=drive_file_id,
+                        document=document,
                         file_path=temp_path,
                     )
 
@@ -192,13 +207,11 @@ class DriveSyncService:
 
                     failed += 1
 
-                    errors.append(
-                        {
-                            "drive_file_id": drive_file_id,
-                            "title": title,
-                            "error": str(error),
-                        }
-                    )
+                    errors.append({
+                        "drive_file_id": drive_file_id,
+                        "title": title,
+                        "error": str(error),
+                    })
 
                     temp_path = os.path.join(
                         temp_dir,
@@ -209,6 +222,7 @@ class DriveSyncService:
                         os.remove(temp_path)
 
             if failed:
+
                 self.operation_service.fail_operation(
                     operation_id,
                     (
@@ -250,8 +264,12 @@ class DriveSyncService:
             raise
 
         finally:
+
             if os.path.isdir(temp_dir):
-                for filename in os.listdir(temp_dir):
+
+                for filename in os.listdir(
+                    temp_dir
+                ):
                     path = os.path.join(
                         temp_dir,
                         filename,
@@ -261,11 +279,16 @@ class DriveSyncService:
                         os.remove(path)
 
     @staticmethod
-    def _md5(file_path: str) -> str:
+    def _md5(
+        file_path: str,
+    ) -> str:
 
         digest = hashlib.md5()
 
-        with open(file_path, "rb") as file_handle:
+        with open(
+            file_path,
+            "rb",
+        ) as file_handle:
 
             for chunk in iter(
                 lambda: file_handle.read(1024 * 1024),
