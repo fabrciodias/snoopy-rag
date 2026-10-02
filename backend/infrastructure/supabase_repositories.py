@@ -351,6 +351,7 @@ class SupabaseDocumentRepository(DocumentRepository):
             self.client
             .table("document_representations")
             .select("representation")
+            .eq("id", representation_id)
             .limit(1)
             .execute()
         )
@@ -366,9 +367,17 @@ class SupabaseDocumentRepository(DocumentRepository):
         if not representation:
             return None
 
-        return DocumentRepresentation(
+        result = DocumentRepresentation(
             **representation
+        )
+
+        if result.document_id != document_id:
+            raise RuntimeError(
+                "A representação corrente não pertence "
+                "ao documento informado."
             )
+
+        return result
 
     @staticmethod
     def _to_entity(
