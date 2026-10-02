@@ -36,14 +36,35 @@ class PublicationService:
         document: Document,
         file_path: str,
     ):
+        """
+        Processa uma nova fonte documental e publica sua representação
+        somente depois que todos os derivados necessários estiverem
+        prontos.
 
-        self.document_repo.update_status(
-            document.document_id,
-            DocumentStatus.PROCESSING,
-        )
+        Para um documento já ACTIVE, a versão corrente permanece
+        intacta durante todo o processamento.
+
+        Em caso de falha:
+            - documento ACTIVE permanece ACTIVE;
+            - documento ainda não publicado passa a FAILED;
+            - nenhuma unidade histórica existente é removida.
+        """
+
+        previous_status = document.status
+
+        # Um documento novo pode entrar em PROCESSING.
+        # Um documento já ACTIVE continua ACTIVE até a publicação.
+        if previous_status != DocumentStatus.ACTIVE:
+            self.document_repo.update_status(
+                document.document_id,
+                DocumentStatus.PROCESSING,
+            )
 
         try:
+            # ====================================================
             # 1. Fonte física → representação canônica
+            # ====================================================
+
             representation = self.processor.process_pdf(
                 file_path=file_path,
                 document_id=document.document_id,
@@ -58,13 +79,10 @@ class PublicationService:
                     "Documento não produziu conteúdo textual válido."
                 )
 
-            # 2. Persistência da representação
-            self.document_repo.save_representation(
-                document.document_id,
-                representation,
-            )
+            # ====================================================
+            # 2. Representação → RetrievalUnits
+            # ====================================================
 
-            # 3. Representação → RetrievalUnits
             units = self.segmentation_service.segment(
                 representation
             )
@@ -74,7 +92,10 @@ class PublicationService:
                     "Documento não produziu RetrievalUnits."
                 )
 
-            # 4. RetrievalUnits → embeddings
+            # ====================================================
+            # 3. RetrievalUnits → embeddings
+            # ====================================================
+
             texts = [
                 unit.content
                 for unit in units
@@ -91,17 +112,32 @@ class PublicationService:
                     "às RetrievalUnits."
                 )
 
+            # ====================================================
+            # 4. Persistência da representação candidata
+            # ====================================================
+
+            self.document_repo.save_representation(
+                document.document_id,
+                representation,
+            )
+
+            # ====================================================
             # 5. Persistência dos derivados
+            # ====================================================
+
             self.unit_repo.save_batch(
                 units=units,
                 embeddings=embeddings,
             )
 
-            # 6. Só agora o documento pode ser publicado
+            # ====================================================
+            # 6. Publicação
+            # ====================================================
+
             published_document = (
-                self.document_repo.update_status(
-                    document.document_id,
-                    DocumentStatus.ACTIVE,
+                self.document_repo.publish_representation(
+                    document=document,
+                    representation=representation,
                 )
             )
 
@@ -119,14 +155,18 @@ class PublicationService:
             }
 
         except Exception:
-            # A compensação continua existindo neste estágio.
-            # A estratégia de atualização segura será refinada
-            # posteriormente na Passada 4.
-            try:
-                self.unit_repo.delete_by_document(
-                    document.document_id
-                )
-            finally:
+            # ====================================================
+            # Falha segura
+            # ====================================================
+            #
+            # Não removemos unidades.
+            #
+            # Se já existia uma publicação ACTIVE, ela permanece
+            # intacta. Os derivados parcialmente criados pertencem
+            # à representação candidata e poderão ser tratados
+            # posteriormente por uma rotina de limpeza.
+            #
+            if previous_status != DocumentStatus.ACTIVE:
                 self.document_repo.update_status(
                     document.document_id,
                     DocumentStatus.FAILED,

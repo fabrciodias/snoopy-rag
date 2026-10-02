@@ -225,12 +225,19 @@ class SupabaseDocumentRepository(DocumentRepository):
         document_id: str,
         representation: DocumentRepresentation,
     ) -> Document:
+        """
+        Persiste a representação no histórico.
+
+        IMPORTANTE:
+        esta operação não altera current_representation_id
+        nem a representação corrente do documento.
+        """
 
         representation_payload = {
             "id": representation.representation_id,
             "document_id": document_id,
             "representation": representation.model_dump(
-            mode="json"
+                mode="json"
             ),
         }
 
@@ -246,32 +253,62 @@ class SupabaseDocumentRepository(DocumentRepository):
                 "Falha ao persistir a representação documental."
             )
 
-        document_response = (
-            self.client
-            .table(self.table_name)
-            .update({
-                "current_representation_id": (
-                    representation.representation_id
-                ),
-                "representation": (
-                    representation.model_dump(
-                        mode="json"
-                    )
-                ),
-            })
-            .eq("id", document_id)
-            .execute()
-        )
+        document = self.get_by_id(document_id)
 
-        if not document_response.data:
+        if document is None:
             raise RuntimeError(
                 f"Documento '{document_id}' não encontrado."
             )
 
-        return self._to_entity(
-            document_response.data[0]
+        return document
+
+    def publish_representation(
+        self,
+        document: Document,
+        representation: DocumentRepresentation,
+    ) -> Document:
+        """
+        Torna uma representação previamente processada a versão
+        corrente do documento.
+
+        A publicação atualiza os metadados documentais e o ponteiro
+        current_representation_id somente depois que o pipeline
+        de processamento foi concluído com sucesso.
+        """
+
+        payload = {
+            "title": document.title,
+            "authors": document.authors,
+            "publication_year": document.publication_year,
+            "drive_file_id": document.drive_file_id,
+            "drive_link": document.drive_link,
+            "document_hash": document.document_hash,
+            "current_representation_id": (
+                representation.representation_id
+            ),
+            "representation": (
+                representation.model_dump(
+                    mode="json"
+                )
+            ),
+            "status": DocumentStatus.ACTIVE.value,
+        }
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .update(payload)
+            .eq("id", document.document_id)
+            .execute()
         )
 
+        if not response.data:
+            raise RuntimeError(
+                f"Documento '{document.document_id}' "
+                "não encontrado durante a publicação."
+            )
+
+        return self._to_entity(response.data[0])
 
     def get_representation(
         self,

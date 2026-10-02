@@ -17,7 +17,6 @@ from backend.domain.entities import (
 )
 from backend.domain.repositories import (
     DocumentRepository,
-    RetrievalUnitRepository,
 )
 from backend.infrastructure.drive_provider import (
     GoogleDriveProvider,
@@ -33,14 +32,12 @@ class DriveSyncService:
         operation_service: OperationService,
         publication_service: PublicationService,
         document_repo: DocumentRepository,
-        unit_repo: RetrievalUnitRepository,
     ):
         self.client = client
         self.drive_provider = drive_provider
         self.operation_service = operation_service
         self.publication_service = publication_service
         self.document_repo = document_repo
-        self.unit_repo = unit_repo
 
     def sync_folder(
         self,
@@ -101,12 +98,21 @@ class DriveSyncService:
                     "md5Checksum"
                 )
 
+                temp_path = os.path.join(
+                    temp_dir,
+                    f"{drive_file_id}.pdf",
+                )
+
                 try:
+                    # ====================================================
+                    # 1. Descobre se o documento já existe
+                    # ====================================================
+
                     existing = (
                         self.client
                         .table("documents")
                         .select(
-                            "id,status,document_hash,representation"
+                            "id,status,document_hash"
                         )
                         .eq(
                             "folder_id",
@@ -130,7 +136,10 @@ class DriveSyncService:
                         else None
                     )
 
-                    # Documento V3 já publicado e sem alteração.
+                    # ====================================================
+                    # 2. Documento já publicado e sem alteração
+                    # ====================================================
+
                     if (
                         existing_document
                         and existing_document["status"]
@@ -138,35 +147,17 @@ class DriveSyncService:
                         and drive_md5
                         and existing_document["document_hash"]
                         == drive_md5
-                        and existing_document.get(
-                            "representation"
-                        )
                     ):
                         skipped += 1
                         continue
 
-                    if existing_document:
-                        document_id = (
-                            existing_document["id"]
-                        )
-
-                        # A remoção dos derivados antigos
-                        # permanece temporariamente aqui.
-                        # A estratégia segura de atualização
-                        # será consolidada na Passada 4.
-                        self.unit_repo.delete_by_document(
-                            document_id
-                        )
-
-                    else:
-                        document_id = str(
-                            uuid.uuid4()
-                        )
-
-                    temp_path = os.path.join(
-                        temp_dir,
-                        f"{drive_file_id}.pdf",
-                    )
+                    # ====================================================
+                    # 3. Baixa primeiro.
+                    # ====================================================
+                    #
+                    # Nenhum estado persistente do documento é alterado
+                    # antes de sabermos que o arquivo físico existe.
+                    #
 
                     self.drive_provider.download_pdf(
                         drive_file_id=drive_file_id,
@@ -174,24 +165,69 @@ class DriveSyncService:
                         output_path=temp_path,
                     )
 
+                    # ====================================================
+                    # 4. Calcula o hash físico real
+                    # ====================================================
+
                     document_hash = self._md5(
                         temp_path
                     )
 
-                    document = Document(
-                        document_id=document_id,
-                        folder_id=folder_id,
-                        user_id=user_id,
-                        title=title,
-                        drive_file_id=drive_file_id,
-                        document_hash=document_hash,
-                        status=DocumentStatus.PENDING,
-                    )
+                    # ====================================================
+                    # 5. Monta o documento candidato
+                    # ====================================================
 
-                    document = (
-                        self.document_repo
-                        .create_or_update(document)
-                    )
+                    if existing_document:
+
+                        document_id = (
+                            existing_document["id"]
+                        )
+
+                        current_document = (
+                            self.document_repo.get_by_id(
+                                document_id
+                            )
+                        )
+
+                        if current_document is None:
+                            raise RuntimeError(
+                                f"Documento '{document_id}' "
+                                "não pôde ser recuperado."
+                            )
+
+                        document = current_document.model_copy(
+                            update={
+                                "title": title,
+                                "drive_file_id": drive_file_id,
+                                "document_hash": document_hash,
+                            }
+                        )
+
+                    else:
+
+                        document = Document(
+                            document_id=str(
+                                uuid.uuid4()
+                            ),
+                            folder_id=folder_id,
+                            user_id=user_id,
+                            title=title,
+                            drive_file_id=drive_file_id,
+                            document_hash=document_hash,
+                            status=DocumentStatus.PENDING,
+                        )
+
+                        # O documento novo precisa existir antes
+                        # que a publicação possa armazenar sua
+                        # representação histórica.
+                        document = (
+                            self.document_repo
+                            .create_or_update(document)
+                        )
+
+                    # ====================================================
+                    # 6. Processa e publica
+                    # ====================================================
 
                     self.publication_service.process_and_publish(
                         document=document,
@@ -199,9 +235,6 @@ class DriveSyncService:
                     )
 
                     processed += 1
-
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
 
                 except Exception as error:
 
@@ -213,10 +246,7 @@ class DriveSyncService:
                         "error": str(error),
                     })
 
-                    temp_path = os.path.join(
-                        temp_dir,
-                        f"{drive_file_id}.pdf",
-                    )
+                finally:
 
                     if os.path.exists(temp_path):
                         os.remove(temp_path)
@@ -272,7 +302,7 @@ class DriveSyncService:
                 ):
                     path = os.path.join(
                         temp_dir,
-                        filename,
+                        filename
                     )
 
                     if os.path.isfile(path):

@@ -122,5 +122,4 @@ drive_sync_service = DriveSyncService(
     operation_service=operation_service,
     publication_service=publication_service,
     document_repo=doc_repo,
-    unit_repo=unit_repo,
     )

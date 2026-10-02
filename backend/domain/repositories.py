@@ -87,10 +87,25 @@ class DocumentRepository(ABC):
         representation: DocumentRepresentation,
     ) -> Document:
         """
-        Persiste uma nova representação histórica do documento
-        e a associa como representação corrente.
+        Persiste uma nova representação histórica.
 
-        A representação anterior não deve ser sobrescrita.
+        Esta operação NÃO altera a representação corrente
+        do documento e NÃO publica a nova versão.
+        """
+        pass
+
+    @abstractmethod
+    def publish_representation(
+        self,
+        document: Document,
+        representation: DocumentRepresentation,
+    ) -> Document:
+        """
+        Publica uma representação previamente processada.
+
+        A representação passa a ser a versão corrente do documento
+        somente depois que todo o pipeline de processamento tiver
+        sido concluído com sucesso.
         """
         pass
 
