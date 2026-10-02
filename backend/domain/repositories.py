@@ -139,13 +139,6 @@ class RetrievalUnitRepository(ABC):
         pass
 
     @abstractmethod
-    def delete_by_document(
-        self,
-        document_id: str,
-    ) -> None:
-        pass
-
-    @abstractmethod
     def get_context(
         self,
         unit_id: int,

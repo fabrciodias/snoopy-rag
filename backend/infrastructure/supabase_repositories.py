@@ -233,6 +233,12 @@ class SupabaseDocumentRepository(DocumentRepository):
         nem a representação corrente do documento.
         """
 
+        if representation.document_id != document_id:
+            raise ValueError(
+                "A representação documental não pertence "
+                "ao documento informado."
+            )
+        
         representation_payload = {
             "id": representation.representation_id,
             "document_id": document_id,
@@ -276,6 +282,12 @@ class SupabaseDocumentRepository(DocumentRepository):
         de processamento foi concluído com sucesso.
         """
 
+        if representation.document_id != document.document_id:
+            raise ValueError(
+                "A representação documental não pertence "
+                "ao documento informado."
+            )
+
         payload = {
             "title": document.title,
             "authors": document.authors,
@@ -315,26 +327,48 @@ class SupabaseDocumentRepository(DocumentRepository):
         document_id: str,
     ) -> Optional[DocumentRepresentation]:
 
-        response = (
+        document_response = (
             self.client
             .table(self.table_name)
-            .select("representation")
+            .select("current_representation_id")
             .eq("id", document_id)
             .limit(1)
             .execute()
         )
 
-        if not response.data:
+        if not document_response.data:
             return None
 
-        representation = response.data[0].get(
-            "representation"
+        representation_id = (
+            document_response.data[0]
+            .get("current_representation_id")
+        )
+
+        if not representation_id:
+            return None
+
+        representation_response = (
+            self.client
+            .table("document_representations")
+            .select("representation")
+            .limit(1)
+            .execute()
+        )
+
+        if not representation_response.data:
+            return None
+
+        representation = (
+            representation_response.data[0]
+            .get("representation")
         )
 
         if not representation:
             return None
 
-        return DocumentRepresentation(**representation)
+        return DocumentRepresentation(
+            **representation
+            )
 
     @staticmethod
     def _to_entity(
@@ -466,19 +500,6 @@ class SupabaseRetrievalUnitRepository(
             unit.unit_id = record["id"]
 
         return units
-
-    def delete_by_document(
-        self,
-        document_id: str,
-    ) -> None:
-
-        (
-            self.client
-            .table(self.table_name)
-            .delete()
-            .eq("document_id", document_id)
-            .execute()
-        )
 
     def get_context(
         self,
