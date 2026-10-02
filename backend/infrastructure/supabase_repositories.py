@@ -386,6 +386,44 @@ class SupabaseRetrievalUnitRepository(
                 "às RetrievalUnits."
             )
 
+        document_ids = {
+            unit.document_id
+            for unit in units
+        }
+
+        if len(document_ids) != 1:
+            raise ValueError(
+                "Todas as RetrievalUnits de um batch devem "
+                "pertencer ao mesmo documento."
+            )
+
+        document_id = next(iter(document_ids))
+
+        document_response = (
+            self.client
+            .table("documents")
+            .select("id, user_id, folder_id")
+            .eq("id", document_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not document_response.data:
+            raise RuntimeError(
+                f"Documento '{document_id}' não encontrado."
+            )
+
+        document = document_response.data[0]
+
+        user_id = document.get("user_id")
+        folder_id = document.get("folder_id")
+
+        if not user_id or not folder_id:
+            raise RuntimeError(
+                f"Documento '{document_id}' não possui "
+                "user_id ou folder_id válidos."
+            )
+
         payload = []
 
         for unit, embedding in zip(
@@ -393,6 +431,8 @@ class SupabaseRetrievalUnitRepository(
             embeddings,
         ):
             payload.append({
+                "user_id": user_id,
+                "folder_id": folder_id,
                 "document_id": unit.document_id,
                 "content": unit.content,
                 "section": unit.section,
