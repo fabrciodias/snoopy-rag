@@ -130,6 +130,21 @@ class RetrievalUnitRepository(ABC):
     ) -> None:
         pass
 
+    @abstractmethod
+    def get_context(
+        self,
+        unit_id: int,
+        window: int = 1,
+    ) -> List[RetrievalUnit]:
+        """
+        Recupera a unidade indicada e suas unidades vizinhas
+        dentro da mesma representação documental.
+
+        A unidade recuperada continua sendo a evidência principal.
+        As demais unidades são utilizadas apenas como contexto.
+        """
+        pass
+
 
 # ============================================================
 # Embedding Provider

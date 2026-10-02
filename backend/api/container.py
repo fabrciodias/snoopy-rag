@@ -101,6 +101,7 @@ retrieval_service = RetrievalService(
 synthesis_service = SynthesisService(
     evidence_repo,
     investigation_repo,
+    unit_repo,
 )
 
 doc_processor = DocumentProcessor()

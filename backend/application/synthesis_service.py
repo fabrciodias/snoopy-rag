@@ -17,6 +17,7 @@ from backend.domain.entities import (
 from backend.domain.repositories import (
     EvidenceRepository,
     InvestigationRepository,
+    RetrievalUnitRepository,
 )
 
 
@@ -37,9 +38,11 @@ class SynthesisService:
         self,
         evidence_repo: EvidenceRepository,
         investigation_repo: InvestigationRepository,
+        unit_repo: RetrievalUnitRepository,
     ):
         self.evidence_repo = evidence_repo
         self.investigation_repo = investigation_repo
+        self.unit_repo = unit_repo
 
         self.model = settings.gemini_llm_model
 
@@ -60,6 +63,30 @@ class SynthesisService:
         evidences: List[Evidence] = []
 
         for result in results:
+
+            contex_units = self.unit_repo.get_context(
+                document_id=result.document_id,
+                representation_id=(
+                    result.representation_id
+                ),
+                unit_index=(
+                    next(
+                        (
+                            unit.unit_index
+                            for unit in self.unit_repo.get_context(
+                                document_id=result.document_id,
+                                representation_id=(
+                                    result.representation_id
+                                ),
+                                unit_index=0,
+                                window=0,
+                            )
+                        ),
+                        0,
+                    )
+                ),
+                window=1,
+            )
 
             evidence = Evidence(
                 evidence_id=str(uuid.uuid4()),

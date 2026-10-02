@@ -403,6 +403,89 @@ class SupabaseRetrievalUnitRepository(
             .execute()
         )
 
+    def get_context(
+        self,
+        unit_id: int,
+        window: int = 1,
+    ) -> List[RetrievalUnit]:
+
+        if window < 0:
+            raise ValueError(
+                "A janela de contexto não pode ser negativa."
+            )
+
+        anchor_response = (
+            self.client
+            .table(self.table_name)
+            .select(
+                "id, document_id, representation_id, "
+                "unit_index"
+            )
+            .eq("id", unit_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not anchor_response.data:
+            return []
+
+        anchor = anchor_response.data[0]
+
+        document_id = anchor["document_id"]
+        representation_id = anchor["representation_id"]
+        anchor_index = anchor["unit_index"]
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select(
+                "id, document_id, representation_id, "
+                "unit_index, content, location, section"
+            )
+            .eq(
+                "document_id",
+                document_id,
+            )
+            .eq(
+                "representation_id",
+                representation_id,
+            )
+            .gte(
+                "unit_index",
+                max(0, anchor_index - window),
+            )
+            .lte(
+                "unit_index",
+                anchor_index + window,
+            )
+            .order("unit_index")
+            .execute()
+        )
+
+        results = []
+
+        for record in response.data:
+            results.append(
+                RetrievalUnit(
+                    unit_id=record["id"],
+                    document_id=record["document_id"],
+                    representation_id=(
+                        record["representation_id"]
+                    ),
+                    unit_index=record["unit_index"],
+                    content=record["content"],
+                    location=(
+                        record.get("location") or {}
+                    ),
+                    section=(
+                        record.get("section")
+                        or "Geral"
+                    ),
+                )
+            )
+
+        return results
+
 
 # ============================================================
 # Investigations

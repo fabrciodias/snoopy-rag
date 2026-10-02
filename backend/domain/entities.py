@@ -223,6 +223,7 @@ class RetrievalResult(BaseModel):
     unit_id: int
     document_id: str
     representation_id: str
+    unit_index: int
 
     rank: int
     retrieval_score: float
