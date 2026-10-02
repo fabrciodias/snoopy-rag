@@ -4,13 +4,16 @@ from fastapi import (
     HTTPException,
 )
 
+from pydantic import BaseModel
+
 from backend.api.dependencies import (
     get_authenticated_user_id,
-    ensure_folder_access,
     PUBLIC_FOLDER_ID,
 )
-from backend.infrastructure.database import supabase_client
-from pydantic import BaseModel
+
+from backend.infrastructure.database import (
+    supabase_client,
+)
 
 
 router = APIRouter(
@@ -63,16 +66,12 @@ def create_folder(
     name = request.name.strip()
 
     if not drive_id:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=400,
             detail="drive_id não pode ser vazio.",
         )
 
     if not name:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=400,
             detail="name não pode ser vazio.",
@@ -95,8 +94,6 @@ def create_folder(
         )
 
         if not response.data:
-            from fastapi import HTTPException
-
             raise HTTPException(
                 status_code=500,
                 detail="Falha ao registrar o acervo.",
@@ -104,9 +101,10 @@ def create_folder(
 
         return response.data[0]
 
-    except Exception as error:
-        from fastapi import HTTPException
+    except HTTPException:
+        raise
 
+    except Exception as error:
         raise HTTPException(
             status_code=500,
             detail=str(error),
@@ -118,8 +116,6 @@ def delete_folder(
     folder_id: str,
     authorization: str | None = Header(default=None),
 ):
-    from fastapi import HTTPException
-
     user_id = get_authenticated_user_id(
         authorization
     )
