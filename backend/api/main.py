@@ -111,7 +111,7 @@ FRONTEND_DIR = (
 )
 def frontend_index():
     return FileResponse(
-        FRONTEND_DIR / "app" / "index.html"
+        FRONTEND_DIR / "index.html"
     )
 
 

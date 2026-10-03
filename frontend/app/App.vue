@@ -1,21 +1,7 @@
 <script setup lang="ts">
+import AppShell from "../components/layout/AppShell.vue";
 </script>
 
 <template>
-    <div class="app-container">
-        <main class="main-area">
-            <section class="view active">
-                <div class="hero">
-                    <h1 class="logo">
-                        LPP-Acervo
-                    </h1>
-
-                    <p class="subtitle">
-                        Memória Institucional e Recuperação
-                        Semântica Documental
-                    </p>
-                </div>
-            </section>
-        </main>
-    </div>
+    <AppShell />
 </template>

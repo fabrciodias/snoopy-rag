@@ -21,8 +21,11 @@
     "components/**/*.vue",
     "features/**/*.ts",
     "features/**/*.vue",
-    "services/**/*.ts",
-    "stores/**/*.ts",
-    "types/**/*.ts"
+    "infrastructure/**/*.ts",
+    "infrastructure/**/*.vue",
+    "renderer/**/*.ts",
+    "renderer/**/*.vue",
+    "state/**/*.ts",
+    "state/**/*.vue"
   ]
 }
