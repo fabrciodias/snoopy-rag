@@ -1,1 +1,0 @@
-{"root":["./app/main.ts","./stores/application.ts","./stores/investigation.ts","./types/document.ts","./types/evidence.ts","./types/investigation.ts","./types/operation.ts"],"errors":true,"version":"5.9.3"}
