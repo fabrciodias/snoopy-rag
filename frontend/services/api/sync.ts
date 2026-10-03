@@ -8,13 +8,14 @@ import type {
 
 export interface SyncRequest {
     folder_id: string;
+    google_token: string;
 }
 
 export async function startSync(
     request: SyncRequest,
 ): Promise<SyncStartResponse> {
     return apiRequest<SyncStartResponse>(
-        "/api/v3/sync-drive",
+        "/sync-drive/",
         {
             method: "POST",
 

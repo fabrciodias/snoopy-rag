@@ -15,7 +15,7 @@ export async function investigate(
     request: InvestigateRequest,
 ): Promise<InvestigationResponse> {
     return apiRequest<InvestigationResponse>(
-        "/api/v3/investigate",
+        "/investigate/",
         {
             method: "POST",
 
