@@ -32,6 +32,8 @@ export async function investigate(
             result.evidences;
     } catch (error) {
         setInvestigationError(error);
+
+        throw error;
     } finally {
         investigationState.isInvestigating = false;
     }
@@ -43,5 +45,7 @@ export async function loadHistory(): Promise<void> {
             await listHistory();
     } catch (error) {
         setInvestigationError(error);
+
+        throw error;
     }
 }

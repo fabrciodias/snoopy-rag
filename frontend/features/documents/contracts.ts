@@ -1,7 +1,3 @@
-import type {
-    DocumentLocation,
-} from "../investigation/contracts";
-
 export type DocumentStatus =
     | "PENDING"
     | "PROCESSING"
