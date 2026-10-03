@@ -4,6 +4,7 @@ import {
 } from "vue";
 
 import {
+    getSession,
     login,
     logout,
 } from "../../infrastructure/supabase-auth";
@@ -25,6 +26,14 @@ import {
     loadFolders,
     selectFolder,
 } from "../../features/folders/actions";
+
+import {
+    syncDrive,
+} from "../../features/synchronization/actions";
+
+import {
+    operationState,
+} from "../../state/operations";
 
 import {
     goHome,
@@ -85,6 +94,61 @@ async function handleConnectDrive():
     }
 }
 
+async function handleSyncDrive():
+    Promise<void> {
+    const folderId =
+        folderState.selectedFolderId;
+
+    if (!folderId) {
+        folderState.error =
+            "Selecione um acervo antes de sincronizar.";
+
+        return;
+    }
+
+    try {
+        folderState.error = null;
+
+        const session =
+            await getSession();
+
+        const googleToken =
+            session?.provider_token;
+
+        if (!googleToken) {
+            throw new Error(
+                "Não foi encontrado um token de acesso ao Google Drive. Faça login novamente.",
+            );
+        }
+
+        const result =
+            await syncDrive({
+                folder_id: folderId,
+                google_token: googleToken,
+            });
+        if (
+            result.status !== "COMPLETED"
+        ) {
+            throw new Error(
+                `A cincronização terminou com status ${result.status}.`,
+            );
+        }
+
+        await loadFolders();
+        
+    } catch (error) {
+        operationState.error =
+            error instanceof Error
+                ? error.message
+                : String(error);
+
+        console.error(
+            "[SYNC] Falha ao sincronizar acervo:",
+            error,
+        );
+    }
+}
+
 function handleFolderChange(
     event: Event,
 ): void {
@@ -94,6 +158,14 @@ function handleFolderChange(
     selectFolder(
         target.value,
     );
+}
+
+function getSyncLabel(): string {
+    if (!operationState.isLoading) {
+        return "Sincronizar Acervo";
+    }
+
+    return "Sincronizando...";
 }
 
 onMounted(async () => {
@@ -193,9 +265,23 @@ onMounted(async () => {
                         transform: translateY(3px);
                     "
                     type="button"
+                    :disabled="
+                        operationState.isLoading ||
+                        folderState.isLoading ||
+                        folderState.isCreating
+                    "
+                    @click="handleSyncDrive"
                 >
                     <i
-                        data-lucide="refresh-cw"
+                        :data-lucide="
+                            operationState.isLoading
+                                ? 'loader-circle'
+                                : 'refresh-cw'
+                        "
+                        :class="{
+                            'animate-spin':
+                                operationState.isLoading,
+                        }"
                         style="
                             width: 14px;
                             height: 14px;
@@ -233,6 +319,30 @@ onMounted(async () => {
                     {{ folder.name }}
                 </option>
             </select>
+
+            <div
+                v-if="operationState.isLoading"
+                style="
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    margin-top: 6px;
+                    text-align: center;
+                "
+            >
+                Sincronizando acervo...
+            </div>
+
+            <div
+                v-else-if="operationState.error"
+                style="
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    margin-top: 6px;
+                    text-align: center;
+                "
+            >
+                {{ operationState.error }}
+            </div>
 
             <button
                 id="btn-drive"
