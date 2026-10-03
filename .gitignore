@@ -24,5 +24,8 @@ node_modules/
 .idea/
 .DS_Store
 
-# Frontend build output
+
+# TypeScript / Vite generated files
+frontend/*.tsbuildinfo
+frontend/vite.config.d.ts
 frontend/dist/
