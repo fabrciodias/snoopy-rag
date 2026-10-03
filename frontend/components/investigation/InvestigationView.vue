@@ -1,5 +1,108 @@
 <script setup lang="ts">
+import {
+    computed,
+    ref,
+} from "vue";
+
 import EvidencePanel from "../evidence/EvidencePanel.vue";
+
+import {
+    investigationState,
+} from "../../state/investigation";
+
+const investigation =
+    computed(
+        () =>
+            investigationState
+                .activeInvestigation,
+    );
+
+const response =
+    computed(
+        () =>
+            investigationState.response,
+    );
+
+const evidences =
+    computed(
+        () =>
+            investigationState.evidences,
+    );
+
+const isInvestigating =
+    computed(
+        () =>
+            investigationState
+                .isInvestigating,
+    );
+
+const error =
+    computed(
+        () =>
+            investigationState.error,
+    );
+
+const sections =
+    computed(() => {
+        if (!response.value) {
+            return [];
+        }
+
+        return response.value.sections;
+    });
+
+const referencedEvidences =
+    computed(() => {
+        if (!response.value) {
+            return [];
+        }
+
+        const references =
+            new Set(
+                response.value
+                    .evidence_refs,
+            );
+
+        return evidences.value.filter(
+            (evidence) =>
+                evidence.evidence_id !== null &&
+                references.has(
+                    evidence.evidence_id,
+                ),
+        );
+    });
+
+const selectedEvidenceId =
+    ref<string | null>(null);
+
+const selectedEvidence =
+    computed(() => {
+        if (
+            !selectedEvidenceId.value
+        ) {
+            return null;
+        }
+
+        return (
+            evidences.value.find(
+                (evidence) =>
+                    evidence.evidence_id ===
+                    selectedEvidenceId.value,
+            ) ?? null
+        );
+    });
+
+function selectEvidence(
+    evidenceId: string,
+): void {
+    selectedEvidenceId.value =
+        evidenceId;
+}
+
+function closeEvidence(): void {
+    selectedEvidenceId.value =
+        null;
+}
 </script>
 
 <template>
@@ -9,9 +112,14 @@ import EvidencePanel from "../evidence/EvidencePanel.vue";
     >
         <header class="topbar">
             <h2
-                id="query-title"
                 class="sticky-query"
-            ></h2>
+            >
+                {{
+                    investigation
+                        ?.original_query ??
+                    "Pesquisa"
+                }}
+            </h2>
         </header>
 
         <main class="layout-grid">
@@ -28,24 +136,75 @@ import EvidencePanel from "../evidence/EvidencePanel.vue";
                 </h3>
 
                 <div
+                    v-if="isInvestigating"
                     id="loading-state"
-                    class="hidden"
                 >
                     <div class="spinner"></div>
 
                     <p
-                        id="live-logs"
                         class="live-logs"
                     >
-                        Iniciando motor...
+                        Processando investigação...
                     </p>
                 </div>
 
-                <div
-                    id="answer-box"
-                    class="hidden"
+                <p
+                    v-else-if="error"
+                    class="home-error"
                 >
-                    <div id="answer-text"></div>
+                    {{ error }}
+                </p>
+
+                <div
+                    v-else-if="response"
+                    id="answer-box"
+                >
+                    <div id="answer-text">
+                        <p>
+                            {{
+                                response.content
+                            }}
+                        </p>
+
+                        <section
+                            v-for="(
+                                section,
+                                index
+                            ) in sections"
+                            :key="index"
+                            style="
+                                margin-top: 24px;
+                            "
+                        >
+                            <h4
+                                v-if="
+                                    typeof section.title ===
+                                    'string'
+                                "
+                                style="
+                                    font-size: 1.1rem;
+                                    font-weight: 600;
+                                    color: var(--text-main);
+                                    margin-bottom: 10px;
+                                "
+                            >
+                                {{
+                                    section.title
+                                }}
+                            </h4>
+
+                            <p
+                                v-if="
+                                    typeof section.content ===
+                                    'string'
+                                "
+                            >
+                                {{
+                                    section.content
+                                }}
+                            </p>
+                        </section>
+                    </div>
 
                     <div
                         id="sources-section"
@@ -66,12 +225,68 @@ import EvidencePanel from "../evidence/EvidencePanel.vue";
                             Referências do Acervo
                         </h3>
 
-                        <div id="sources-container"></div>
+                        <div
+                            id="sources-container"
+                        >
+                            <button
+                                v-for="(
+                                    evidence,
+                                    index
+                                ) in referencedEvidences"
+                                :key="
+                                    evidence.evidence_id ??
+                                    evidence.unit_id
+                                "
+                                class="btn-outline"
+                                style="
+                                    width: 100%;
+                                    justify-content: flex-start;
+                                    margin-bottom: 8px;
+                                    text-align: left;
+                                "
+                                type="button"
+                                @click="
+                                    evidence.evidence_id &&
+                                    selectEvidence(
+                                        evidence.evidence_id,
+                                    )
+                                "
+                            >
+                                Evidência
+                                {{ index + 1 }}
+                            </button>
+
+                            <p
+                                v-if="
+                                    referencedEvidences.length ===
+                                    0
+                                "
+                                style="
+                                    color: var(--text-muted);
+                                    font-size: 0.9rem;
+                                "
+                            >
+                                Nenhuma evidência foi
+                                associada à resposta.
+                            </p>
+                        </div>
                     </div>
                 </div>
+
+                <p
+                    v-else
+                    style="
+                        color: var(--text-muted);
+                    "
+                >
+                    Nenhuma resposta disponível.
+                </p>
             </section>
 
-            <EvidencePanel />
+            <EvidencePanel
+                :evidence="selectedEvidence"
+                @close="closeEvidence"
+            />
         </main>
     </section>
 </template>

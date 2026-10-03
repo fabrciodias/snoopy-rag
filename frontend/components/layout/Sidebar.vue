@@ -1,12 +1,38 @@
 <script setup lang="ts">
 import {
+    onMounted,
+} from "vue";
+
+import {
     login,
     logout,
 } from "../../infrastructure/supabase-auth";
 
 import {
+    pickDriveFolder,
+} from "../../infrastructure/google-picker";
+
+import {
     authState,
 } from "../../state/authentication";
+
+import {
+    folderState,
+} from "../../state/folders";
+
+import {
+    addFolder,
+    loadFolders,
+    selectFolder,
+} from "../../features/folders/actions";
+
+import {
+    goHome,
+} from "../../state/navigation";
+
+function handleNewInvestigation(): void {
+    goHome();
+}
 
 async function handleLogin(): Promise<void> {
     try {
@@ -29,6 +55,58 @@ async function handleLogout(): Promise<void> {
         );
     }
 }
+
+async function handleConnectDrive():
+    Promise<void> {
+    try {
+        folderState.error = null;
+
+        const folder =
+            await pickDriveFolder();
+
+        if (!folder) {
+            return;
+        }
+
+        await addFolder({
+            name: folder.name,
+            drive_id: folder.id,
+        });
+    } catch (error) {
+        folderState.error =
+            error instanceof Error
+                ? error.message
+                : String(error);
+
+        console.error(
+            "[FOLDERS] Falha ao conectar acervo:",
+            error,
+        );
+    }
+}
+
+function handleFolderChange(
+    event: Event,
+): void {
+    const target =
+        event.target as HTMLSelectElement;
+
+    selectFolder(
+        target.value,
+    );
+}
+
+onMounted(async () => {
+    if (!authState.user) {
+        return;
+    }
+
+    try {
+        await loadFolders();
+    } catch {
+        // O erro já foi armazenado no estado.
+    }
+});
 </script>
 
 <template>
@@ -39,6 +117,8 @@ async function handleLogout(): Promise<void> {
                     id="logo-btn"
                     class="logo-area"
                     title="Página Inicial"
+                    type="button"
+                    @click="goHome"
                 >
                     <i
                         data-lucide="microscope"
@@ -77,147 +157,119 @@ async function handleLogout(): Promise<void> {
             </button>
         </div>
 
-        <div class="sidebar-middle">
+        <div
+            v-if="authState.user"
+            id="folder-container"
+            class="folder-box"
+            style="
+                display: flex;
+                flex-direction: column;
+            "
+        >
             <div
-                id="auth-section"
-                class="auth-box"
+                style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 6px;
+                "
             >
-                <div
-                    id="folder-container"
-                    class="folder-box hidden"
-                    style="display: flex; flex-direction: column;"
+                <span
+                    class="folder-label"
+                    style="
+                        margin-bottom: 0;
+                        line-height: 1;
+                    "
                 >
-                    <div
+                    Acervo Atual
+                </span>
+
+                <button
+                    id="btn-sync"
+                    class="btn-icon"
+                    title="Sincronizar Acervo"
+                    style="
+                        padding: 2px;
+                        transform: translateY(3px);
+                    "
+                    type="button"
+                >
+                    <i
+                        data-lucide="refresh-cw"
                         style="
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: center;
-                            margin-bottom: 6px;
+                            width: 14px;
+                            height: 14px;
                         "
-                    >
-                        <span
-                            class="folder-label"
-                            style="margin-bottom: 0; line-height: 1;"
-                        >
-                            Acervo Atual
-                        </span>
-
-                        <button
-                            id="btn-sync"
-                            class="btn-icon hidden"
-                            title="Sincronizar Acervo"
-                            style="
-                                padding: 2px;
-                                transform: translateY(3px);
-                            "
-                        >
-                            <i
-                                data-lucide="refresh-cw"
-                                style="width: 14px; height: 14px;"
-                            ></i>
-                        </button>
-                    </div>
-
-                    <select
-                        id="folder-selector"
-                        class="folder-dropdown"
-                    >
-                        <option value="f7faf7d9-ec80-46c6-9572-174865bf1e62">
-                            GEPAFOR (Público)
-                        </option>
-                    </select>
-
-                    <button
-                        id="btn-drive"
-                        class="btn-outline w-full hidden"
-                        style="
-                            margin-top: 10px;
-                            font-size: 0.8rem;
-                            padding: 6px;
-                            justify-content: center;
-                        "
-                    >
-                        <i
-                            data-lucide="folder-plus"
-                            class="icon-sm"
-                        ></i>
-
-                        Conectar Pasta Privada
-                    </button>
-
-                    <div
-                        id="sync-logs"
-                        style="
-                            font-size: 0.75rem;
-                            color: var(--primary);
-                            margin-top: 6px;
-                            text-align: center;
-                            min-height: 14px;
-                        "
-                    ></div>
-
-                    <div
-                        id="sync-progress-container"
-                        class="sync-accordion hidden"
-                    >
-                        <div
-                            id="btn-toggle-sync"
-                            class="sync-accordion-header"
-                        >
-                            <span
-                                id="sync-global-status"
-                                class="sync-status-text"
-                            >
-                                Processando arquivos...
-                            </span>
-
-                            <i
-                                data-lucide="chevron-down"
-                                class="sync-chevron icon-sm"
-                            ></i>
-                        </div>
-
-                        <div
-                            id="sync-jobs-list"
-                            class="sync-accordion-body"
-                        ></div>
-                    </div>
-                </div>
+                    ></i>
+                </button>
             </div>
 
-            <nav class="sidebar-nav">
-                <div
-                    id="btn-nav-folder"
-                    class="nav-title-box"
-                    title="Gerenciar Acervos"
+            <select
+                id="folder-selector"
+                class="folder-dropdown"
+                :value="
+                    folderState.selectedFolderId ??
+                    undefined
+                "
+                :disabled="
+                    folderState.isLoading ||
+                    folderState.isCreating
+                "
+                @change="handleFolderChange"
+            >
+                <option
+                    v-if="folderState.isLoading"
+                    disabled
+                    value=""
                 >
-                    <i
-                        data-lucide="folder"
-                        class="icon-sm"
-                    ></i>
+                    Carregando acervos...
+                </option>
 
-                    <h3 class="nav-title">
-                        Acervos
-                    </h3>
-                </div>
-
-                <div
-                    id="btn-nav-history"
-                    class="nav-title-box"
-                    title="Histórico Recente"
+                <option
+                    v-for="folder in folderState.folders"
+                    :key="folder.id"
+                    :value="folder.id"
                 >
-                    <i
-                        data-lucide="history"
-                        class="icon-sm"
-                    ></i>
+                    {{ folder.name }}
+                </option>
+            </select>
 
-                    <h3 class="nav-title">
-                        Histórico Recente
-                    </h3>
-                </div>
+            <button
+                id="btn-drive"
+                class="btn-outline w-full"
+                style="
+                    margin-top: 10px;
+                    font-size: 0.8rem;
+                    padding: 6px;
+                    justify-content: center;
+                "
+                type="button"
+                :disabled="folderState.isCreating"
+                @click="handleConnectDrive"
+            >
+                <i
+                    data-lucide="folder-plus"
+                    class="icon-sm"
+                ></i>
 
-                <div id="history-list"></div>
-            </nav>
+                {{
+                    folderState.isCreating
+                        ? "Conectando..."
+                        : "Conectar Pasta Privada"
+                }}
+            </button>
+
+            <div
+                v-if="folderState.error"
+                style="
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    margin-top: 6px;
+                    text-align: center;
+                "
+            >
+                {{ folderState.error }}
+            </div>
         </div>
 
         <div class="sidebar-bottom">
@@ -323,6 +375,13 @@ async function handleLogout(): Promise<void> {
                         style="width: 18px; height: 18px;"
                     ></i>
                 </button>
+
+                <button
+                    id="btn-sidebar-new"
+                    class="btn-primary-full"
+                    type="button"
+                    @click="handleNewInvestigation"
+                ></button>
             </div>
         </div>
     </aside>

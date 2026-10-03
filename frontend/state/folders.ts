@@ -11,6 +11,7 @@ export interface FolderState {
     selectedFolderId: string | null;
 
     isLoading: boolean;
+    isCreating: boolean;
     error: string | null;
 }
 
@@ -20,6 +21,7 @@ export const folderState =
         selectedFolderId: null,
 
         isLoading: false,
+        isCreating: false,
         error: null,
     });
 

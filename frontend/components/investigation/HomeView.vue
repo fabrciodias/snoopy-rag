@@ -21,6 +21,10 @@ import {
     investigationState,
 } from "../../state/investigation";
 
+import {
+    goToInvestigation,
+} from "../../state/navigation";
+
 const query = ref("");
 
 const selectedFolderId = computed(
@@ -48,12 +52,18 @@ async function submitInvestigation(): Promise<void> {
         return;
     }
 
-    await investigate({
-        folder_id:
-            selectedFolderId.value,
-        query: normalizedQuery,
-        limit: 5,
-    });
+    try {
+        await investigate({
+            folder_id:
+                selectedFolderId.value,
+            query: normalizedQuery,
+            limit: 5
+        });
+
+        goToInvestigation();
+    } catch {
+        // O erro já está armazenado no estado.
+    }
 }
 
 function handleSubmit(): void {

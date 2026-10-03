@@ -23,6 +23,14 @@ import {
     setAuthError,
 } from "../../state/authentication.ts";
 
+import {
+    computed,
+} from "vue";
+
+import {
+    navigationState,
+} from "../../state/navigation";
+
 let stopAuthListener:
     (() => void) | null = null;
 
@@ -54,6 +62,12 @@ onMounted(async () => {
 onUnmounted(() => {
     stopAuthListener?.();
 });
+
+const currentView =
+    computed(
+        () =>
+            navigationState.currentView,
+    );
 </script>
 
 <template>
@@ -77,11 +91,23 @@ onUnmounted(() => {
             id="main-content"
             class="main-area"
         >
-            <HomeView />
+            <HomeView 
+                v-if="currentView === 'home'"    
+            />
 
-            <InvestigationView />
+            <InvestigationView 
+                v-else-if="
+                    currentView ===
+                    'investigation'
+                "
+            />
 
-            <ReadingView />
+            <ReadingView 
+                v-else-if="
+                    currentView ===
+                    'reading'
+                "
+            />
         </div>
 
         <SettingsModal />
