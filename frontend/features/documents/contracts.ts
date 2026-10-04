@@ -44,5 +44,6 @@ export interface Document {
 
     status: DocumentStatus;
 
-    representation: DocumentRepresentation | null;
+    current_representation_id: string | null;
+    current_representation: DocumentRepresentation | null;
 }

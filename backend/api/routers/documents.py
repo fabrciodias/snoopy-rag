@@ -34,6 +34,9 @@ def get_document(
     A autorização é realizada através do acervo ao qual
     o documento pertence.
 
+    A representação retornada é sempre a representação
+    atualmente publicada para o documento.
+
     O frontend não acessa diretamente o banco.
     """
 
@@ -54,7 +57,7 @@ def get_document(
             drive_file_id,
             drive_link,
             status,
-            representation
+            current_representation_id
             """
         )
         .eq("id", document_id)
@@ -75,4 +78,57 @@ def get_document(
         user_id,
     )
 
-    return document
+    representation_id = (
+        document.get("current_representation_id")
+    )
+
+    current_representation = None
+
+    if representation_id:
+        representation_response = (
+            supabase_client
+            .table("document_representations")
+            .select(
+                "id, document_id, representation"
+            )
+            .eq("id", representation_id)
+            .eq("document_id", document_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not representation_response.data:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "A representação corrente do documento "
+                    "não foi encontrada."
+                ),
+            )
+
+        representation_record = (
+            representation_response.data[0]
+        )
+
+        current_representation = (
+            representation_record.get(
+                "representation"
+            )
+        )
+
+    return {
+        "id": document["id"],
+        "folder_id": document["folder_id"],
+        "title": document["title"],
+        "authors": document["authors"],
+        "publication_year": document["publication_year"],
+        "drive_file_id": document["drive_file_id"],
+        "drive_link": document["drive_link"],
+        "status": document["status"],
+        "current_representation_id": (
+            representation_id
+        ),
+        "current_representation": (
+            current_representation
+        ),
+    }
