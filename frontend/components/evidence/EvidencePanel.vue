@@ -12,7 +12,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    close: [];
+    (event: "close"): void;
+    (event: "open-reading"): void;
 }>();
 
 const location =
@@ -236,6 +237,15 @@ const locationLabel =
                             }}
                         </span>
                     </div>
+
+                    <button
+                        type="button"
+                        class="btn-outline"
+                        style="margin-top: 14px;"
+                        @click="emit('open-reading')"
+                    >
+                        Abrir no Documento
+                    </button>
                 </div>
             </article>
 

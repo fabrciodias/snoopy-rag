@@ -10,6 +10,10 @@ import {
     investigationState,
 } from "../../state/investigation";
 
+import {
+    goToReading
+} from "../../state/navigation";
+
 const investigation =
     computed(
         () =>
@@ -97,6 +101,15 @@ function selectEvidence(
 ): void {
     selectedEvidenceId.value =
         evidenceId;
+}
+
+function openEvidenceInReading(): void {
+    if (!selectedEvidence.value) return;
+
+    goToReading(
+        selectedEvidence.value.document_id,
+        selectedEvidence.value.location,
+    );
 }
 
 function closeEvidence(): void {
@@ -286,6 +299,7 @@ function closeEvidence(): void {
             <EvidencePanel
                 :evidence="selectedEvidence"
                 @close="closeEvidence"
+                @open-reading="openEvidenceInReading"
             />
         </main>
     </section>
