@@ -130,12 +130,12 @@ async function handleSyncDrive():
             result.status !== "COMPLETED"
         ) {
             throw new Error(
-                `A cincronização terminou com status ${result.status}.`,
+                `A sincronização terminou com status ${result.status}.`,
             );
         }
 
         await loadFolders();
-        
+
     } catch (error) {
         operationState.error =
             error instanceof Error
