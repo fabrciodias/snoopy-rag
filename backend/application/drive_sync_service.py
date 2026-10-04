@@ -85,6 +85,23 @@ class DriveSyncService:
                 )
             )
 
+            print(
+                f"[SYNC DEBUG] folder_id={folder_id} "
+                f"drive_folder_id={drive_folder_id}"
+            )
+
+            print(
+                f"[SYNC DEBUG] PDFs encontrados: {len(drive_files)}"
+            )
+
+            for drive_file in drive_files:
+                print(
+                    "[SYNC DEBUG] PDF: "
+                    f"id={drive_file.get('id')} "
+                    f"name={drive_file.get('name')} "
+                    f"mimeType={drive_file.get('mimeType')}"
+                )
+
             processed = 0
             skipped = 0
             failed = 0

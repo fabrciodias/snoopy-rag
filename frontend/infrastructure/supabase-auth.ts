@@ -53,6 +53,7 @@ export async function login(): Promise<void> {
     } = await client.auth.signInWithOAuth({
         provider: "google",
         options: {
+            redirectTo: `${window.location.origin}/`,
             scopes:
                 "https://www.googleapis.com/auth/drive.readonly",
         },
