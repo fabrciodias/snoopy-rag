@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+    nextTick,
     onMounted,
     ref,
     watch,
@@ -51,9 +52,22 @@ const emit = defineEmits<{
 }>();
 
 const isCollapsed = ref(false);
+
 const isLightTheme = ref(
     document.body.classList.contains("light-theme"),
 );
+
+/**
+ * O Lucide transforma elementos <i data-lucide="...">
+ * em elementos <svg>. Como alguns desses elementos entram
+ * no DOM através de estados reativos do Vue, a atualização
+ * precisa acontecer depois do próximo ciclo de renderização.
+ */
+async function refreshIcons(): Promise<void> {
+    await nextTick();
+
+    window.lucide?.createIcons();
+}
 
 function handleSidebarToggle(): void {
     if (window.innerWidth <= 850) {
@@ -74,7 +88,7 @@ function handleLogoClick(): void {
     handleNewInvestigation();
 }
 
-function handleThemeToggle(): void {
+async function handleThemeToggle(): Promise<void> {
     isLightTheme.value =
         !isLightTheme.value;
 
@@ -90,7 +104,6 @@ function handleThemeToggle(): void {
             : "dark",
     );
 
-    window.lucide?.createIcons();
 }
 
 function handleOpenSettings(): void {
@@ -195,6 +208,7 @@ async function handleSyncDrive():
                 folder_id: folderId,
                 google_token: googleToken,
             });
+
         if (
             result.status !== "COMPLETED"
         ) {
@@ -204,6 +218,7 @@ async function handleSyncDrive():
         }
 
         await loadFolders();
+        await refreshIcons();
 
     } catch (error) {
         operationState.error =
@@ -245,15 +260,19 @@ onMounted(async () => {
 
     if (savedTheme === "light") {
         isLightTheme.value = true;
+
         document.body.classList.add(
             "light-theme",
         );
     } else if (savedTheme === "dark") {
         isLightTheme.value = false;
+
         document.body.classList.remove(
             "light-theme",
         );
     }
+
+    await refreshIcons();
 
     if (!authState.user) {
         return;
@@ -261,6 +280,7 @@ onMounted(async () => {
 
     try {
         await loadFolders();
+        await refreshIcons();
     } catch {
         // O erro já foi armazenado no estado.
     }
@@ -270,10 +290,12 @@ watch(
     () => authState.user,
     async (user) => {
         if (!user) {
+            await refreshIcons();
             return;
         }
 
         if (folderState.folders.length > 0) {
+            await refreshIcons();
             return;
         }
 
@@ -282,17 +304,20 @@ watch(
         } catch {
             // O erro já foi armazenado no estado.
         }
+
+        await refreshIcons();
     },
 );
 
 </script>
 
 <template>
-    <aside class="sidebar"
-            :class="{
-                collapsed: isCollapsed,
-                'mobile-open': props.mobileOpen,
-            }"
+    <aside
+        class="sidebar"
+        :class="{
+            collapsed: isCollapsed,
+            'mobile-open': props.mobileOpen,
+        }"
     >
         <div class="sidebar-top">
             <div class="sidebar-header">
@@ -325,13 +350,17 @@ watch(
                     type="button"
                     @click="handleSidebarToggle"
                 >
-                    <i data-lucide="panel-left-close"></i>
+                    <i
+                        data-lucide="panel-left-close"
+                    ></i>
                 </button>
             </div>
 
             <button
                 id="btn-sidebar-new"
                 class="btn-primary-full"
+                type="button"
+                @click="handleNewInvestigation"
             >
                 <i
                     data-lucide="plus"
@@ -399,7 +428,7 @@ watch(
                             ></i>
                         </button>
                     </div>
-                    
+
                     <select
                         id="folder-selector"
                         class="folder-dropdown"
@@ -420,12 +449,13 @@ watch(
                         >
                             Carregando acervos...
                         </option>
+
                         <option
                             v-for="folder in folderState.folders"
                             :key="folder.id"
                             :value="folder.id"
                         >
-                            {{  folder.name  }}
+                            {{ folder.name }}
                         </option>
                     </select>
 
@@ -450,7 +480,7 @@ watch(
                             text-align: center;
                         "
                     >
-                        {{  operationState.error  }}
+                        {{ operationState.error }}
                     </div>
 
                     <button
@@ -473,7 +503,7 @@ watch(
                             class="icon-sm"
                         ></i>
 
-                        {{ 
+                        {{
                             folderState.isCreating
                                 ? "Conectando..."
                                 : "Conectar Pasta Privada"
@@ -489,7 +519,7 @@ watch(
                             text-align: center;
                         "
                     >
-                        {{  folderState.error  }}
+                        {{ folderState.error }}
                     </div>
                 </div>
             </div>
@@ -527,12 +557,15 @@ watch(
                 @click="handleThemeToggle"
             >
                 <i
-                    :data-lucide="
-                        isLightTheme
-                            ? 'sun'
-                            : 'moon'
-                    "
-                    class="icon-sm"
+                    data-lucide="sun"
+                    class="icon-sm theme-icon theme-icon-light"
+                    :class="{ hidden: !isLightTheme }"
+                ></i>
+
+                <i  
+                    data-lucide="moon"
+                    class="icon-sm theme-icon theme-icon-dark"
+                    :class="{ hidden: isLightTheme }"
                 ></i>
 
                 <span
@@ -552,6 +585,7 @@ watch(
                     margin-top: 4px;
                     min-height: 44px;
                 "
+                type="button"
                 @click="handleLogin"
             >
                 <i
@@ -593,7 +627,10 @@ watch(
                 >
                     <img
                         id="user-avatar"
-                        :src="authState.user?.user_metadata?.avatar_url ?? ''"
+                        :src="
+                            authState.user?.user_metadata?.avatar_url ??
+                            ''
+                        "
                         alt="Avatar"
                         class="avatar-img"
                     >
@@ -621,7 +658,10 @@ watch(
                 >
                     <i
                         data-lucide="settings"
-                        style="width: 18px; height: 18px;"
+                        style="
+                            width: 18px;
+                            height: 18px;
+                        "
                     ></i>
                 </button>
             </div>

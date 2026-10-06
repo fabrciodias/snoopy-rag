@@ -31,7 +31,7 @@ function handleClose(): void {
 <template>
     <div
         id="settings-modal"
-        class="modal-overlay hidden"
+        class="modal-overlay"
         :class="{
             active: open,
         }"
