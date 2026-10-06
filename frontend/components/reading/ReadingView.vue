@@ -6,6 +6,11 @@ import {
 } from "vue";
 
 import {
+    ArrowLeft,
+    ExternalLink,
+} from "@lucide/vue";
+
+import {
     loadDocument,
 } from "../../features/documents/actions";
 
@@ -158,9 +163,7 @@ onMounted(() => {
                     type="button"
                     @click="handleBack"
                 >
-                    <i
-                        data-lucide="arrow-left"
-                    ></i>
+                    <ArrowLeft />
 
                     <span class="hide-mobile">
                         Voltar
@@ -196,10 +199,7 @@ onMounted(() => {
                     class="btn-outline btn-reading-action"
                     title="Abrir PDF Original"
                 >
-                    <i
-                        data-lucide="external-link"
-                        class="icon-sm"
-                    ></i>
+                    <ExternalLink class="icon-sm" />
 
                     <span class="hide-mobile">
                         PDF

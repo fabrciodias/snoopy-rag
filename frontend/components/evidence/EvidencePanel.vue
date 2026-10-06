@@ -3,6 +3,10 @@ import {
     computed,
 } from "vue";
 
+import {
+    X,
+} from "@lucide/vue";
+
 import type {
     Evidence,
 } from "../../features/investigation/contracts";
@@ -110,7 +114,7 @@ const locationLabel =
                 style="margin-right: -8px;"
                 @click="emit('close')"
             >
-                <i data-lucide="x"></i>
+                <X />
             </button>
         </div>
 

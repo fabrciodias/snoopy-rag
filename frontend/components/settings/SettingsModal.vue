@@ -1,5 +1,13 @@
 <script setup lang="ts">
 import {
+    Settings,
+    X,
+    Trash2,
+    UploadCloud,
+    LogOut,
+} from "@lucide/vue";
+
+import {
     logout,
 } from "../../infrastructure/supabase-auth";
 
@@ -46,10 +54,7 @@ function handleClose(): void {
                         gap: 8px;
                     "
                 >
-                    <i
-                        data-lucide="settings"
-                        class="icon-sm"
-                    ></i>
+                    <Settings class="icon-sm" />
 
                     Configurações
                 </h3>
@@ -61,7 +66,7 @@ function handleClose(): void {
                     type="button"
                     @click="handleClose"
                 >
-                    <i data-lucide="x"></i>
+                    <X />
                 </button>
             </div>
 
@@ -79,10 +84,7 @@ function handleClose(): void {
                         id="btn-remove-folder"
                         class="btn-danger w-full hidden"
                     >
-                        <i
-                            data-lucide="trash-2"
-                            class="icon-sm"
-                        ></i>
+                        <Trash2 class="icon-sm" />
 
                         Desconectar Acervo Privado
                     </button>
@@ -97,10 +99,7 @@ function handleClose(): void {
                             cursor: not-allowed;
                         "
                     >
-                        <i
-                            data-lucide="upload-cloud"
-                            class="icon-sm"
-                        ></i>
+                        <UploadCloud class="icon-sm" />
 
                         Upload Manual (Em breve)
                     </button>
@@ -124,11 +123,7 @@ function handleClose(): void {
                         style="color: var(--text-main);"
                         @click="handleLogout"
                     >
-                        <i
-                            data-lucide="log-out"
-                            class="icon-sm"
-                        ></i>
-
+                        <LogOut class="icon-sm" />
                         Sair da Conta
                     </button>
                 </div>

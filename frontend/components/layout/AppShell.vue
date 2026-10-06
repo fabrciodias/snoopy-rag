@@ -2,8 +2,11 @@
 import {
     onMounted,
     onUnmounted,
-    nextTick,
 } from "vue";
+
+import {
+    Menu,
+} from "@lucide/vue";
 
 import Sidebar from "./Sidebar.vue";
 
@@ -76,10 +79,6 @@ onMounted(async () => {
         setAuthError(error);
         authState.initialized = true;
     }
-
-    await nextTick();
-
-    window.lucide?.createIcons();
 });
 
 onUnmounted(() => {
@@ -111,7 +110,7 @@ const currentView =
             type="button"
             @click="openMobileSidebar"
         >
-            <i data-lucide="menu"></i>
+            <Menu />
         </button>
 
         <Sidebar 

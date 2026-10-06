@@ -1,10 +1,23 @@
 <script setup lang="ts">
 import {
-    nextTick,
     onMounted,
     ref,
     watch,
 } from "vue";
+
+import {
+    Settings,
+    Sun,
+    Moon,
+    Microscope,
+    PanelLeftOpen,
+    PanelLeftClose,
+    Plus,
+    RefreshCw,
+    FolderPlus,
+    Folder,
+    LogIn,
+} from "@lucide/vue";
 
 import {
     getGoogleProviderToken,
@@ -56,18 +69,6 @@ const isCollapsed = ref(false);
 const isLightTheme = ref(
     document.body.classList.contains("light-theme"),
 );
-
-/**
- * O Lucide transforma elementos <i data-lucide="...">
- * em elementos <svg>. Como alguns desses elementos entram
- * no DOM através de estados reativos do Vue, a atualização
- * precisa acontecer depois do próximo ciclo de renderização.
- */
-async function refreshIcons(): Promise<void> {
-    await nextTick();
-
-    window.lucide?.createIcons();
-}
 
 function handleSidebarToggle(): void {
     if (window.innerWidth <= 850) {
@@ -218,7 +219,6 @@ async function handleSyncDrive():
         }
 
         await loadFolders();
-        await refreshIcons();
 
     } catch (error) {
         operationState.error =
@@ -272,15 +272,12 @@ onMounted(async () => {
         );
     }
 
-    await refreshIcons();
-
     if (!authState.user) {
         return;
     }
 
     try {
         await loadFolders();
-        await refreshIcons();
     } catch {
         // O erro já foi armazenado no estado.
     }
@@ -290,12 +287,10 @@ watch(
     () => authState.user,
     async (user) => {
         if (!user) {
-            await refreshIcons();
             return;
         }
 
         if (folderState.folders.length > 0) {
-            await refreshIcons();
             return;
         }
 
@@ -304,8 +299,6 @@ watch(
         } catch {
             // O erro já foi armazenado no estado.
         }
-
-        await refreshIcons();
     },
 );
 
@@ -328,15 +321,13 @@ watch(
                     type="button"
                     @click="handleLogoClick"
                 >
-                    <i
-                        data-lucide="microscope"
+                    <Microscope
                         class="icon-brand logo-default"
-                    ></i>
+                    />
 
-                    <i
-                        data-lucide="panel-left-open"
+                    <PanelLeftOpen
                         class="icon-brand logo-hover hidden"
-                    ></i>
+                    />
 
                     <h2 class="logo-small">
                         LPP-Acervo
@@ -350,9 +341,7 @@ watch(
                     type="button"
                     @click="handleSidebarToggle"
                 >
-                    <i
-                        data-lucide="panel-left-close"
-                    ></i>
+                    <PanelLeftClose />
                 </button>
             </div>
 
@@ -362,10 +351,7 @@ watch(
                 type="button"
                 @click="handleNewInvestigation"
             >
-                <i
-                    data-lucide="plus"
-                    class="icon-sm"
-                ></i>
+                <Plus class="icon-sm" />
 
                 <span>Nova Pesquisa</span>
             </button>
@@ -419,13 +405,12 @@ watch(
                             "
                             @click="handleSyncDrive"
                         >
-                            <i
-                                data-lucide="refresh-cw"
+                            <RefreshCw
                                 style="
                                     width: 14px;
                                     height: 14px;
                                 "
-                            ></i>
+                            />
                         </button>
                     </div>
 
@@ -498,10 +483,7 @@ watch(
                         "
                         @click="handleConnectDrive"
                     >
-                        <i
-                            data-lucide="folder-plus"
-                            class="icon-sm"
-                        ></i>
+                        <FolderPlus class="icon-sm" />
 
                         {{
                             folderState.isCreating
@@ -531,10 +513,7 @@ watch(
                     title="Gerenciar Acervos"
                     @click="focusFolderSelector"
                 >
-                    <i
-                        data-lucide="folder"
-                        class="icon-sm"
-                    ></i>
+                    <Folder class="icon-sm" />
 
                     <h3 class="nav-title">
                         Acervos
@@ -556,17 +535,15 @@ watch(
                 type="button"
                 @click="handleThemeToggle"
             >
-                <i
-                    data-lucide="sun"
+                <Sun
+                    v-if="isLightTheme"
                     class="icon-sm theme-icon theme-icon-light"
-                    :class="{ hidden: !isLightTheme }"
-                ></i>
+                />
 
-                <i  
-                    data-lucide="moon"
+                <Moon  
+                    v-else
                     class="icon-sm theme-icon theme-icon-dark"
-                    :class="{ hidden: isLightTheme }"
-                ></i>
+                />
 
                 <span
                     class="nav-title"
@@ -588,10 +565,7 @@ watch(
                 type="button"
                 @click="handleLogin"
             >
-                <i
-                    data-lucide="log-in"
-                    class="icon-sm"
-                ></i>
+                <LogIn class="icon-sm" />
 
                 <span
                     style="
@@ -656,13 +630,12 @@ watch(
                     type="button"
                     @click="handleOpenSettings"
                 >
-                    <i
-                        data-lucide="settings"
+                    <Settings
                         style="
                             width: 18px;
                             height: 18px;
                         "
-                    ></i>
+                    />
                 </button>
             </div>
         </div>
