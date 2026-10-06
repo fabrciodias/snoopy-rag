@@ -3,9 +3,18 @@ import {
     logout,
 } from "../../infrastructure/supabase-auth";
 
+defineProps<{
+    open: boolean;
+}>();
+
+const emit = defineEmits<{
+    (event: "close"): void;
+}>();
+
 async function handleLogout(): Promise<void> {
     try {
         await logout();
+        emit("close");
     } catch (error) {
         console.error(
             "[AUTH] Falha no logout:",
@@ -13,12 +22,20 @@ async function handleLogout(): Promise<void> {
         );
     }
 }
+
+function handleClose(): void {
+    emit("close");
+}
 </script>
 
 <template>
     <div
         id="settings-modal"
         class="modal-overlay hidden"
+        :class="{
+            active: open,
+        }"
+        @click.self="handleClose"
     >
         <div class="modal-content">
             <div class="modal-header">
@@ -41,6 +58,8 @@ async function handleLogout(): Promise<void> {
                     id="btn-close-modal"
                     class="btn-icon"
                     title="Fechar"
+                    type="button"
+                    @click="handleClose"
                 >
                     <i data-lucide="x"></i>
                 </button>

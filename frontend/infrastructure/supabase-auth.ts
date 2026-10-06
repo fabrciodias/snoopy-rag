@@ -8,6 +8,9 @@ import { loadConfig } from "./config";
 
 let supabaseClient: SupabaseClient | null = null;
 
+const GOOGLE_PROVIDER_TOKEN_KEY =
+    "snoopy_g_token";
+
 export async function getSupabaseClient(): Promise<SupabaseClient> {
     if (supabaseClient) {
         return supabaseClient;
@@ -30,6 +33,31 @@ export async function getSupabaseClient(): Promise<SupabaseClient> {
     return supabaseClient;
 }
 
+function persistGoogleProviderToken(
+    session: Session | null,
+): void {
+    if (session?.provider_token) {
+        localStorage.setItem(
+            GOOGLE_PROVIDER_TOKEN_KEY,
+            session.provider_token,
+        );
+
+        return;
+    }
+
+    if (!session) {
+        localStorage.removeItem(
+            GOOGLE_PROVIDER_TOKEN_KEY,
+        );
+    }
+}
+
+export function getGoogleProviderToken(): string | null {
+    return localStorage.getItem(
+        GOOGLE_PROVIDER_TOKEN_KEY,
+    );
+}
+
 export async function getSession(): Promise<Session | null> {
     const client = await getSupabaseClient();
 
@@ -41,6 +69,10 @@ export async function getSession(): Promise<Session | null> {
     if (error) {
         throw error;
     }
+
+    persistGoogleProviderToken(
+        data.session,
+    );
 
     return data.session;
 }
@@ -74,6 +106,10 @@ export async function logout(): Promise<void> {
     if (error) {
         throw error;
     }
+
+    localStorage.removeItem(
+        GOOGLE_PROVIDER_TOKEN_KEY,
+    );
 }
 
 export async function onAuthStateChange(
@@ -87,6 +123,10 @@ export async function onAuthStateChange(
         data,
     } = client.auth.onAuthStateChange(
         (_event, session) => {
+            persistGoogleProviderToken(
+                session,
+            );
+
             callback(session);
         },
     );

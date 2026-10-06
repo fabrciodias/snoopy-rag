@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import {
     onMounted,
+    ref,
+    watch,
 } from "vue";
 
 import {
-    getSession,
+    getGoogleProviderToken,
     login,
     logout,
 } from "../../infrastructure/supabase-auth";
@@ -38,6 +40,76 @@ import {
 import {
     goHome,
 } from "../../state/navigation";
+
+const props = defineProps<{
+    mobileOpen: boolean;
+}>();
+
+const emit = defineEmits<{
+    (event: "close-mobile"): void;
+    (event: "open-settings"): void;
+}>();
+
+const isCollapsed = ref(false);
+const isLightTheme = ref(
+    document.body.classList.contains("light-theme"),
+);
+
+function handleSidebarToggle(): void {
+    if (window.innerWidth <= 850) {
+        emit("close-mobile");
+        return;
+    }
+
+    isCollapsed.value =
+        !isCollapsed.value;
+}
+
+function handleLogoClick(): void {
+    if (isCollapsed.value) {
+        isCollapsed.value = false;
+        return;
+    }
+
+    handleNewInvestigation();
+}
+
+function handleThemeToggle(): void {
+    isLightTheme.value =
+        !isLightTheme.value;
+
+    document.body.classList.toggle(
+        "light-theme",
+        isLightTheme.value,
+    );
+
+    localStorage.setItem(
+        "snoopy_theme",
+        isLightTheme.value
+            ? "light"
+            : "dark",
+    );
+
+    window.lucide?.createIcons();
+}
+
+function handleOpenSettings(): void {
+    emit("open-settings");
+}
+
+function focusFolderSelector(): void {
+    if (!isCollapsed.value) {
+        return;
+    }
+
+    isCollapsed.value = false;
+
+    requestAnimationFrame(() => {
+        document
+            .getElementById("folder-selector")
+            ?.focus();
+    });
+}
 
 function handleNewInvestigation(): void {
     goHome();
@@ -109,11 +181,8 @@ async function handleSyncDrive():
     try {
         folderState.error = null;
 
-        const session =
-            await getSession();
-
         const googleToken =
-            session?.provider_token;
+            getGoogleProviderToken();
 
         if (!googleToken) {
             throw new Error(
@@ -169,6 +238,23 @@ function getSyncLabel(): string {
 }
 
 onMounted(async () => {
+    const savedTheme =
+        localStorage.getItem(
+            "snoopy_theme",
+        );
+
+    if (savedTheme === "light") {
+        isLightTheme.value = true;
+        document.body.classList.add(
+            "light-theme",
+        );
+    } else if (savedTheme === "dark") {
+        isLightTheme.value = false;
+        document.body.classList.remove(
+            "light-theme",
+        );
+    }
+
     if (!authState.user) {
         return;
     }
@@ -179,10 +265,35 @@ onMounted(async () => {
         // O erro já foi armazenado no estado.
     }
 });
+
+watch(
+    () => authState.user,
+    async (user) => {
+        if (!user) {
+            return;
+        }
+
+        if (folderState.folders.length > 0) {
+            return;
+        }
+
+        try {
+            await loadFolders();
+        } catch {
+            // O erro já foi armazenado no estado.
+        }
+    },
+);
+
 </script>
 
 <template>
-    <aside class="sidebar">
+    <aside class="sidebar"
+            :class="{
+                collapsed: isCollapsed,
+                'mobile-open': props.mobileOpen,
+            }"
+    >
         <div class="sidebar-top">
             <div class="sidebar-header">
                 <div
@@ -190,7 +301,7 @@ onMounted(async () => {
                     class="logo-area"
                     title="Página Inicial"
                     type="button"
-                    @click="goHome"
+                    @click="handleLogoClick"
                 >
                     <i
                         data-lucide="microscope"
@@ -211,6 +322,8 @@ onMounted(async () => {
                     id="btn-sidebar-toggle"
                     class="btn-icon"
                     title="Recolher menu"
+                    type="button"
+                    @click="handleSidebarToggle"
                 >
                     <i data-lucide="panel-left-close"></i>
                 </button>
@@ -229,157 +342,175 @@ onMounted(async () => {
             </button>
         </div>
 
-        <div
-            v-if="authState.user"
-            id="folder-container"
-            class="folder-box"
-            style="
-                display: flex;
-                flex-direction: column;
-            "
-        >
+        <div class="sidebar-middle">
             <div
-                style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 6px;
-                "
+                v-if="authState.user"
+                id="auth-section"
+                class="auth-box"
             >
-                <span
-                    class="folder-label"
+                <div
+                    id="folder-container"
+                    class="folder-box"
                     style="
-                        margin-bottom: 0;
-                        line-height: 1;
+                        display: flex;
+                        flex-direction: column;
                     "
                 >
-                    Acervo Atual
-                </span>
+                    <div
+                        style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 6px;
+                        "
+                    >
+                        <span
+                            class="folder-label"
+                            style="
+                                margin-bottom: 0;
+                                line-height: 1;
+                            "
+                        >
+                            Acervo Atual
+                        </span>
 
-                <button
-                    id="btn-sync"
-                    class="btn-icon"
-                    title="Sincronizar Acervo"
-                    style="
-                        padding: 2px;
-                        transform: translateY(3px);
-                    "
-                    type="button"
-                    :disabled="
-                        operationState.isLoading ||
-                        folderState.isLoading ||
-                        folderState.isCreating
-                    "
-                    @click="handleSyncDrive"
+                        <button
+                            id="btn-sync"
+                            class="btn-icon"
+                            title="Sincronizar Acervo"
+                            style="
+                                padding: 2px;
+                                transform: translateY(3px);
+                            "
+                            type="button"
+                            :disabled="
+                                operationState.isLoading ||
+                                folderState.isLoading ||
+                                folderState.isCreating
+                            "
+                            @click="handleSyncDrive"
+                        >
+                            <i
+                                data-lucide="refresh-cw"
+                                style="
+                                    width: 14px;
+                                    height: 14px;
+                                "
+                            ></i>
+                        </button>
+                    </div>
+                    
+                    <select
+                        id="folder-selector"
+                        class="folder-dropdown"
+                        :value="
+                            folderState.selectedFolderId ??
+                            undefined
+                        "
+                        :disabled="
+                            folderState.isLoading ||
+                            folderState.isCreating
+                        "
+                        @change="handleFolderChange"
+                    >
+                        <option
+                            v-if="folderState.isLoading"
+                            disabled
+                            value=""
+                        >
+                            Carregando acervos...
+                        </option>
+                        <option
+                            v-for="folder in folderState.folders"
+                            :key="folder.id"
+                            :value="folder.id"
+                        >
+                            {{  folder.name  }}
+                        </option>
+                    </select>
+
+                    <div
+                        v-if="operationState.isLoading"
+                        style="
+                            font-size: 0.75rem;
+                            color: var(--text-muted);
+                            margin-top: 6px;
+                            text-align: center;
+                        "
+                    >
+                        Sincronizando acervo...
+                    </div>
+
+                    <div
+                        v-else-if="operationState.error"
+                        style="
+                            font-size: 0.75rem;
+                            color: var(--text-muted);
+                            margin-top: 6px;
+                            text-align: center;
+                        "
+                    >
+                        {{  operationState.error  }}
+                    </div>
+
+                    <button
+                        id="btn-drive"
+                        class="btn-outline w-full"
+                        style="
+                            margin-top: 10px;
+                            font-size: 0.8rem;
+                            padding: 6px;
+                            justify-content: center;
+                        "
+                        type="button"
+                        :disabled="
+                            folderState.isCreating
+                        "
+                        @click="handleConnectDrive"
+                    >
+                        <i
+                            data-lucide="folder-plus"
+                            class="icon-sm"
+                        ></i>
+
+                        {{ 
+                            folderState.isCreating
+                                ? "Conectando..."
+                                : "Conectar Pasta Privada"
+                        }}
+                    </button>
+
+                    <div
+                        v-if="folderState.error"
+                        style="
+                            font-size: 0.75rem;
+                            color: var(--text-muted);
+                            margin-top: 6px;
+                            text-align: center;
+                        "
+                    >
+                        {{  folderState.error  }}
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div
+                    id="btn-nav-folder"
+                    class="nav-title-box"
+                    title="Gerenciar Acervos"
+                    @click="focusFolderSelector"
                 >
                     <i
-                        :data-lucide="
-                            operationState.isLoading
-                                ? 'loader-circle'
-                                : 'refresh-cw'
-                        "
-                        :class="{
-                            'animate-spin':
-                                operationState.isLoading,
-                        }"
-                        style="
-                            width: 14px;
-                            height: 14px;
-                        "
+                        data-lucide="folder"
+                        class="icon-sm"
                     ></i>
-                </button>
-            </div>
 
-            <select
-                id="folder-selector"
-                class="folder-dropdown"
-                :value="
-                    folderState.selectedFolderId ??
-                    undefined
-                "
-                :disabled="
-                    folderState.isLoading ||
-                    folderState.isCreating
-                "
-                @change="handleFolderChange"
-            >
-                <option
-                    v-if="folderState.isLoading"
-                    disabled
-                    value=""
-                >
-                    Carregando acervos...
-                </option>
-
-                <option
-                    v-for="folder in folderState.folders"
-                    :key="folder.id"
-                    :value="folder.id"
-                >
-                    {{ folder.name }}
-                </option>
-            </select>
-
-            <div
-                v-if="operationState.isLoading"
-                style="
-                    font-size: 0.75rem;
-                    color: var(--text-muted);
-                    margin-top: 6px;
-                    text-align: center;
-                "
-            >
-                Sincronizando acervo...
-            </div>
-
-            <div
-                v-else-if="operationState.error"
-                style="
-                    font-size: 0.75rem;
-                    color: var(--text-muted);
-                    margin-top: 6px;
-                    text-align: center;
-                "
-            >
-                {{ operationState.error }}
-            </div>
-
-            <button
-                id="btn-drive"
-                class="btn-outline w-full"
-                style="
-                    margin-top: 10px;
-                    font-size: 0.8rem;
-                    padding: 6px;
-                    justify-content: center;
-                "
-                type="button"
-                :disabled="folderState.isCreating"
-                @click="handleConnectDrive"
-            >
-                <i
-                    data-lucide="folder-plus"
-                    class="icon-sm"
-                ></i>
-
-                {{
-                    folderState.isCreating
-                        ? "Conectando..."
-                        : "Conectar Pasta Privada"
-                }}
-            </button>
-
-            <div
-                v-if="folderState.error"
-                style="
-                    font-size: 0.75rem;
-                    color: var(--text-muted);
-                    margin-top: 6px;
-                    text-align: center;
-                "
-            >
-                {{ folderState.error }}
-            </div>
+                    <h3 class="nav-title">
+                        Acervos
+                    </h3>
+                </div>
+            </nav>
         </div>
 
         <div class="sidebar-bottom">
@@ -392,9 +523,15 @@ onMounted(async () => {
                     justify-content: flex-start;
                 "
                 title="Alternar Tema"
+                type="button"
+                @click="handleThemeToggle"
             >
                 <i
-                    data-lucide="moon"
+                    :data-lucide="
+                        isLightTheme
+                            ? 'sun'
+                            : 'moon'
+                    "
                     class="icon-sm"
                 ></i>
 
@@ -479,19 +616,14 @@ onMounted(async () => {
                     id="btn-settings"
                     class="btn-icon"
                     title="Configurações"
+                    type="button"
+                    @click="handleOpenSettings"
                 >
                     <i
                         data-lucide="settings"
                         style="width: 18px; height: 18px;"
                     ></i>
                 </button>
-
-                <button
-                    id="btn-sidebar-new"
-                    class="btn-primary-full"
-                    type="button"
-                    @click="handleNewInvestigation"
-                ></button>
             </div>
         </div>
     </aside>

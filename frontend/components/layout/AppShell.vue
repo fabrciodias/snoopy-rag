@@ -25,6 +25,7 @@ import {
 
 import {
     computed,
+    ref,
 } from "vue";
 
 import {
@@ -33,6 +34,28 @@ import {
 
 let stopAuthListener:
     (() => void) | null = null;
+
+const mobileSidebarOpen =
+    ref(false);
+
+const settingsOpen =
+    ref(false);
+
+function openMobileSidebar(): void {
+    mobileSidebarOpen.value = true;
+}
+
+function closeMobileSidebar(): void {
+    mobileSidebarOpen.value = false;
+}
+
+function openSettings(): void {
+    settingsOpen.value = true;
+}
+
+function closeSettings(): void {
+    settingsOpen.value = false;
+}
 
 onMounted(async () => {
     try {
@@ -75,17 +98,27 @@ const currentView =
         <div
             id="mobile-overlay"
             class="mobile-overlay"
+            :class="{
+                active: mobileSidebarOpen,
+            }"
+            @click="closeMobileSidebar"
         ></div>
 
         <button
             id="btn-mobile-menu"
             class="btn-mobile-menu btn-icon"
             title="Menu"
+            type="button"
+            @click="openMobileSidebar"
         >
             <i data-lucide="menu"></i>
         </button>
 
-        <Sidebar />
+        <Sidebar 
+            :mobile-open="mobileSidebarOpen"
+            @close-mobile="closeMobileSidebar"
+            @open-settings="openSettings"
+        />
 
         <div
             id="main-content"
@@ -110,6 +143,9 @@ const currentView =
             />
         </div>
 
-        <SettingsModal />
+        <SettingsModal 
+            :open="settingsOpen"
+            @close="closeSettings"
+        />
     </div>
 </template>
