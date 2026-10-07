@@ -905,6 +905,36 @@ body {
     border-color: #ef4444;
 }
 
+.disconnect-warning {
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary);
+    border-radius: var(--radius-md);
+    background: var(--bg-hover);
+}
+
+.disconnect-warning-title {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.disconnect-warning-text {
+    margin: 0 0 14px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.disconnect-warning-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.disconnect-warning-actions > button {
+    flex: 1;
+}
+
 /* --------------------------------------------------------------------------
    10. READING VIEW (MODO LEITURA IMERSIVO)
    -------------------------------------------------------------------------- */

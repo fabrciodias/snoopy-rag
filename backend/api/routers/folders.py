@@ -50,7 +50,13 @@ def list_folders(
         .execute()
     )
 
-    return response.data
+    folders = response.data or []
+
+    for folder in folders:
+        if folder.get("id") == PUBLIC_FOLDER_ID:
+            folder["name"] = "Acervo Público"
+
+    return folders
 
 
 @router.post("/")

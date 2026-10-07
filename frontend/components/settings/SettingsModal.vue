@@ -63,23 +63,6 @@ async function handleLogout(): Promise<void> {
     }
 }
 
-async function handleRemoveFolder(): Promise<void> {
-    if (!privateFolder.value) {
-        return;
-    }
-
-    try {
-        await removeFolder(
-            privateFolder.value.id,
-        );
-    } catch (error) {
-        console.error(
-            "[FOLDERS] Falha ao desconectar acervo:",
-            error,
-        );
-    }
-}
-
 function handleRemoveFolderRequest(): void {
     disconnectError.value = null;
     disconnectStep.value = 1;
@@ -186,41 +169,17 @@ function handleClose(): void {
 
                     <div
                         v-if="disconnectStep === 1"
-                        style="
-                            margin-top: 12px;
-                            padding: 14px;
-                            border: 1px solid var(--border-color);
-                            border-left: 4px solid var(--danger);
-                            border-radius: 8px;
-                            background: var(--bg-secondary);
-                        "
+                        class="disconnect-warning"
                     >
-                        <strong
-                            style="
-                                display: block;
-                                margin-bottom: 8px;
-                            "
-                        >
+                        <strong class="disconnect-warning-title">
                             Desconectar acervo privado?
                         </strong>
 
-                        <p
-                            style="
-                                margin: 0 0 14px;
-                                font-size: 0.85rem;
-                                color: var(--text-muted);
-                                line-height: 1.5;
-                            "
-                        >
+                        <p class="disconnect-warning-text">
                             Isso vai desvincular seu acervo privado do Google Drive.
                         </p>
 
-                        <div
-                            style="
-                                display: flex;
-                                gap: 8px;
-                            "
-                        >
+                        <div class="disconnect-warning-actions">
                             <button
                                 class="btn-outline"
                                 style="flex: 1;"
@@ -243,42 +202,18 @@ function handleClose(): void {
 
                     <div
                         v-if="disconnectStep === 2"
-                        style="
-                            margin-top: 12px;
-                            padding: 14px;
-                            border: 1px solid var(--border-color);
-                            border-left: 4px solid var(--danger);
-                            border-radius: 8px;
-                            background: var(--bg-secondary);
-                        "
+                        class="disconnect-warning"
                     >
-                        <strong
-                            style="
-                                display: block;
-                                margin-bottom: 8px;
-                            "
-                        >
+                        <strong class="disconnect-warning-title">
                             Confirme a desconexão
                         </strong>
 
-                        <p
-                            style="
-                                margin: 0 0 14px;
-                                font-size: 0.85rem;
-                                color: var(--text-muted);
-                                line-height: 1.5;
-                            "
-                        >
+                        <p class="disconnect-warning-text">
                             Este acervo nao aparecerá mais nas suas buscas.
                             Os dados já processados continuarão salvos na nuvem.
                         </p>
 
-                        <div
-                            style="
-                                display: flex;
-                                gap: 8px;
-                            "
-                        >
+                        <div class="disconnect-warning-actions">
                             <button
                                 class="btn-outline"
                                 style="flex: 1;"

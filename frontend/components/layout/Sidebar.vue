@@ -451,7 +451,7 @@ watch(
                             :key="folder.id"
                             :value="folder.id"
                         >
-                            {{ folder.name || "Acervo Público" }}
+                            {{ folder.name }}
                         </option>
                     </select>
 
