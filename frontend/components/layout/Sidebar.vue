@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+    computed,
     onMounted,
     ref,
     watch,
@@ -68,6 +69,16 @@ const isCollapsed = ref(false);
 
 const isLightTheme = ref(
     document.body.classList.contains("light-theme"),
+);
+
+const hasPrivateFolder = computed(
+    () =>
+        !!authState.user &&
+        folderState.folders.some(
+            (folder) =>
+                folder.user_id ===
+                authState.user?.id,
+        ),
 );
 
 function handleSidebarToggle(): void {
@@ -440,7 +451,7 @@ watch(
                             :key="folder.id"
                             :value="folder.id"
                         >
-                            {{ folder.name }}
+                            {{ folder.name || "Acervo Público" }}
                         </option>
                     </select>
 
@@ -469,6 +480,7 @@ watch(
                     </div>
 
                     <button
+                        v-if="!hasPrivateFolder"
                         id="btn-drive"
                         class="btn-outline w-full"
                         style="

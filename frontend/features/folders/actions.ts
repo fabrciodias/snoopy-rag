@@ -1,5 +1,6 @@
 import {
     createFolder,
+    deleteFolder,
     listFolders,
 } from "./api";
 
@@ -84,5 +85,20 @@ export async function addFolder(
     } finally {
         folderState.isCreating =
             false;
+    }
+}
+
+export async function removeFolder(
+    folderId: string,
+): Promise<void> {
+    folderState.error = null;
+
+    try {
+        await deleteFolder(folderId);
+
+        await loadFolders();
+    } catch (error) {
+        setFolderError(error);
+        throw error;
     }
 }

@@ -1,11 +1,28 @@
 <script setup lang="ts">
 import {
+    ref,
+    computed,
+} from "vue";
+
+import {
     Settings,
     X,
     Trash2,
     UploadCloud,
     LogOut,
 } from "@lucide/vue";
+
+import {
+    authState,
+} from "../../state/authentication";
+
+import {
+    folderState,
+} from "../../state/folders";
+
+import {
+    removeFolder,
+} from "../../features/folders/actions";
 
 import {
     logout,
@@ -19,6 +36,21 @@ const emit = defineEmits<{
     (event: "close"): void;
 }>();
 
+const disconnectStep = ref<0 | 1 | 2>(0);
+const isDisconnecting = ref(false);
+const disconnectError = ref<string | null>(null);
+
+const privateFolder = computed(
+    () =>
+        authState.user
+            ? folderState.folders.find(
+                  (folder) =>
+                      folder.user_id ===
+                      authState.user?.id,
+              ) ?? null
+            : null,
+);
+
 async function handleLogout(): Promise<void> {
     try {
         await logout();
@@ -31,7 +63,67 @@ async function handleLogout(): Promise<void> {
     }
 }
 
+async function handleRemoveFolder(): Promise<void> {
+    if (!privateFolder.value) {
+        return;
+    }
+
+    try {
+        await removeFolder(
+            privateFolder.value.id,
+        );
+    } catch (error) {
+        console.error(
+            "[FOLDERS] Falha ao desconectar acervo:",
+            error,
+        );
+    }
+}
+
+function handleRemoveFolderRequest(): void {
+    disconnectError.value = null;
+    disconnectStep.value = 1;
+}
+
+function handleCancelDisconnect(): void {
+    disconnectStep.value = 0;
+    disconnectError.value = null;
+}
+
+function handleContinueDisconnect(): void {
+    disconnectError.value = null;
+    disconnectStep.value = 2;
+}
+
+async function handleConfirmDisconnect(): Promise<void> {
+    if (!privateFolder.value) {
+        return;
+    }
+
+    isDisconnecting.value = true;
+    disconnectError.value = null;
+
+    try {
+        await removeFolder(privateFolder.value.id);
+
+        disconnectStep.value = 0;
+        emit("close");
+    } catch (error) {
+        console.error(
+            "[FOLDERS] Falha ao desconectar acervo:",
+            error,
+        );
+
+        disconnectError.value =
+            "Não foi possível desconectar o acervo. Tente novamente.";
+    } finally {
+        isDisconnecting.value = false;
+    }
+}
+
 function handleClose(): void {
+    disconnectStep.value = 0;
+    disconnectError.value = null;
     emit("close");
 }
 </script>
@@ -81,13 +173,148 @@ function handleClose(): void {
                     </p>
 
                     <button
+                        v-if="privateFolder && disconnectStep === 0"
                         id="btn-remove-folder"
-                        class="btn-danger w-full hidden"
+                        class="btn-danger w-full"
+                        type="button"
+                        @click="handleRemoveFolderRequest"
                     >
                         <Trash2 class="icon-sm" />
 
                         Desconectar Acervo Privado
                     </button>
+
+                    <div
+                        v-if="disconnectStep === 1"
+                        style="
+                            margin-top: 12px;
+                            padding: 14px;
+                            border: 1px solid var(--border-color);
+                            border-left: 4px solid var(--danger);
+                            border-radius: 8px;
+                            background: var(--bg-secondary);
+                        "
+                    >
+                        <strong
+                            style="
+                                display: block;
+                                margin-bottom: 8px;
+                            "
+                        >
+                            Desconectar acervo privado?
+                        </strong>
+
+                        <p
+                            style="
+                                margin: 0 0 14px;
+                                font-size: 0.85rem;
+                                color: var(--text-muted);
+                                line-height: 1.5;
+                            "
+                        >
+                            Isso vai desvincular seu acervo privado do Google Drive.
+                        </p>
+
+                        <div
+                            style="
+                                display: flex;
+                                gap: 8px;
+                            "
+                        >
+                            <button
+                                class="btn-outline"
+                                style="flex: 1;"
+                                type="button"
+                                @click="handleCancelDisconnect"
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                class="btn-danger"
+                                style="flex: 1;"
+                                type="button"
+                                @click="handleContinueDisconnect"
+                            >
+                                Continuar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="disconnectStep === 2"
+                        style="
+                            margin-top: 12px;
+                            padding: 14px;
+                            border: 1px solid var(--border-color);
+                            border-left: 4px solid var(--danger);
+                            border-radius: 8px;
+                            background: var(--bg-secondary);
+                        "
+                    >
+                        <strong
+                            style="
+                                display: block;
+                                margin-bottom: 8px;
+                            "
+                        >
+                            Confirme a desconexão
+                        </strong>
+
+                        <p
+                            style="
+                                margin: 0 0 14px;
+                                font-size: 0.85rem;
+                                color: var(--text-muted);
+                                line-height: 1.5;
+                            "
+                        >
+                            Este acervo nao aparecerá mais nas suas buscas.
+                            Os dados já processados continuarão salvos na nuvem.
+                        </p>
+
+                        <div
+                            style="
+                                display: flex;
+                                gap: 8px;
+                            "
+                        >
+                            <button
+                                class="btn-outline"
+                                style="flex: 1;"
+                                type="button"
+                                :disabled="isDisconnecting"
+                                @click="disconnectStep = 1"
+                            >
+                                Voltar
+                            </button>
+
+                            <button
+                                class="btn-danger"
+                                style="flex: 1;"
+                                type="button"
+                                :disabled="isDisconnecting"
+                                @click="handleConfirmDisconnect"
+                            >
+                                {{ 
+                                    isDisconnecting
+                                        ? "Desconectando..."
+                                        : "Desconectar"
+                                }}
+                            </button>
+                        </div>
+
+                        <p
+                            v-if="disconnectError"
+                            style="
+                                margin: 10px 0 0;
+                                font-size: 0.8rem;
+                                color: var(--text-muted);
+                            "
+                        >
+                            {{ disconnectError }}
+                        </p>
+                    </div>
 
                     <button
                         class="btn-outline w-full"
