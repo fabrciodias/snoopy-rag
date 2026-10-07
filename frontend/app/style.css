@@ -101,7 +101,8 @@ body {
 
 /* Sistema de Views Chaveadas */
 .view { 
-    display: none; 
+    display: block;
+    animation: fadeIn var(--trans-med); 
 }
 
 .view.active { 
@@ -975,6 +976,45 @@ body {
     display: flex;
     flex-direction: column;
     gap: 40px; /* Respiro gigante entre as quebras de seção */
+}
+
+.reading-page {
+    width: 100%;
+}
+
+.reading-page-header {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+}
+
+.reading-page-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.reading-block {
+    position: relative;
+    margin: 0;
+    padding-left: 16px;
+    border-left: 4px solid transparent;
+    font-size: 1.15rem;
+    line-height: 1.85;
+    color: var(--text-main);
+    transition:
+        border-color var(--trans-fast),
+        background-color var(--trans-fast),
+        padding-left var(--trans-fast);
+}
+
+.reading-block-evidence {
+    border-left-color: var(--primary);
+    /*background-color: var(--bg-hover);
+    padding-left: 16px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0; */
 }
 
 /* O Bloco de Texto (Chunk) */

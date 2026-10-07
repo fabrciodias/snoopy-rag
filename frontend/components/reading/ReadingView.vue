@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import {
     computed,
-    onMounted,
+    nextTick,
     ref,
+    watch,
 } from "vue";
 
 import {
@@ -77,40 +78,72 @@ const pages =
                 ?.pages ?? [],
     );
 
+const readingContainer =
+    ref<HTMLElement | null>(null);
+
 function blockIsInLocation(
     page: DocumentPage,
     block: DocumentBlock,
 ): boolean {
-    if (!location.value) {
+    const currentLocation = location.value;
+
+    if (!currentLocation) {
         return false;
     }
 
+    const startPage =
+        currentLocation.start_page ??
+        page.page_number;
+
+    const endPage =
+        currentLocation.end_page ??
+        startPage;
+
     if (
-        page.page_number <
-            (location.value.start_page ?? page.page_number) ||
-        page.page_number >
-            (location.value.end_page ??
-                location.value.start_page ??
-                page.page_number)
+        page.page_number < startPage ||
+        page.page_number > endPage
     ) {
         return false;
     }
 
-    if (
-        location.value.start_block === null
-    ) {
-        return false;
+    const blockIndex = block.block_index;
+
+    // Evidência inteira na mesma página.
+    if (startPage === endPage) {
+        return (
+            (
+                currentLocation.start_block === null ||
+                blockIndex >=
+                    currentLocation.start_block
+            ) &&
+            (
+                currentLocation.end_block === null ||
+                blockIndex <=
+                    currentLocation.end_block
+            )
+        );
     }
 
-    const endBlock =
-        location.value.end_block ??
-        location.value.start_block;
+    // Primeira página: do bloco inicial até o fim.
+    if (page.page_number === startPage) {
+        return (
+            currentLocation.start_block === null ||
+            blockIndex >=
+                currentLocation.start_block
+        );
+    }
 
-    return (
-        block.block_index >=
-            location.value.start_block &&
-        block.block_index <= endBlock
-    );
+    // Última página: do início até o bloco final.
+    if (page.page_number === endPage) {
+        return (
+            currentLocation.end_block === null ||
+            blockIndex <=
+                currentLocation.end_block
+        );
+    }
+
+    // Páginas intermediárias: todos os blocos pertencem à evidência.
+    return true;
 }
 
 async function loadCurrentDocument(): Promise<void> {
@@ -138,13 +171,66 @@ async function loadCurrentDocument(): Promise<void> {
     }
 }
 
+async function scrollToEvidence(): Promise<void> {
+    await nextTick();
+
+    const target =
+        readingContainer.value?.querySelector(
+            ".reading-block-evidence",
+        );
+
+    if (!target) {
+        return;
+    }
+
+    target.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+    });
+}
+
+async function ensureReadingDocument(): Promise<void> {
+    if (!documentId.value) {
+        return;
+    }
+
+    if (
+        document.value?.id !==
+        documentId.value
+    ) {
+        await loadCurrentDocument();
+    }
+
+    await scrollToEvidence();
+}
+
 function handleBack(): void {
     goToInvestigation();
 }
 
-onMounted(() => {
-    void loadCurrentDocument();
-});
+watch(
+    [
+        () => navigationState.currentView,
+        documentId,
+        () =>
+            JSON.stringify(
+                navigationState.reading.location,
+            ),
+    ],
+    async ([view]) => {
+        if (
+            view !== "reading" ||
+            !documentId.value
+        ) {
+            return;
+        }
+
+        await ensureReadingDocument();
+    },
+    {
+        immediate: true,
+    },
+);
 </script>
 
 <template>
@@ -247,6 +333,7 @@ onMounted(() => {
                 "
                 id="reading-content"
                 class="reading-container"
+                ref="readingContainer"
             >
                 <article
                     v-for="page in pages"

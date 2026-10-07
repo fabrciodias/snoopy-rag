@@ -14,6 +14,10 @@ import {
     goToReading
 } from "../../state/navigation";
 
+import type {
+    DocumentReference,
+} from "../../features/investigation/contracts";
+
 const investigation =
     computed(
         () =>
@@ -76,6 +80,49 @@ const referencedEvidences =
         );
     });
 
+const references =
+    computed(
+        () =>
+            response.value?.references ??
+            [],
+    );
+
+function referenceForEvidence(
+    evidence: {
+        document_id: string;
+    },
+): DocumentReference | null {
+    return (
+        references.value.find(
+            (reference) =>
+                reference.document_id ===
+                evidence.document_id,
+        ) ?? null
+    );
+}
+
+function formatReference(
+    reference: DocumentReference | null,
+): string {
+    if (!reference) {
+        return "Metadados indisponíveis.";
+    }
+
+    const authors =
+        reference.authors?.trim() ||
+        "AUTOR DESCONHECIDO";
+
+    const title =
+        reference.title?.trim() ||
+        "Título não informado";
+
+    const year =
+        reference.publication_year ??
+        "s.d.";
+
+    return `${authors.toUpperCase()}. ${title}. ${year}.`;
+}
+
 const selectedEvidenceId =
     ref<string | null>(null);
 
@@ -121,7 +168,7 @@ function closeEvidence(): void {
 <template>
     <section
         id="result-view"
-        class="view"
+        class="view active"
     >
         <header class="topbar">
             <h2
@@ -135,7 +182,13 @@ function closeEvidence(): void {
             </h2>
         </header>
 
-        <main class="layout-grid">
+        <main 
+            class="layout-grid"
+            :class="{
+                'evidence-active':
+                    selectedEvidence !== null,  
+            }"
+        >
             <section class="answer-section">
                 <h3
                     style="
@@ -254,8 +307,11 @@ function closeEvidence(): void {
                                 style="
                                     width: 100%;
                                     justify-content: flex-start;
+                                    align-items: flex-start;
+                                    flex-direction: column;
                                     margin-bottom: 8px;
                                     text-align: left;
+                                    gap: 4px;
                                 "
                                 type="button"
                                 @click="
@@ -264,9 +320,25 @@ function closeEvidence(): void {
                                         evidence.evidence_id,
                                     )
                                 "
-                            >
-                                Evidência
-                                {{ index + 1 }}
+                            >   <strong>
+                                    Evidência {{ index + 1 }}
+                                </strong>
+
+                                <span
+                                    style="
+                                        color: var(--text-muted);
+                                        font-size: 0.8rem;
+                                        line-height: 1.4;
+                                    "
+                                >
+                                    {{ 
+                                        formatReference(
+                                            referenceForEvidence(
+                                                evidence,
+                                            ),
+                                        )
+                                    }}
+                                </span>
                             </button>
 
                             <p
@@ -298,6 +370,13 @@ function closeEvidence(): void {
 
             <EvidencePanel
                 :evidence="selectedEvidence"
+                :reference="
+                    selectedEvidence
+                        ? referenceForEvidence(
+                            selectedEvidence,
+                        )
+                        : null
+                "
                 @close="closeEvidence"
                 @open-reading="openEvidenceInReading"
             />

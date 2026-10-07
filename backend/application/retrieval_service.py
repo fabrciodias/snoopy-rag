@@ -191,6 +191,32 @@ class RetrievalService:
                 reverse=True,
             )[:limit]
 
+            document_ids = list({
+                str(item["document_id"])
+                for item in fused_results
+            })
+
+            documents_by_id = {}
+
+            if document_ids:
+                documents_response = (
+                    self.client
+                    .table("documents")
+                    .select(
+                        "id, title, authors, publication_year, "
+                        "drive_file_id, drive_link"
+                    )
+                    .in_("id", document_ids)
+                    .execute()
+                )
+
+                documents_by_id = {
+                    str(document["id"]): document
+                    for document in (
+                        documents_response.data or []
+                    )
+                }
+
             # ====================================================
             # 5. MATERIALIZAÇÃO DOS RETRIEVAL RESULTS
             # ====================================================
@@ -201,6 +227,29 @@ class RetrievalService:
                 fused_results,
                 start=1,
             ):
+                document = documents_by_id.get(
+                    str(row["document_id"])
+                )
+
+                metadata = dict(
+                    row.get("metadata") or {}
+                )
+
+                if document:
+                    metadata.update({
+                        "title": document.get("title"),
+                        "authors": document.get("authors"),
+                        "publication_year": document.get(
+                            "publication_year"
+                        ),
+                        "drive_file_id": document.get(
+                            "drive_file_id"
+                        ),
+                        "drive_link": document.get(
+                            "drive_link"
+                        ),
+                    })
+
                 result = RetrievalResult(
                     result_id=str(uuid.uuid4()),
                     investigation_id=(
@@ -224,10 +273,7 @@ class RetrievalService:
                         "location",
                         {},
                     ),
-                    metadata=row.get(
-                        "metadata",
-                        {},
-                    ),
+                    metadata=metadata,
                 )
 
                 results.append(result)

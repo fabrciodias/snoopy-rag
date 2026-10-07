@@ -4,15 +4,18 @@ import {
 } from "vue";
 
 import {
+    BookOpen,
     X,
 } from "@lucide/vue";
 
 import type {
     Evidence,
+    DocumentReference,
 } from "../../features/investigation/contracts";
 
 const props = defineProps<{
     evidence: Evidence | null;
+    reference: DocumentReference | null;
 }>();
 
 const emit = defineEmits<{
@@ -74,6 +77,27 @@ const locationLabel =
         }
 
         return parts.join(" · ");
+    });
+
+const bibliographicReference =
+    computed(() => {
+        if (!props.reference) {
+            return "Metadados indisponíveis.";
+        }
+
+        const authors =
+            props.reference.authors?.trim() ||
+            "AUTOR DESCONHECIDO";
+
+        const title =
+            props.reference.title?.trim() ||
+            "Título não informado";
+
+        const year =
+            props.reference.publication_year ??
+            "s.d.";
+
+        return `${authors.toUpperCase()}. ${title}. ${year}.`;
     });
 </script>
 
@@ -141,12 +165,37 @@ const locationLabel =
                 >
                     <div
                         style="
-                            font-size: 0.8rem;
-                            color: var(--text-muted);
-                            margin-bottom: 8px;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            gap: 12px;
+                            margin-bottom: 10px;
                         "
                     >
-                        Evidência
+                        <div
+                            style="
+                                font-size: 0.8rem;
+                                color: var(--text-muted);
+                            "
+                        >
+                            Evidência
+                        </div>
+
+                        <button
+                            type="button"
+                            class="btn-outline"
+                            style="
+                                width: fit-content;
+                                padding: 6px 10px;
+                                font-size: 0.78rem;
+                                flex-shrink: 0;
+                            "
+                            @click="emit('open-reading')"
+                        >
+                            <BookOpen class="icon-sm" />
+
+                            Ler no Contexto
+                        </button>
                     </div>
 
                     <blockquote
@@ -162,35 +211,6 @@ const locationLabel =
                     >
                         {{ evidence.content }}
                     </blockquote>
-                </div>
-
-                <div
-                    v-if="evidence.context"
-                    style="
-                        margin-top: 24px;
-                    "
-                >
-                    <div
-                        style="
-                            font-size: 0.8rem;
-                            color: var(--text-muted);
-                            margin-bottom: 8px;
-                        "
-                    >
-                        Contexto documental
-                    </div>
-
-                    <div
-                        style="
-                            color: var(--text-muted);
-                            line-height: 1.6;
-                            white-space: pre-line;
-                        "
-                    >
-                        {{
-                            evidence.context
-                        }}
-                    </div>
                 </div>
 
                 <div
@@ -219,58 +239,25 @@ const locationLabel =
                             color: var(--text-muted);
                         "
                     >
+                        <strong
+                            style="
+                                color: var(--text-main);
+                                line-height: 1.5;
+                            "
+                        >
+                            {{ 
+                                bibliographicReference
+                            }}
+                        </strong>
+
                         <span
                             v-if="locationLabel"
                         >
                             {{ locationLabel }}
                         </span>
-
-                        <span>
-                            Documento:
-                            {{
-                                evidence.document_id
-                            }}
-                        </span>
-
-                        <span>
-                            Representação:
-                            {{
-                                evidence
-                                    .provenance
-                                    .representation_id
-                            }}
-                        </span>
                     </div>
-
-                    <button
-                        type="button"
-                        class="btn-outline"
-                        style="margin-top: 14px;"
-                        @click="emit('open-reading')"
-                    >
-                        Abrir no Documento
-                    </button>
                 </div>
             </article>
-
-            <p
-                id="chunk-abnt"
-                class="evidence-subtitle"
-                style="
-                    font-size: 0.82rem;
-                    color: var(--text-muted);
-                    font-family: monospace;
-                    margin-top: 15px;
-                    border-top: 1px dashed var(--border-color);
-                    padding-top: 15px;
-                "
-            >
-                Evidência:
-                {{
-                    evidence.evidence_id ??
-                    "sem identificador"
-                }}
-            </p>
         </template>
     </aside>
 </template>

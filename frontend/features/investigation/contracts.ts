@@ -14,6 +14,14 @@ export interface Investigation {
     created_at: string | null;
 }
 
+export interface DocumentReference {
+    document_id: string;
+    title: string | null;
+    authors: string | null;
+    publication_year: number | null;
+    drive_link: string | null;
+}
+
 export interface DocumentLocation {
     start_page: number | null;
     end_page: number | null;
@@ -57,7 +65,7 @@ export interface StructuredResponse {
     content: string;
     sections: Record<string, unknown>[];
     evidence_refs: string[];
-    references: Record<string, unknown>[];
+    references: DocumentReference[];
 }
 
 export interface InvestigateRequest {

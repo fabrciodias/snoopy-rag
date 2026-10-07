@@ -301,6 +301,28 @@ ESTRUTURA OBRIGATÓRIA:
         # 6. MATERIALIZAÇÃO DA STRUCTURED RESPONSE
         # ========================================================
 
+        references_by_document = {}
+
+        for result in results:
+            if result.document_id in references_by_document:
+                continue
+
+            metadata = result.metadata or {}
+
+            references_by_document[result.document_id] = {
+                "document_id": result.document_id,
+                "title": metadata.get("title"),
+                "authors": metadata.get("authors"),
+                "publication_year": metadata.get(
+                    "publication_year"
+                ),
+                "drive_link": metadata.get("drive_link"),
+            }
+
+        references = list(
+            references_by_document.values()
+        )
+
         structured_response = StructuredResponse(
             response_id=str(uuid.uuid4()),
             content=llm_output.get(
@@ -315,10 +337,7 @@ ESTRUTURA OBRIGATÓRIA:
                 "evidence_refs",
                 [],
             ),
-            references=llm_output.get(
-                "references",
-                [],
-            ),
+            references=references,
         )
 
         # ========================================================
