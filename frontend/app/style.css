@@ -914,6 +914,10 @@ body {
     background: var(--bg-hover);
 }
 
+.disconnect-warning-final {
+    border-left-color: #ef4444;
+}
+
 .disconnect-warning-title {
     display: block;
     margin-bottom: 8px;

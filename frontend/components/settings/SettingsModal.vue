@@ -202,14 +202,14 @@ function handleClose(): void {
 
                     <div
                         v-if="disconnectStep === 2"
-                        class="disconnect-warning"
+                        class="disconnect-warning disconnect-warning-final"
                     >
                         <strong class="disconnect-warning-title">
                             Confirme a desconexão
                         </strong>
 
                         <p class="disconnect-warning-text">
-                            Este acervo nao aparecerá mais nas suas buscas.
+                            Este acervo não aparecerá mais nas suas buscas.
                             Os dados já processados continuarão salvos na nuvem.
                         </p>
 
