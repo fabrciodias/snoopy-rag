@@ -1,6 +1,7 @@
 import {
     investigate as investigateRequest,
     listHistory,
+    getInvestigation,
 } from "./api";
 
 import {
@@ -47,5 +48,34 @@ export async function loadHistory(): Promise<void> {
         setInvestigationError(error);
 
         throw error;
+    }
+}
+
+export async function loadInvestigation(
+    investigationId: string,
+): Promise<void> {
+    investigationState.isInvestigating = true;
+    investigationState.error = null;
+
+    try {
+        const result =
+            await getInvestigation(
+                investigationId,
+            );
+
+        investigationState.activeInvestigation =
+            result.investigation;
+
+        investigationState.response =
+            result.response;
+
+        investigationState.evidences =
+            result.evidences;
+    } catch (error) {
+        setInvestigationError(error);
+
+        throw error;
+    } finally {
+        investigationState.isInvestigating = false;
     }
 }

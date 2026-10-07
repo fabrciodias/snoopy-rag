@@ -25,3 +25,11 @@ export function listHistory(): Promise<HistoryEntry[]> {
         "/history/",
     );
 }
+
+export function getInvestigation(
+    investigationId: string,
+): Promise<InvestigationResponse> {
+    return apiRequest<InvestigationResponse>(
+        `/investigations/${investigationId}`,
+    );
+}

@@ -84,4 +84,5 @@ export interface InvestigationResponse {
 export interface HistoryEntry {
     query: string;
     created_at: string | null;
+    investigation_id: string | null;
 }

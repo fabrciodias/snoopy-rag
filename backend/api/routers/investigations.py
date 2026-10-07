@@ -14,6 +14,8 @@ from backend.api.dependencies import (
 from backend.api.container import (
     retrieval_service,
     synthesis_service,
+    investigation_repo,
+    evidence_repo,
 )
 
 from backend.infrastructure.database import (
@@ -61,7 +63,7 @@ def list_history(
         supabase_client
         .table("search_history")
         .select(
-            "query, created_at"
+            "query, created_at, investigation_id"
         )
         .eq(
             "user_id",
@@ -95,6 +97,9 @@ def list_history(
             "query": query,
             "created_at": item.get(
                 "created_at"
+            ),
+            "investigation_id": item.get(
+                "investigation_id"
             ),
         })
 
@@ -204,6 +209,7 @@ def investigate(
                     "user_id": user_id,
                     "folder_id": request.folder_id,
                     "query": query,
+                    "investigation_id": investigation.investigation_id,
                 })
                 .execute()
             )
@@ -234,3 +240,53 @@ def investigate(
             status_code=500,
             detail=str(error),
         )
+
+
+@router.get(
+    "/investigations/{investigation_id}",
+    tags=["Investigation"],
+)
+def get_investigation(
+    investigation_id: str,
+    authorization: str | None = Header(
+        default=None
+    ),
+):
+    """
+    Recupera uma investigação já concluída.
+
+    A investigação é restaurada a partir do estado persistido,
+    sem executar novamente a busca ou a síntese.
+    """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    investigation = investigation_repo.get_by_id(
+        investigation_id
+    )
+
+    if investigation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Investigação não encontrada.",
+        )
+
+    if investigation.user_id != user_id:
+        raise HTTPException(
+            status_code=404,
+            detail="Investigação não encontrada.",
+        )
+
+    evidences = evidence_repo.get_by_investigation(
+        investigation_id
+    )
+
+    response = investigation.structured_response
+
+    return {
+        "investigation": investigation,
+        "response": response,
+        "evidences": evidences,
+    }
