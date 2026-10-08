@@ -17,6 +17,7 @@ import {
     RefreshCw,
     FolderPlus,
     Folder,
+    History,
     LogIn,
 } from "@lucide/vue";
 
@@ -53,7 +54,18 @@ import {
 } from "../../state/operations";
 
 import {
+    loadHistory,
+    loadInvestigation,
+} from "../../features/investigation/actions";
+
+import {
+    investigationState,
+    clearHistory,
+} from "../../state/investigation";
+
+import {
     goHome,
+    goToInvestigation,
 } from "../../state/navigation";
 
 const props = defineProps<{
@@ -134,6 +146,28 @@ function focusFolderSelector(): void {
             .getElementById("folder-selector")
             ?.focus();
     });
+}
+
+async function handleHistoryClick(
+    investigationId: string | null,
+): Promise<void> {
+    if (!investigationId) {
+        return;
+    }
+
+    try {
+        await loadInvestigation(
+            investigationId,
+        );
+
+        goToInvestigation();
+        emit("close-mobile");
+    } catch (error) {
+        console.error(
+            "[HISTORY] Falha ao restaurar investigação:",
+            error,
+        );
+    }
 }
 
 function handleNewInvestigation(): void {
@@ -289,6 +323,7 @@ onMounted(async () => {
 
     try {
         await loadFolders();
+        await loadHistory();
     } catch {
         // O erro já foi armazenado no estado.
     }
@@ -298,15 +333,16 @@ watch(
     () => authState.user,
     async (user) => {
         if (!user) {
-            return;
-        }
-
-        if (folderState.folders.length > 0) {
+            clearHistory();
             return;
         }
 
         try {
-            await loadFolders();
+            if (folderState.folders.length === 0) {
+                await loadFolders();
+            }
+
+            await loadHistory();
         } catch {
             // O erro já foi armazenado no estado.
         }
@@ -530,6 +566,64 @@ watch(
                     <h3 class="nav-title">
                         Acervos
                     </h3>
+                </div>
+
+                <div
+                    v-if="authState.user"
+                    id="btn-nav-history"
+                    class="nav-title-box"
+                    title="Histórico Recente"
+                >
+                    <History class="icon-sm" />
+
+                    <h3 class="nav-title">
+                        Histórico Recente
+                    </h3>
+                </div>
+
+                <div
+                    v-if="authState.user"
+                    id="history-list"
+                >
+                    <p
+                        v-if="
+                            investigationState.history.length === 0
+                        "
+                        class="history-empty"
+                    >
+                        Nenhuma pesquisa recente.
+                    </p>
+
+                    <button
+                        v-for="entry in investigationState.history"
+                        :key="
+                            entry.investigation_id ??
+                            `${entry.query}-${entry.created_at}`
+                        "
+                        class="history-item"
+                        :class="{
+                            'history-item-disabled':
+                                !entry.investigation_id,
+                        }"
+                        type="button"
+                        :disabled="!entry.investigation_id"
+                        :title="
+                            entry.investigation_id
+                                ? 'Restaurar investigação'
+                                : 'Esta pesquisa não possui investigação persistida'
+                        "
+                        @click="
+                            handleHistoryClick(
+                                entry.investigation_id,
+                            )
+                        "
+                    >
+                        <History class="icon-sm" />
+
+                        <span>
+                            {{  entry.query  }}
+                        </span>
+                    </button>
                 </div>
             </nav>
         </div>

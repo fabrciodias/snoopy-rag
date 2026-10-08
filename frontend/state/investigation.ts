@@ -39,6 +39,10 @@ export function clearInvestigation(): void {
     investigationState.error = null;
 }
 
+export function clearHistory(): void {
+    investigationState.history = [];
+}
+
 export function setInvestigationError(
     error: unknown,
 ): void {

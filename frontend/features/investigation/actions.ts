@@ -31,6 +31,15 @@ export async function investigate(
 
         investigationState.evidences =
             result.evidences;
+
+        try {
+            await loadHistory();
+        } catch (error) {
+            console.error(
+                "[HISTORY] Falha ao atualizar histórico:",
+                error,
+            );
+        }
     } catch (error) {
         setInvestigationError(error);
 
