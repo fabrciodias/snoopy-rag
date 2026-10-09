@@ -205,7 +205,7 @@ class RetrievalService:
                     .select(
                         "id, title, authors, publication_year, "
                         "document_type, language, keywords, "
-                        "drive_file_name, drive_file_id, drive_link "
+                        "drive_file_name, drive_file_id, drive_link, "
                         "mime_type"
                     )
                     .in_("id", document_ids)

@@ -403,6 +403,9 @@ class SupabaseDocumentRepository(DocumentRepository):
 
         data["document_id"] = data.pop("id")
 
+        data["authors"] = data.get("authors") or []
+        data["keywords"] = data.get("keywords") or []
+
         if representation:
             data["representation"] = (
                 DocumentRepresentation(**representation)
