@@ -204,7 +204,9 @@ class RetrievalService:
                     .table("documents")
                     .select(
                         "id, title, authors, publication_year, "
-                        "drive_file_id, drive_link"
+                        "document_type, language, keywords, "
+                        "drive_file_name, drive_file_id, drive_link "
+                        "mime_type"
                     )
                     .in_("id", document_ids)
                     .execute()
@@ -242,12 +244,21 @@ class RetrievalService:
                         "publication_year": document.get(
                             "publication_year"
                         ),
+                        "document_type": document.get(
+                            "document_type"
+                        ),
+                        "language": document.get("language"),
+                        "keywords": document.get("keywords") or [],
+                        "drive_file_name": document.get(
+                            "drive_file_name"
+                        ),
                         "drive_file_id": document.get(
                             "drive_file_id"
                         ),
                         "drive_link": document.get(
                             "drive_link"
                         ),
+                        "mime_type": document.get("mime_type"),
                     })
 
                 result = RetrievalResult(

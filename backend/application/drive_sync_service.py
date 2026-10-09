@@ -110,10 +110,14 @@ class DriveSyncService:
             for drive_file in drive_files:
 
                 drive_file_id = drive_file["id"]
-                title = drive_file["name"]
-                drive_md5 = drive_file.get(
-                    "md5Checksum"
-                )
+
+                drive_file_name = drive_file["name"]
+
+                drive_link = drive_file.get("webViewLink")
+
+                mime_type = drive_file.get("mimeType")
+
+                drive_md5 = drive_file.get("md5Checksum")
 
                 temp_path = os.path.join(
                     temp_dir,
@@ -214,8 +218,10 @@ class DriveSyncService:
 
                         document = current_document.model_copy(
                             update={
-                                "title": title,
+                                "drive_file_name": drive_file_name,
                                 "drive_file_id": drive_file_id,
+                                "drive_link": drive_link,
+                                "mime_type": mime_type,
                                 "document_hash": document_hash,
                             }
                         )
@@ -223,13 +229,14 @@ class DriveSyncService:
                     else:
 
                         document = Document(
-                            document_id=str(
-                                uuid.uuid4()
-                            ),
+                            document_id=str(uuid.uuid4()),
                             folder_id=folder_id,
                             user_id=user_id,
-                            title=title,
+                            title="Título não identificado",
+                            drive_file_name=drive_file_name,
                             drive_file_id=drive_file_id,
+                            drive_link=drive_link,
+                            mime_type=mime_type,
                             document_hash=document_hash,
                             status=DocumentStatus.PENDING,
                         )
@@ -259,7 +266,7 @@ class DriveSyncService:
 
                     errors.append({
                         "drive_file_id": drive_file_id,
-                        "title": title,
+                        "drive_file_name": drive_file_name,
                         "error": str(error),
                     })
 

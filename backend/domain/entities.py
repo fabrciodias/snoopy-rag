@@ -18,32 +18,81 @@ class DocumentStatus(str, Enum):
     REMOVED = "REMOVED"
 
 
+class BibliographicMetadata(BaseModel):
+    """
+    Metadados bibliográficos extraídos do conteúdo da obra.
+
+    Campos desconhecidos permanecem ausentes. Esta entidade
+    não representa os metadados técnicos do arquivo físico.
+    """
+
+    title: Optional[str] = None
+
+    authors: List[str] = Field(
+        default_factory=list
+    )
+
+    publication_year: Optional[str] = None
+
+    document_type: Optional[str] = None
+
+    language: Optional[str] = None
+
+    keywords: List[str] = Field(
+        default_factory=list
+    )
+
+
 class Document(BaseModel):
     """
     Entidade documental principal do Snoopy.
 
     Representa o documento lógico pertencente a um acervo.
-    A representação extraída do arquivo físico é mantida
-    separadamente em DocumentRepresentation.
+    Sua identidade independe do nome do arquivo físico.
+
+    Os metadados bibliográficos descrevem a obra.
+    Os campos de proveniência identificam o arquivo de origem.
+    A representação extraída permanece separada em
+    DocumentRepresentation.
     """
 
     document_id: str
     folder_id: str
     user_id: str
 
+    # Metadados bibliográficos
     title: str
-    authors: Optional[str] = None
-    publication_year: Optional[int] = None
+
+    authors: List[str] = Field(
+        default_factory=list
+    )
+
+    publication_year: Optional[str] = None
+
+    document_type: Optional[str] = None
+
+    language: Optional[str] = None
+
+    keywords: List[str] = Field(
+        default_factory=list
+    )
+
+    # Proveniência do arquivo físico
+    drive_file_name: Optional[str] = None
 
     drive_file_id: Optional[str] = None
+
     drive_link: Optional[str] = None
+
+    mime_type: Optional[str] = None
+
     document_hash: Optional[str] = None
 
     status: DocumentStatus = DocumentStatus.PENDING
 
     current_representation_id: Optional[str] = None
-    representation: Optional["DocumentRepresentation"] = None
 
+    representation: Optional["DocumentRepresentation"] = None
 
 # ============================================================
 # Document Representation

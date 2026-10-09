@@ -47,6 +47,10 @@ from backend.application.publication_service import (
     PublicationService,
 )
 
+from backend.application.bibliographic_metadata_extractor import (
+    BibliographicMetadataExtractor,
+)
+
 
 # ============================================================
 # Infrastructure
@@ -108,12 +112,15 @@ doc_processor = DocumentProcessor()
 
 seg_service = SegmentationService()
 
+metadata_extractor = BibliographicMetadataExtractor()
+
 publication_service = PublicationService(
     processor=doc_processor,
     segmentation_service=seg_service,
     document_repo=doc_repo,
     unit_repo=unit_repo,
     embedding_provider=emb_provider,
+    metadata_extractor=metadata_extractor,
 )
 
 drive_sync_service = DriveSyncService(

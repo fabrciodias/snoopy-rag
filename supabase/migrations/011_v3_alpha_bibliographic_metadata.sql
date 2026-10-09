@@ -1,0 +1,10 @@
+BEGIN;
+
+ALTER TABLE public.documents
+    ADD COLUMN IF NOT EXISTS document_type TEXT,
+    ADD COLUMN IF NOT EXISTS language TEXT,
+    ADD COLUMN IF NOT EXISTS keywords TEXT[] NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS drive_file_name TEXT,
+    ADD COLUMN IF NOT EXISTS mime_type TEXT;
+
+COMMIT;
