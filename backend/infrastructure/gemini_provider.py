@@ -22,7 +22,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         self.client = genai.Client(
             api_key=settings.gemini_api_key,
             http_options=types.HttpOptions(
-                retry_options=types.HttpOptions(
+                retry_options=types.HttpRetryOptions(
                     attempts=5,
                     initial_delay=1.0,
                     max_delay=60.0,
