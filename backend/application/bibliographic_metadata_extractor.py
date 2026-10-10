@@ -8,13 +8,11 @@ from pydantic import ValidationError
 
 from backend.config import settings
 from backend.domain.entities import (
-    BibliographicMetadata,
-    DocumentRepresentation,
+BibliographicMetadata,
+DocumentRepresentation,
 )
 
-
 logger = logging.getLogger(__name__)
-
 
 class BibliographicMetadataExtractor:
     """
@@ -25,126 +23,145 @@ class BibliographicMetadataExtractor:
     Sua responsabilidade é produzir metadados validados.
     """
 
-    MAX_INPUT_CHARS = 16000
+MAX_INPUT_CHARS = 16000
 
-    def __init__(self):
-        self.model = settings.gemini_llm_model
+def __init__(self):
+    self.model = settings.gemini_llm_model
 
-        self.client = genai.Client(
-            api_key=settings.gemini_api_key
+    self.client = genai.Client(
+        api_key=settings.gemini_api_key,
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(
+                attempts=5,
+                initial_delay=1.0,
+                max_delay=60.0,
+                exp_base=2.0,
+                jitter=1.0,
+                http_status_codes=[
+                    408,
+                    429,
+                    500,
+                    502,
+                    503,
+                    504,
+                ],
+            ),
+        ),
+    )
+
+def extract(
+    self,
+    representation: DocumentRepresentation,
+) -> BibliographicMetadata:
+    """
+    Identifica metadados bibliográficos utilizando
+    o conteúdo textual da representação.
+
+    Em caso de falha de extração, retorna um objeto
+    vazio e registra o problema. Isso permite que o
+    fluxo de publicação decida como prosseguir sem
+    inventar informações bibliográficas.
+    """
+
+    text = self._extract_text(
+        representation
+    )
+
+    if not text:
+        return BibliographicMetadata()
+
+    prompt = self._build_prompt(text)
+
+    try:
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.1,
+            ),
         )
 
-    def extract(
-        self,
-        representation: DocumentRepresentation,
-    ) -> BibliographicMetadata:
-        """
-        Identifica metadados bibliográficos utilizando
-        o conteúdo textual da representação.
-
-        Em caso de falha de extração, retorna um objeto
-        vazio e registra o problema. Isso permite que o
-        fluxo de publicação decida como prosseguir sem
-        inventar informações bibliográficas.
-        """
-
-        text = self._extract_text(
-            representation
+    except Exception:
+        logger.exception(
+            "Falha na chamada ao Gemini durante "
+            "a extração bibliográfica."
         )
 
-        if not text:
-            return BibliographicMetadata()
+        return BibliographicMetadata()
 
-        prompt = self._build_prompt(text)
+    try:
+        payload = json.loads(
+            response.text or ""
+        )
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.1,
-                ),
+        if not isinstance(payload, dict):
+            raise ValueError(
+                "A resposta bibliográfica não é um objeto JSON."
             )
 
-        except Exception:
-            logger.exception(
-                "Falha na chamada ao Gemini durante "
-                "a extração bibliográfica."
-            )
+        metadata = BibliographicMetadata.model_validate(
+            payload
+        )
 
-            return BibliographicMetadata()
+    except (
+        json.JSONDecodeError,
+        ValidationError,
+        ValueError,
+        TypeError,
+    ):
+        logger.exception(
+            "Resposta bibliográfica inválida."
+        )
 
-        try:
-            payload = json.loads(
-                response.text or ""
-            )
+        return BibliographicMetadata()
 
-            if not isinstance(payload, dict):
-                raise ValueError(
-                    "A resposta bibliográfica não é um objeto JSON."
-                )
+    return self._normalize(metadata)
 
-            metadata = BibliographicMetadata.model_validate(
-                payload
-            )
+@classmethod
+def _extract_text(
+    cls,
+    representation: DocumentRepresentation,
+) -> str:
+    """
+    Reúne o texto das páginas respeitando a ordem
+    da representação documental.
 
-        except (
-            json.JSONDecodeError,
-            ValidationError,
-            ValueError,
-            TypeError,
-        ):
-            logger.exception(
-                "Resposta bibliográfica inválida."
-            )
+    O limite reduz o consumo de tokens. A seleção inicial
+    favorece o conteúdo introdutório, onde frequentemente
+    aparecem título, autoria, resumo e palavras-chave.
+    """
 
-            return BibliographicMetadata()
+    page_texts = []
 
-        return self._normalize(metadata)
+    for page in representation.pages:
+        blocks = sorted(
+            page.blocks,
+            key=lambda block: block.block_index,
+        )
 
-    @classmethod
-    def _extract_text(
-        cls,
-        representation: DocumentRepresentation,
-    ) -> str:
-        """
-        Reúne o texto das páginas respeitando a ordem
-        da representação documental.
+        text = "\n".join(
+            block.text.strip()
+            for block in blocks
+            if block.text and block.text.strip()
+        )
 
-        O limite reduz o consumo de tokens. A seleção inicial
-        favorece o conteúdo introdutório, onde frequentemente
-        aparecem título, autoria, resumo e palavras-chave.
-        """
+        if text:
+            page_texts.append(text)
 
-        page_texts = []
+    combined_text = "\n\n".join(page_texts)
 
-        for page in representation.pages:
-            blocks = sorted(
-                page.blocks,
-                key=lambda block: block.block_index,
-            )
+    return combined_text[
+        :cls.MAX_INPUT_CHARS
+    ].strip()
 
-            text = "\n".join(
-                block.text.strip()
-                for block in blocks
-                if block.text and block.text.strip()
-            )
+@staticmethod
+def _build_prompt(
+    text: str,
+) -> str:
+    return f"""
+```
 
-            if text:
-                page_texts.append(text)
-
-        combined_text = "\n\n".join(page_texts)
-
-        return combined_text[
-            :cls.MAX_INPUT_CHARS
-        ].strip()
-
-    @staticmethod
-    def _build_prompt(
-        text: str,
-    ) -> str:
-        return f"""
 Você é um extrator de metadados bibliográficos.
 
 Sua tarefa é identificar informações bibliográficas
@@ -176,12 +193,12 @@ REGRAS:
 FORMATO OBRIGATÓRIO:
 
 {{
-    "title": null,
-    "authors": [],
-    "publication_year": null,
-    "document_type": null,
-    "language": null,
-    "keywords": []
+"title": null,
+"authors": [],
+"publication_year": null,
+"document_type": null,
+"language": null,
+"keywords": []
 }}
 
 CONTEÚDO DOCUMENTAL:
@@ -191,50 +208,50 @@ CONTEÚDO DOCUMENTAL:
 </documento>
 """
 
-    @staticmethod
-    def _normalize(
-        metadata: BibliographicMetadata,
-    ) -> BibliographicMetadata:
-        """
-        Remove espaços e valores vazios sem preencher
-        campos com informações não verificadas.
-        """
+@staticmethod
+def _normalize(
+    metadata: BibliographicMetadata,
+) -> BibliographicMetadata:
+    """
+    Remove espaços e valores vazios sem preencher
+    campos com informações não verificadas.
+    """
 
-        def clean_optional(
-            value: Optional[str],
-        ) -> Optional[str]:
-            if value is None:
-                return None
+    def clean_optional(
+        value: Optional[str],
+    ) -> Optional[str]:
+        if value is None:
+            return None
 
-            value = value.strip()
+        value = value.strip()
 
-            return value or None
+        return value or None
 
-        authors = list(dict.fromkeys(
-            author.strip()
-            for author in metadata.authors
-            if author and author.strip()
-        ))
+    authors = list(dict.fromkeys(
+        author.strip()
+        for author in metadata.authors
+        if author and author.strip()
+    ))
 
-        keywords = list(dict.fromkeys(
-            keyword.strip()
-            for keyword in metadata.keywords
-            if keyword and keyword.strip()
-        ))
+    keywords = list(dict.fromkeys(
+        keyword.strip()
+        for keyword in metadata.keywords
+        if keyword and keyword.strip()
+    ))
 
-        return BibliographicMetadata(
-            title=clean_optional(
-                metadata.title
-            ),
-            authors=authors,
-            publication_year=clean_optional(
-                metadata.publication_year
-            ),
-            document_type=clean_optional(
-                metadata.document_type
-            ),
-            language=clean_optional(
-                metadata.language
-            ),
-            keywords=keywords,
-        )
+    return BibliographicMetadata(
+        title=clean_optional(
+            metadata.title
+        ),
+        authors=authors,
+        publication_year=clean_optional(
+            metadata.publication_year
+        ),
+        document_type=clean_optional(
+            metadata.document_type
+        ),
+        language=clean_optional(
+            metadata.language
+        ),
+        keywords=keywords,
+    )
