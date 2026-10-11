@@ -13,6 +13,7 @@ export type ViewName =
 
 export interface ReadingNavigationState {
     documentId: string | null;
+    evidenceId: string | null;
     location: DocumentLocation | null;
 }
 
@@ -26,6 +27,7 @@ export const navigationState =
         currentView: "home",
         reading: {
             documentId: null,
+            evidenceId: null,
             location: null,
         },
     });
@@ -33,8 +35,7 @@ export const navigationState =
 export function navigateTo(
     view: ViewName,
 ): void {
-    navigationState.currentView =
-        view;
+    navigationState.currentView = view;
 }
 
 export function goHome(): void {
@@ -47,10 +48,14 @@ export function goToInvestigation(): void {
 
 export function goToReading(
     documentId: string,
+    evidenceId: string,
     location: DocumentLocation,
 ): void {
     navigationState.reading.documentId =
         documentId;
+
+    navigationState.reading.evidenceId =
+        evidenceId;
 
     navigationState.reading.location =
         location;

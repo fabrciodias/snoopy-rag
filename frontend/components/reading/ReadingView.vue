@@ -12,11 +12,11 @@ import {
 } from "@lucide/vue";
 
 import {
-    loadDocument,
+    loadContextualReading,
 } from "../../features/documents/actions";
 
 import type {
-    Document,
+    ContextualReading,
     DocumentBlock,
     DocumentPage,
 } from "../../features/documents/contracts";
@@ -26,60 +26,45 @@ import {
     navigationState,
 } from "../../state/navigation";
 
-const documentId =
-    computed(
-        () =>
-            navigationState.reading
-                .documentId,
+const documentId = computed(
+    () => navigationState.reading.documentId,
+);
+
+const evidenceId = computed(
+    () => navigationState.reading.evidenceId,
+);
+
+const location = computed(
+    () => navigationState.reading.location,
+);
+
+const document = ref<ContextualReading | null>(null);
+
+const isLoading = ref(false);
+
+const error = ref<string | null>(null);
+
+const currentPage = computed(() => {
+    if (
+        !document.value?.representation ||
+        !location.value?.start_page
+    ) {
+        return null;
+    }
+
+    return (
+        document.value.representation.pages.find(
+            (page) =>
+                page.page_number === location.value?.start_page,
+        ) ?? null
     );
+});
 
-const location =
-    computed(
-        () =>
-            navigationState.reading
-                .location,
-    );
+const pages = computed(
+    () => document.value?.representation.pages ?? [],
+);
 
-const document =
-    ref<Document | null>(null);
-
-const isLoading =
-    ref(false);
-
-const error =
-    ref<string | null>(null);
-
-const currentPage =
-    computed(() => {
-        if (
-            !document.value?.current_representation ||
-            !location.value?.start_page
-        ) {
-            return null;
-        }
-
-        return (
-            document.value
-                .current_representation
-                .pages.find(
-                    (page) =>
-                        page.page_number ===
-                        location.value
-                            ?.start_page,
-                ) ?? null
-        );
-    });
-
-const pages =
-    computed(
-        () =>
-            document.value
-                ?.current_representation
-                ?.pages ?? [],
-    );
-
-const readingContainer =
-    ref<HTMLElement | null>(null);
+const readingContainer = ref<HTMLElement | null>(null);
 
 function blockIsInLocation(
     page: DocumentPage,
@@ -92,12 +77,10 @@ function blockIsInLocation(
     }
 
     const startPage =
-        currentLocation.start_page ??
-        page.page_number;
+        currentLocation.start_page ?? page.page_number;
 
     const endPage =
-        currentLocation.end_page ??
-        startPage;
+        currentLocation.end_page ?? startPage;
 
     if (
         page.page_number < startPage ||
@@ -113,13 +96,11 @@ function blockIsInLocation(
         return (
             (
                 currentLocation.start_block === null ||
-                blockIndex >=
-                    currentLocation.start_block
+                blockIndex >= currentLocation.start_block
             ) &&
             (
                 currentLocation.end_block === null ||
-                blockIndex <=
-                    currentLocation.end_block
+                blockIndex <= currentLocation.end_block
             )
         );
     }
@@ -128,8 +109,7 @@ function blockIsInLocation(
     if (page.page_number === startPage) {
         return (
             currentLocation.start_block === null ||
-            blockIndex >=
-                currentLocation.start_block
+            blockIndex >= currentLocation.start_block
         );
     }
 
@@ -137,8 +117,7 @@ function blockIsInLocation(
     if (page.page_number === endPage) {
         return (
             currentLocation.end_block === null ||
-            blockIndex <=
-                currentLocation.end_block
+            blockIndex <= currentLocation.end_block
         );
     }
 
@@ -147,9 +126,10 @@ function blockIsInLocation(
 }
 
 async function loadCurrentDocument(): Promise<void> {
-    if (!documentId.value) {
+    if (!documentId.value || !evidenceId.value) {
         error.value =
-            "Nenhum documento foi selecionado.";
+            "Não foi possível identificar o documento e a evidência selecionados.";
+        document.value = null;
         return;
     }
 
@@ -157,11 +137,13 @@ async function loadCurrentDocument(): Promise<void> {
     error.value = null;
 
     try {
-        document.value =
-            await loadDocument(
-                documentId.value,
-            );
+        document.value = await loadContextualReading(
+            documentId.value,
+            evidenceId.value,
+        );
     } catch (loadError) {
+        document.value = null;
+
         error.value =
             loadError instanceof Error
                 ? loadError.message
@@ -190,13 +172,13 @@ async function scrollToEvidence(): Promise<void> {
 }
 
 async function ensureReadingDocument(): Promise<void> {
-    if (!documentId.value) {
+    if (!documentId.value || !evidenceId.value) {
         return;
     }
 
     if (
-        document.value?.id !==
-        documentId.value
+        document.value?.document_id !== documentId.value ||
+        document.value?.evidence_id !== evidenceId.value
     ) {
         await loadCurrentDocument();
     }
@@ -212,15 +194,14 @@ watch(
     [
         () => navigationState.currentView,
         documentId,
-        () =>
-            JSON.stringify(
-                navigationState.reading.location,
-            ),
+        evidenceId,
+        () => JSON.stringify(navigationState.reading.location),
     ],
     async ([view]) => {
         if (
             view !== "reading" ||
-            !documentId.value
+            !documentId.value ||
+            !evidenceId.value
         ) {
             return;
         }
@@ -273,13 +254,9 @@ watch(
                 class="topbar-side right"
             >
                 <a
-                    v-if="
-                        document?.drive_link
-                    "
+                    v-if="document?.drive_link"
                     id="reading-original-link"
-                    :href="
-                        document.drive_link
-                    "
+                    :href="document.drive_link"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="btn-outline btn-reading-action"
@@ -301,16 +278,10 @@ watch(
                 v-if="isLoading"
                 class="reading-container"
             >
-                <div
-                    id="loading-state"
-                >
-                    <div
-                        class="spinner"
-                    ></div>
+                <div id="loading-state">
+                    <div class="spinner"></div>
 
-                    <p
-                        class="live-logs"
-                    >
+                    <p class="live-logs">
                         Carregando documento...
                     </p>
                 </div>
@@ -320,66 +291,43 @@ watch(
                 v-else-if="error"
                 class="reading-container"
             >
-                <p
-                    class="home-error"
-                >
+                <p class="home-error">
                     {{ error }}
                 </p>
             </div>
 
             <div
-                v-else-if="
-                    document?.current_representation
-                "
+                v-else-if="document?.representation"
                 id="reading-content"
                 class="reading-container"
                 ref="readingContainer"
             >
                 <article
                     v-for="page in pages"
-                    :key="
-                        page.page_number
-                    "
+                    :key="page.page_number"
                     class="reading-page"
-                    :data-page="
-                        page.page_number
-                    "
+                    :data-page="page.page_number"
                     :class="{
                         'reading-page-current':
-                            currentPage
-                                ?.page_number ===
-                            page.page_number,
+                            currentPage?.page_number === page.page_number,
                     }"
                 >
-                    <header
-                        class="reading-page-header"
-                    >
+                    <header class="reading-page-header">
                         Página
-                        {{
-                            page.page_number
-                        }}
+                        {{ page.page_number }}
                     </header>
 
-                    <div
-                        class="reading-page-content"
-                    >
+                    <div class="reading-page-content">
                         <p
                             v-for="block in page.blocks"
-                            :key="
-                                `${page.page_number}-${block.block_index}`
-                            "
+                            :key="`${page.page_number}-${block.block_index}`"
                             class="reading-block"
                             :class="{
                                 'reading-block-evidence':
-                                    blockIsInLocation(
-                                        page,
-                                        block,
-                                    ),
+                                    blockIsInLocation(page, block),
                             }"
                         >
-                            {{
-                                block.text
-                            }}
+                            {{ block.text }}
                         </p>
                     </div>
                 </article>

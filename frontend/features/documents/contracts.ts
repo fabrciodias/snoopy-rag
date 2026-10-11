@@ -47,3 +47,15 @@ export interface Document {
     current_representation_id: string | null;
     current_representation: DocumentRepresentation | null;
 }
+
+export interface ContextualReading {
+    document_id: string;
+    title: string | null;
+    evidence_id: string;
+    drive_link: string | null;
+    representation_id: string;
+    location: import(
+        "../investigation/contracts"
+    ).DocumentLocation;
+    representation: DocumentRepresentation;
+}

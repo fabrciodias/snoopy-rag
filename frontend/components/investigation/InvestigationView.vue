@@ -170,11 +170,19 @@ function selectEvidence(
 }
 
 function openEvidenceInReading(): void {
-    if (!selectedEvidence.value) return;
+    const evidence = selectedEvidence.value;
+
+    if (
+        !evidence ||
+        !evidence.evidence_id
+    ) {
+        return;
+    }
 
     goToReading(
-        selectedEvidence.value.document_id,
-        selectedEvidence.value.location,
+        evidence.document_id,
+        evidence.evidence_id,
+        evidence.location
     );
 }
 
