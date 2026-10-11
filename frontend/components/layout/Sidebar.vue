@@ -349,6 +349,22 @@ watch(
     },
 );
 
+watch(
+    () => folderState.selectedFolderId,
+    async (folderId) => {
+        if (!authState.user || !folderId) {
+            clearHistory();
+            return;
+        }
+
+        try {
+            await loadHistory(folderId);
+        } catch {
+            // O erro já foi armazenado no estado.
+        }
+    },
+);
+
 </script>
 
 <template>

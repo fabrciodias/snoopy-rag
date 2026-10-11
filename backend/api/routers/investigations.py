@@ -43,6 +43,7 @@ class InvestigateRequest(BaseModel):
     tags=["History"],
 )
 def list_history(
+    folder_id: str,
     authorization: str | None = Header(
         default=None
     ),
@@ -59,6 +60,11 @@ def list_history(
         authorization
     )
 
+    ensure_folder_access(
+        folder_id,
+        user_id,
+    )
+
     response = (
         supabase_client
         .table("search_history")
@@ -69,6 +75,11 @@ def list_history(
             "user_id",
             user_id,
         )
+        .eq(
+            "folder_id",
+            folder_id,
+        )
+
         .order(
             "created_at",
             desc=True,
@@ -257,6 +268,9 @@ def get_investigation(
 
     A investigação é restaurada a partir do estado persistido,
     sem executar novamente a busca ou a síntese.
+
+    O acesso depende da identidade do usuário e de seu acesso 
+    atual ao acervo associado à investigação.
     """
 
     user_id = get_authenticated_user_id(
@@ -278,6 +292,19 @@ def get_investigation(
             status_code=404,
             detail="Investigação não encontrada.",
         )
+
+    try:
+        ensure_folder_access(
+            investigation.folder_id,
+            user_id,
+        )
+    except HTTPException as error:
+        if error.status_code in (403, 404):
+            raise HTTPException(
+                status_code=404,
+                detail="Investigação não encontrada.",
+            ) from None
+        raise
 
     evidences = evidence_repo.get_by_investigation(
         investigation_id

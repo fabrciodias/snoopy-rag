@@ -20,9 +20,15 @@ export function investigate(
     );
 }
 
-export function listHistory(): Promise<HistoryEntry[]> {
+export function listHistory(
+    folderId: string,
+): Promise<HistoryEntry[]> {
+    const params = new URLSearchParams({
+        folder_id: folderId,
+    });
+
     return apiRequest<HistoryEntry[]>(
-        "/history/",
+        `/history/?${params.toString()}`,
     );
 }
 
@@ -30,6 +36,6 @@ export function getInvestigation(
     investigationId: string,
 ): Promise<InvestigationResponse> {
     return apiRequest<InvestigationResponse>(
-        `/investigations/${investigationId}`,
+        `/investigations/${encodeURIComponent(investigationId)}`,
     );
 }

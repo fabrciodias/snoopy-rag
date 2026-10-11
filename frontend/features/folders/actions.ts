@@ -9,58 +9,75 @@ import {
     setFolderError,
 } from "../../state/folders";
 
+import {
+    invalidateActiveWork,
+} from "../../state/workContext";
+
 import type {
     CreateFolderRequest,
 } from "./contracts";
 
+let folderRequestVersion = 0;
+
 export async function loadFolders(): Promise<void> {
+    const requestVersion = ++folderRequestVersion;
+
     folderState.isLoading = true;
     folderState.error = null;
 
     try {
-        const folders =
-            await listFolders();
+        const folders = await listFolders();
 
-        folderState.folders =
-            folders;
-
-        if (
-            !folderState.selectedFolderId &&
-            folders.length > 0
-        ) {
-            folderState.selectedFolderId =
-                folders[0].id;
+        if (requestVersion !== folderRequestVersion) {
+            return;
         }
 
-        const selectedExists =
-            folderState.folders.some(
-                (folder) =>
-                    folder.id ===
-                    folderState.selectedFolderId,
-            );
+        const previousSelectedId =
+            folderState.selectedFolderId;
+
+        const selectedStillExists = folders.some(
+            (folder) => folder.id === previousSelectedId,
+        );
+
+        folderState.folders = folders;
 
         if (
-            folderState.selectedFolderId &&
-            !selectedExists
+            previousSelectedId &&
+            selectedStillExists
         ) {
-            folderState.selectedFolderId =
-                folders[0]?.id ??
-                null;
+            return;
         }
+
+        if (previousSelectedId) {
+            invalidateActiveWork();
+        }
+
+        folderState.selectedFolderId =
+            folders[0]?.id ?? null;
     } catch (error) {
+        if (requestVersion !== folderRequestVersion) {
+            return;
+        }
+
         setFolderError(error);
         throw error;
     } finally {
-        folderState.isLoading =
-            false;
+        if (requestVersion === folderRequestVersion) {
+            folderState.isLoading = false;
+        }
     }
 }
 
 export function selectFolder(
     folderId: string,
 ): void {
-    folderState.selectedFolderId =
-        folderId;
+    if (folderState.selectedFolderId === folderId) {
+        return;
+    }
+
+    invalidateActiveWork();
+
+    folderState.selectedFolderId = folderId;
 }
 
 export async function addFolder(
@@ -70,21 +87,16 @@ export async function addFolder(
     folderState.error = null;
 
     try {
-        const folder =
-            await createFolder(
-                request,
-            );
+        const folder = await createFolder(request);
 
         await loadFolders();
 
-        folderState.selectedFolderId =
-            folder.id;
+        selectFolder(folder.id);
     } catch (error) {
         setFolderError(error);
         throw error;
     } finally {
-        folderState.isCreating =
-            false;
+        folderState.isCreating = false;
     }
 }
 
@@ -93,8 +105,16 @@ export async function removeFolder(
 ): Promise<void> {
     folderState.error = null;
 
+    const isSelectedFolder =
+        folderState.selectedFolderId === folderId;
+
     try {
         await deleteFolder(folderId);
+
+        if (isSelectedFolder) {
+            invalidateActiveWork();
+            folderState.selectedFolderId = null;
+        }
 
         await loadFolders();
     } catch (error) {

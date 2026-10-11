@@ -10,6 +10,10 @@ import {
 } from "../../state/investigation";
 
 import {
+    folderState,
+} from "../../state/folders";
+
+import {
     getWorkContextVersion,
 } from "../../state/workContext";
 
@@ -20,21 +24,32 @@ import type {
 export async function investigate(
     request: InvestigateRequest,
 ): Promise<void> {
-    const contextVersion =
-        getWorkContextVersion();
+    const contextVersion = getWorkContextVersion();
+    const folderId = folderState.selectedFolderId;
+
+    if (!folderId || request.folder_id !== folderId) {
+        throw new Error(
+            "O acervo selecionado mudou. Selecione o acervo desejado e tente novamente.",
+        );
+    }
 
     investigationState.isInvestigating = true;
     investigationState.error = null;
 
     try {
-        const result =
-            await investigateRequest(request);
+        const result = await investigateRequest(request);
 
         if (
-            contextVersion !==
-            getWorkContextVersion()
+            contextVersion !== getWorkContextVersion() ||
+            folderId !== folderState.selectedFolderId
         ) {
             return;
+        }
+
+        if (result.investigation.folder_id !== folderId) {
+            throw new Error(
+                "A investigação retornada não corresponde ao acervo selecionado.",
+            );
         }
 
         investigationState.activeInvestigation =
@@ -47,12 +62,11 @@ export async function investigate(
             result.evidences;
 
         try {
-            await loadHistory();
-
+            await loadHistory(folderId);
         } catch (error) {
             if (
-                contextVersion !==
-                getWorkContextVersion()
+                contextVersion !== getWorkContextVersion() ||
+                folderId !== folderState.selectedFolderId
             ) {
                 return;
             }
@@ -62,57 +76,59 @@ export async function investigate(
                 error,
             );
         }
-
     } catch (error) {
         if (
-            contextVersion !==
-            getWorkContextVersion()
+            contextVersion !== getWorkContextVersion() ||
+            folderId !== folderState.selectedFolderId
         ) {
             return;
         }
 
         setInvestigationError(error);
-
         throw error;
-
     } finally {
         if (
-            contextVersion ===
-            getWorkContextVersion()
+            contextVersion === getWorkContextVersion() &&
+            folderId === folderState.selectedFolderId
         ) {
             investigationState.isInvestigating = false;
         }
     }
 }
 
-export async function loadHistory(): Promise<void> {
-    const contextVersion =
-        getWorkContextVersion();
+export async function loadHistory(
+    folderId: string | null = folderState.selectedFolderId,
+): Promise<void> {
+    const contextVersion = getWorkContextVersion();
+
+    if (
+        !folderId ||
+        folderId !== folderState.selectedFolderId
+    ) {
+        investigationState.history = [];
+        return;
+    }
 
     try {
-        const history =
-            await listHistory();
+        const history = await listHistory(folderId);
 
         if (
-            contextVersion !==
-            getWorkContextVersion()
+            contextVersion !== getWorkContextVersion() ||
+            folderId !== folderState.selectedFolderId
         ) {
             return;
         }
 
-        investigationState.history =
-            history;
-
+        investigationState.history = history;
     } catch (error) {
         if (
-            contextVersion !==
-            getWorkContextVersion()
+            contextVersion !== getWorkContextVersion() ||
+            folderId !== folderState.selectedFolderId
         ) {
             return;
         }
 
         setInvestigationError(error);
-
         throw error;
     }
 }
@@ -120,23 +136,32 @@ export async function loadHistory(): Promise<void> {
 export async function loadInvestigation(
     investigationId: string,
 ): Promise<void> {
-    const contextVersion =
-        getWorkContextVersion();
+    const contextVersion = getWorkContextVersion();
+    const folderId = folderState.selectedFolderId;
+
+    if (!folderId) {
+        throw new Error(
+            "Selecione um acervo antes de restaurar uma investigação.",
+        );
+    }
 
     investigationState.isInvestigating = true;
     investigationState.error = null;
 
     try {
-        const result =
-            await getInvestigation(
-                investigationId,
-            );
+        const result = await getInvestigation(investigationId);
 
         if (
-            contextVersion !==
-            getWorkContextVersion()
+            contextVersion !== getWorkContextVersion() ||
+            folderId !== folderState.selectedFolderId
         ) {
             return;
+        }
+
+        if (result.investigation.folder_id !== folderId) {
+            throw new Error(
+                "A investigação não pertence ao acervo selecionado.",
+            );
         }
 
         investigationState.activeInvestigation =
@@ -147,23 +172,20 @@ export async function loadInvestigation(
 
         investigationState.evidences =
             result.evidences;
-
     } catch (error) {
         if (
-            contextVersion !==
-            getWorkContextVersion()
+            contextVersion !== getWorkContextVersion() ||
+            folderId !== folderState.selectedFolderId
         ) {
             return;
         }
 
         setInvestigationError(error);
-
         throw error;
-
     } finally {
         if (
-            contextVersion ===
-            getWorkContextVersion()
+            contextVersion === getWorkContextVersion() &&
+            folderId === folderState.selectedFolderId
         ) {
             investigationState.isInvestigating = false;
         }

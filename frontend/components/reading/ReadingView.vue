@@ -26,6 +26,10 @@ import {
     navigationState,
 } from "../../state/navigation";
 
+import {
+    getWorkContextVersion,
+} from "../../state/workContext";
+
 const documentId = computed(
     () => navigationState.reading.documentId,
 );
@@ -126,10 +130,14 @@ function blockIsInLocation(
 }
 
 async function loadCurrentDocument(): Promise<void> {
-    if (!documentId.value || !evidenceId.value) {
+    const requestedDocumentId = documentId.value;
+    const requestedEvidenceId = evidenceId.value;
+    const contextVersion = getWorkContextVersion();
+
+    if (!requestedDocumentId || !requestedEvidenceId) {
+        document.value = null;
         error.value =
             "Não foi possível identificar o documento e a evidência selecionados.";
-        document.value = null;
         return;
     }
 
@@ -137,11 +145,31 @@ async function loadCurrentDocument(): Promise<void> {
     error.value = null;
 
     try {
-        document.value = await loadContextualReading(
-            documentId.value,
-            evidenceId.value,
+        const result = await loadContextualReading(
+            requestedDocumentId,
+            requestedEvidenceId,
         );
+
+        if (
+            contextVersion !== getWorkContextVersion() ||
+            requestedDocumentId !== documentId.value ||
+            requestedEvidenceId !== evidenceId.value ||
+            navigationState.currentView !== "reading"
+        ) {
+            return;
+        }
+
+        document.value = result;
     } catch (loadError) {
+        if (
+            contextVersion !== getWorkContextVersion() ||
+            requestedDocumentId !== documentId.value ||
+            requestedEvidenceId !== evidenceId.value ||
+            navigationState.currentView !== "reading"
+        ) {
+            return;
+        }
+
         document.value = null;
 
         error.value =
@@ -149,7 +177,13 @@ async function loadCurrentDocument(): Promise<void> {
                 ? loadError.message
                 : String(loadError);
     } finally {
-        isLoading.value = false;
+        if (
+            contextVersion === getWorkContextVersion() &&
+            requestedDocumentId === documentId.value &&
+            requestedEvidenceId === evidenceId.value
+        ) {
+            isLoading.value = false;
+        }
     }
 }
 
