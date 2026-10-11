@@ -7,6 +7,10 @@ import type {
     User,
 } from "@supabase/supabase-js";
 
+import {
+    clearUserWorkState,
+} from "./workContext";
+
 export interface AuthState {
     initialized: boolean;
     session: Session | null;
@@ -24,6 +28,19 @@ export const authState = reactive<AuthState>({
 export function setSession(
     session: Session | null,
 ): void {
+    const previousUserId =
+        authState.user?.id ?? null;
+
+    const nextUserId =
+        session?.user?.id ?? null;
+
+    const identityChanged =
+        previousUserId !== nextUserId;
+
+    if (identityChanged) {
+        clearUserWorkState();
+    }
+
     authState.session = session;
     authState.user = session?.user ?? null;
 }

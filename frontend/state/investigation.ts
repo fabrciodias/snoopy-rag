@@ -36,6 +36,8 @@ export function clearInvestigation(): void {
     investigationState.activeInvestigation = null;
     investigationState.response = null;
     investigationState.evidences = [];
+
+    investigationState.isInvestigating = false;
     investigationState.error = null;
 }
 
