@@ -17,8 +17,8 @@ export interface Investigation {
 export interface DocumentReference {
     document_id: string;
     title: string | null;
-    authors: string | null;
-    publication_year: number | null;
+    authors: string | string[] | null;
+    publication_year: number | string | null;
     drive_link: string | null;
 }
 

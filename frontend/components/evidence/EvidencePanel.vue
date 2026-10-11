@@ -85,9 +85,16 @@ const bibliographicReference =
             return "Metadados indisponíveis.";
         }
 
-        const authors =
-            props.reference.authors?.trim() ||
-            "AUTOR DESCONHECIDO";
+        const authors = Array.isArray(props.reference.authors)
+            ? props.reference.authors
+                .filter((author) => typeof author === "string")
+                .map((author) => author.trim())
+                .filter(Boolean)
+                .join(", ")
+            : typeof props.reference.authors === "string"
+                ? props.reference.authors.trim()
+                : "";
+                
 
         const title =
             props.reference.title?.trim() ||

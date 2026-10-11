@@ -109,18 +109,37 @@ function formatReference(
     }
 
     const authors =
-        reference.authors?.trim() ||
-        "AUTOR DESCONHECIDO";
+        Array.isArray(reference.authors)
+            ? reference.authors
+                .filter(
+                    (author) =>
+                        typeof author === "string",
+                )
+                .map((author) => author.trim())
+                .filter(Boolean)
+                .join(", ")
+            : typeof reference.authors === "string"
+                ? reference.authors.trim()
+                : "";
 
-    const title =
-        reference.title?.trim() ||
-        "Título não informado";
+    const title = 
+        typeof reference.title === "string"
+            ? reference.title.trim()
+            : "";
 
     const year =
-        reference.publication_year ??
-        "s.d.";
+        reference.publication_year == null ||
+        String(reference.publication_year).trim() ===""
+            ? "s.d."
+            : String(reference.publication_year).trim();
 
-    return `${authors.toUpperCase()}. ${title}. ${year}.`;
+    const formattedAuthors = 
+        authors || "AUTOR DESCONHECIDO";
+
+    const formattedTitle =
+        title || "Título não informado";
+
+    return `${formattedAuthors.toUpperCase()}. ${formattedTitle}. ${year}.`;
 }
 
 const selectedEvidenceId =
