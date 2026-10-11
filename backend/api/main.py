@@ -30,6 +30,10 @@ from backend.api.routers.investigations import (
     router as investigations_router,
 )
 
+from backend.api.routers.evidence import (
+    router as evidence_router,
+)
+
 
 # ============================================================
 # Application
@@ -67,6 +71,10 @@ app.include_router(
 
 app.include_router(
     investigations_router
+)
+
+app.include_router(
+    evidence_router
 )
 
 

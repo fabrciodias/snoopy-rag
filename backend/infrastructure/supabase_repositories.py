@@ -389,6 +389,77 @@ class SupabaseDocumentRepository(DocumentRepository):
 
         return result
 
+    def get_representation_by_id(
+        self,
+        document_id: str,
+        representation_id: str,
+    )-> Optional[DocumentRepresentation]:
+        """
+        Recupera uma representação histórica específica.
+
+        A consulta valida tanto a identidade da representação
+        quanto sua associação ao documento.
+
+        Não utiliza a representação corrente como fallback.
+        """
+
+        response = (
+            self.client
+            .table("document_representations")
+            .select(
+                "id, document_id, representation"
+            )
+            .eq(
+                "id",
+                representation_id,
+            )
+            .eq(
+                "document_id",
+                document_id,
+            )
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        record = response.data[0]
+
+        representation_data = record.get(
+            "representation"
+        )
+
+        if not representation_data:
+            raise RuntimeError(
+                "A representação documental persistida " \
+                "não possui conteúdo."
+            )
+
+        representation = DocumentRepresentation(
+            **representation_data
+        )
+
+        if (
+            representation.representation_id
+            != record["id"]
+        ):
+            raise RuntimeError(
+                "A identidade da representação persistida " \
+                "não corresponde ao registro."
+            )
+
+        if (
+            representation.document_id
+            != document_id
+        ):
+            raise RuntimeError(
+                "A representação documental não pertence " \
+                "ao documento solicitado."
+            )
+
+        return representation
+
     @staticmethod
     def _to_entity(
         record: dict,

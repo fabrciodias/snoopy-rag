@@ -1,0 +1,733 @@
+﻿
+===== backend/application/retrieval_service.py:65-115 =====
+  65: 
+  66:         try:
+  67:             query_embeddings = (
+  68:                 self.emb_provider.generate_embeddings(
+  69:                     [query]
+  70:                 )
+  71:             )
+  72: 
+  73:             if not query_embeddings:
+  74:                 investigation = (
+  75:                     self.investigation_repo.update_status(
+  76:                         investigation.investigation_id,
+  77:                         InvestigationStatus.COMPLETED,
+  78:                     )
+  79:                 )
+  80: 
+  81:                 return investigation, []
+  82: 
+  83:             vector = query_embeddings[0]
+  84: 
+  85:             response = self.client.rpc(
+  86:                 "v3_hybrid_search",
+  87:                 {
+  88:                     "p_query_text": query,
+  89:                     "p_query_embedding": vector,
+  90:                     "p_match_count": limit * 2,
+  91:                     "p_user_id": user_id,
+  92:                     "p_folder_id": folder_id,
+  93:                 },
+  94:             ).execute()
+  95: 
+  96:             raw_results = response.data or []
+  97: 
+  98:             # ====================================================
+  99:             # 1. RANKING SEMÃ‚NTICO
+ 100:             # ====================================================
+ 101: 
+ 102:             semantic_sorted = sorted(
+ 103:                 (
+ 104:                     item
+ 105:                     for item in raw_results
+ 106:                     if item.get("semantic_score")
+ 107:                     is not None
+ 108:                 ),
+ 109:                 key=lambda item: item["semantic_score"],
+ 110:                 reverse=True,
+ 111:             )
+ 112: 
+ 113:             # ====================================================
+ 114:             # 2. RANKING LEXICAL
+ 115:             # ====================================================
+
+===== backend/application/retrieval_service.py:245-295 =====
+ 245:                             "publication_year"
+ 246:                         ),
+ 247:                         "document_type": document.get(
+ 248:                             "document_type"
+ 249:                         ),
+ 250:                         "language": document.get("language"),
+ 251:                         "keywords": document.get("keywords") or [],
+ 252:                         "drive_file_name": document.get(
+ 253:                             "drive_file_name"
+ 254:                         ),
+ 255:                         "drive_file_id": document.get(
+ 256:                             "drive_file_id"
+ 257:                         ),
+ 258:                         "drive_link": document.get(
+ 259:                             "drive_link"
+ 260:                         ),
+ 261:                         "mime_type": document.get("mime_type"),
+ 262:                     })
+ 263: 
+ 264:                 result = RetrievalResult(
+ 265:                     result_id=str(uuid.uuid4()),
+ 266:                     investigation_id=(
+ 267:                         investigation.investigation_id
+ 268:                     ),
+ 269:                     unit_id=row["unit_id"],
+ 270:                     document_id=row["document_id"],
+ 271:                     representation_id=(
+ 272:                         row["representation_id"]
+ 273:                     ),
+ 274:                     rank=idx,
+ 275:                     retrieval_score=row["rrf_score"],
+ 276:                     semantic_score=row.get(
+ 277:                         "semantic_score"
+ 278:                     ),
+ 279:                     lexical_score=row.get(
+ 280:                         "lexical_score"
+ 281:                     ),
+ 282:                     content=row["content"],
+ 283:                     location=row.get(
+ 284:                         "location",
+ 285:                         {},
+ 286:                     ),
+ 287:                     metadata=metadata,
+ 288:                 )
+ 289: 
+ 290:                 results.append(result)
+ 291: 
+ 292:             # ====================================================
+ 293:             # 6. PERSISTÃŠNCIA
+ 294:             # ====================================================
+ 295: 
+
+===== backend/application/publication_service.py:155-200 =====
+ 155:                 representation,
+ 156:             )
+ 157: 
+ 158:             # ====================================================
+ 159:             # 6. PersistÃªncia dos derivados
+ 160:             # ====================================================
+ 161: 
+ 162:             self.unit_repo.save_batch(
+ 163:                 units=units,
+ 164:                 embeddings=embeddings,
+ 165:             )
+ 166: 
+ 167:             # ====================================================
+ 168:             # 7. PublicaÃ§Ã£o
+ 169:             # ====================================================
+ 170: 
+ 171:             published_document = (
+ 172:                 self.document_repo.publish_representation(
+ 173:                     document=document,
+ 174:                     representation=representation,
+ 175:                 )
+ 176:             )
+ 177: 
+ 178:             return {
+ 179:                 "document_id": (
+ 180:                     published_document.document_id
+ 181:                 ),
+ 182:                 "representation_id": (
+ 183:                     representation.representation_id
+ 184:                 ),
+ 185:                 "unit_count": len(units),
+ 186:                 "status": DocumentStatus.ACTIVE.value,
+ 187:             }
+ 188: 
+ 189:         except Exception:
+ 190:             # Uma falha durante a atualizaÃ§Ã£o nÃ£o deve substituir
+ 191:             # a representaÃ§Ã£o que jÃ¡ estava publicada.
+ 192:             if previous_status != DocumentStatus.ACTIVE:
+ 193:                 self.document_repo.update_status(
+ 194:                     document.document_id,
+ 195:                     DocumentStatus.FAILED,
+ 196:                 )
+ 197: 
+ 198:             raise
+ 199: 
+ 200:     @staticmethod
+
+===== backend/application/synthesis_service.py:105-155 =====
+ 105:                 context_parts.append(
+ 106:                     "CONTEXTO DOCUMENTAL POSTERIOR:\n"
+ 107:                     + "\n\n".join(next_context)
+ 108:                 )
+ 109: 
+ 110:             context = (
+ 111:                 "\n\n".join(context_parts)
+ 112:                 if context_parts
+ 113:                 else "Nenhum contexto documental adjacente disponÃ­vel."
+ 114:             )
+ 115: 
+ 116:             evidence = Evidence(
+ 117:                 evidence_id=str(uuid.uuid4()),
+ 118:                 investigation_id=result.investigation_id,
+ 119:                 unit_id=result.unit_id,
+ 120:                 document_id=result.document_id,
+ 121:                 location=result.location,
+ 122:                 content=result.content,
+ 123:                 context=context,
+ 124:                 provenance=EvidenceProvenance(
+ 125:                     investigation_id=(
+ 126:                         result.investigation_id
+ 127:                     ),
+ 128:                     result_id=result.result_id,
+ 129:                     unit_id=result.unit_id,
+ 130:                     document_id=result.document_id,
+ 131:                     representation_id=(
+ 132:                         result.representation_id
+ 133:                     ),
+ 134:                     location=result.location,
+ 135:                 ),
+ 136:             )
+ 137: 
+ 138:             evidences.append(evidence)
+ 139: 
+ 140:         self.evidence_repo.save_batch(
+ 141:             evidences
+ 142:         )
+ 143: 
+ 144:         # ========================================================
+ 145:         # 2. CONSTRUÃ‡ÃƒO DO CONTEXTO PARA O LLM
+ 146:         # ========================================================
+ 147: 
+ 148:         context_blocks = []
+ 149: 
+ 150:         for evidence in evidences:
+ 151: 
+ 152:             block = (
+ 153:                 f"--- INÃCIO DA EVIDÃŠNCIA "
+ 154:                 f"[{evidence.evidence_id}] ---\n\n"
+ 155:                 f"EVIDÃŠNCIA PRINCIPAL:\n"
+
+===== backend/infrastructure/supabase_repositories.py:220-320 =====
+ 220: 
+ 221:         if not response.data:
+ 222:             raise RuntimeError(
+ 223:                 f"Documento '{document_id}' nÃ£o encontrado."
+ 224:             )
+ 225: 
+ 226:         return self._to_entity(response.data[0])
+ 227: 
+ 228:     def save_representation(
+ 229:         self,
+ 230:         document_id: str,
+ 231:         representation: DocumentRepresentation,
+ 232:     ) -> Document:
+ 233:         """
+ 234:         Persiste a representaÃ§Ã£o no histÃ³rico.
+ 235: 
+ 236:         IMPORTANTE:
+ 237:         esta operaÃ§Ã£o nÃ£o altera current_representation_id
+ 238:         nem a representaÃ§Ã£o corrente do documento.
+ 239:         """
+ 240: 
+ 241:         if representation.document_id != document_id:
+ 242:             raise ValueError(
+ 243:                 "A representaÃ§Ã£o documental nÃ£o pertence "
+ 244:                 "ao documento informado."
+ 245:             )
+ 246:         
+ 247:         representation_payload = {
+ 248:             "id": representation.representation_id,
+ 249:             "document_id": document_id,
+ 250:             "representation": representation.model_dump(
+ 251:                 mode="json"
+ 252:             ),
+ 253:         }
+ 254: 
+ 255:         history_response = (
+ 256:             self.client
+ 257:             .table("document_representations")
+ 258:             .insert(representation_payload)
+ 259:             .execute()
+ 260:         )
+ 261: 
+ 262:         if not history_response.data:
+ 263:             raise RuntimeError(
+ 264:                 "Falha ao persistir a representaÃ§Ã£o documental."
+ 265:             )
+ 266: 
+ 267:         document = self.get_by_id(document_id)
+ 268: 
+ 269:         if document is None:
+ 270:             raise RuntimeError(
+ 271:                 f"Documento '{document_id}' nÃ£o encontrado."
+ 272:             )
+ 273: 
+ 274:         return document
+ 275: 
+ 276:     def publish_representation(
+ 277:         self,
+ 278:         document: Document,
+ 279:         representation: DocumentRepresentation,
+ 280:     ) -> Document:
+ 281:         """
+ 282:         Torna uma representaÃ§Ã£o previamente processada a versÃ£o
+ 283:         corrente do documento.
+ 284: 
+ 285:         A publicaÃ§Ã£o atualiza os metadados documentais e o ponteiro
+ 286:         current_representation_id somente depois que o pipeline
+ 287:         de processamento foi concluÃ­do com sucesso.
+ 288:         """
+ 289: 
+ 290:         if representation.document_id != document.document_id:
+ 291:             raise ValueError(
+ 292:                 "A representaÃ§Ã£o documental nÃ£o pertence "
+ 293:                 "ao documento informado."
+ 294:             )
+ 295: 
+ 296:         payload = {
+ 297:             "title": document.title,
+ 298:             "authors": document.authors,
+ 299:             "publication_year": document.publication_year,
+ 300:             "document_type": document.document_type,
+ 301:             "language": document.language,
+ 302:             "keywords": document.keywords,
+ 303:             "drive_file_name": document.drive_file_name,
+ 304:             "drive_file_id": document.drive_file_id,
+ 305:             "drive_link": document.drive_link,
+ 306:             "mime_type": document.mime_type,
+ 307:             "document_hash": document.document_hash,
+ 308:             "current_representation_id": (
+ 309:                 representation.representation_id
+ 310:             ),
+ 311:             "representation": (
+ 312:                 representation.model_dump(
+ 313:                     mode="json"
+ 314:                 )
+ 315:             ),
+ 316:             "status": DocumentStatus.ACTIVE.value,
+ 317:         }
+ 318: 
+ 319:         response = (
+ 320:             self.client
+
+===== backend/infrastructure/supabase_repositories.py:330-380 =====
+ 330:                 "nÃ£o encontrado durante a publicaÃ§Ã£o."
+ 331:             )
+ 332: 
+ 333:         return self._to_entity(response.data[0])
+ 334: 
+ 335:     def get_representation(
+ 336:         self,
+ 337:         document_id: str,
+ 338:     ) -> Optional[DocumentRepresentation]:
+ 339: 
+ 340:         document_response = (
+ 341:             self.client
+ 342:             .table(self.table_name)
+ 343:             .select("current_representation_id")
+ 344:             .eq("id", document_id)
+ 345:             .limit(1)
+ 346:             .execute()
+ 347:         )
+ 348: 
+ 349:         if not document_response.data:
+ 350:             return None
+ 351: 
+ 352:         representation_id = (
+ 353:             document_response.data[0]
+ 354:             .get("current_representation_id")
+ 355:         )
+ 356: 
+ 357:         if not representation_id:
+ 358:             return None
+ 359: 
+ 360:         representation_response = (
+ 361:             self.client
+ 362:             .table("document_representations")
+ 363:             .select("representation")
+ 364:             .eq("id", representation_id)
+ 365:             .limit(1)
+ 366:             .execute()
+ 367:         )
+ 368: 
+ 369:         if not representation_response.data:
+ 370:             return None
+ 371: 
+ 372:         representation = (
+ 373:             representation_response.data[0]
+ 374:             .get("representation")
+ 375:         )
+ 376: 
+ 377:         if not representation:
+ 378:             return None
+ 379: 
+ 380:         result = DocumentRepresentation(
+
+===== backend/infrastructure/supabase_repositories.py:480-610 =====
+ 480:                 "user_id ou folder_id vÃ¡lidos."
+ 481:             )
+ 482: 
+ 483:         payload = []
+ 484: 
+ 485:         for unit, embedding in zip(
+ 486:             units,
+ 487:             embeddings,
+ 488:         ):
+ 489:             payload.append({
+ 490:                 "user_id": user_id,
+ 491:                 "folder_id": folder_id,
+ 492:                 "document_id": unit.document_id,
+ 493:                 "content": unit.content,
+ 494:                 "section": unit.section,
+ 495:                 "embedding": embedding,
+ 496:                 "unit_index": unit.unit_index,
+ 497:                 "location": unit.location.model_dump(
+ 498:                     mode="json"
+ 499:                 ),
+ 500:                 "representation_id": (
+ 501:                     unit.representation_id
+ 502:                 ),
+ 503:             })
+ 504: 
+ 505:         response = (
+ 506:             self.client
+ 507:             .table(self.table_name)
+ 508:             .insert(payload)
+ 509:             .execute()
+ 510:         )
+ 511: 
+ 512:         if len(response.data) != len(units):
+ 513:             raise RuntimeError(
+ 514:                 "Nem todas as RetrievalUnits "
+ 515:                 "foram persistidas."
+ 516:             )
+ 517: 
+ 518:         for unit, record in zip(
+ 519:             units,
+ 520:             response.data,
+ 521:         ):
+ 522:             unit.unit_id = record["id"]
+ 523: 
+ 524:         return units
+ 525: 
+ 526:     def get_context(
+ 527:         self,
+ 528:         unit_id: int,
+ 529:         window: int = 1,
+ 530:     ) -> List[RetrievalUnit]:
+ 531: 
+ 532:         if window < 0:
+ 533:             raise ValueError(
+ 534:                 "A janela de contexto nÃ£o pode ser negativa."
+ 535:             )
+ 536: 
+ 537:         anchor_response = (
+ 538:             self.client
+ 539:             .table(self.table_name)
+ 540:             .select(
+ 541:                 "id, document_id, representation_id, "
+ 542:                 "unit_index"
+ 543:             )
+ 544:             .eq("id", unit_id)
+ 545:             .limit(1)
+ 546:             .execute()
+ 547:         )
+ 548: 
+ 549:         if not anchor_response.data:
+ 550:             return []
+ 551: 
+ 552:         anchor = anchor_response.data[0]
+ 553: 
+ 554:         document_id = anchor["document_id"]
+ 555:         representation_id = anchor["representation_id"]
+ 556:         anchor_index = anchor["unit_index"]
+ 557: 
+ 558:         response = (
+ 559:             self.client
+ 560:             .table(self.table_name)
+ 561:             .select(
+ 562:                 "id, document_id, representation_id, "
+ 563:                 "unit_index, content, location, section"
+ 564:             )
+ 565:             .eq(
+ 566:                 "document_id",
+ 567:                 document_id,
+ 568:             )
+ 569:             .eq(
+ 570:                 "representation_id",
+ 571:                 representation_id,
+ 572:             )
+ 573:             .gte(
+ 574:                 "unit_index",
+ 575:                 max(0, anchor_index - window),
+ 576:             )
+ 577:             .lte(
+ 578:                 "unit_index",
+ 579:                 anchor_index + window,
+ 580:             )
+ 581:             .order("unit_index")
+ 582:             .execute()
+ 583:         )
+ 584: 
+ 585:         results = []
+ 586: 
+ 587:         for record in response.data:
+ 588:             results.append(
+ 589:                 RetrievalUnit(
+ 590:                     unit_id=record["id"],
+ 591:                     document_id=record["document_id"],
+ 592:                     representation_id=(
+ 593:                         record["representation_id"]
+ 594:                     ),
+ 595:                     unit_index=record["unit_index"],
+ 596:                     content=record["content"],
+ 597:                     location=(
+ 598:                         record.get("location") or {}
+ 599:                     ),
+ 600:                     section=(
+ 601:                         record.get("section")
+ 602:                         or "Geral"
+ 603:                     ),
+ 604:                 )
+ 605:             )
+ 606: 
+ 607:         return results
+ 608: 
+ 609: 
+ 610: # ============================================================
+
+===== backend/infrastructure/supabase_repositories.py:745-795 =====
+ 745: # ============================================================
+ 746: 
+ 747: 
+ 748: class SupabaseRetrievalResultRepository(
+ 749:     RetrievalResultRepository
+ 750: ):
+ 751: 
+ 752:     def __init__(self, client: Client):
+ 753:         self.client = client
+ 754:         self.table_name = "retrieval_results"
+ 755: 
+ 756:     def save_batch(
+ 757:         self,
+ 758:         results: List[RetrievalResult],
+ 759:     ) -> List[RetrievalResult]:
+ 760: 
+ 761:         if not results:
+ 762:             return []
+ 763: 
+ 764:         payload = []
+ 765: 
+ 766:         for result in results:
+ 767:             payload.append({
+ 768:                 "id": result.result_id,
+ 769:                 "investigation_id": (
+ 770:                     result.investigation_id
+ 771:                 ),
+ 772:                 "unit_id": result.unit_id,
+ 773:                 "document_id": result.document_id,
+ 774:                 "representation_id": result.representation_id,
+ 775:                 "rank": result.rank,
+ 776:                 "retrieval_score": (
+ 777:                     result.retrieval_score
+ 778:                 ),
+ 779:                 "semantic_score": (
+ 780:                     result.semantic_score
+ 781:                 ),
+ 782:                 "lexical_score": (
+ 783:                     result.lexical_score
+ 784:                 ),
+ 785:                 "content": result.content,
+ 786:                 "location": result.location.model_dump(
+ 787:                     mode="json"
+ 788:                 ),
+ 789:                 "metadata": result.metadata,
+ 790:             })
+ 791: 
+ 792:         response = (
+ 793:             self.client
+ 794:             .table(self.table_name)
+ 795:             .insert(payload)
+
+===== backend/domain/entities.py:75-160 =====
+  75: 
+  76:     keywords: List[str] = Field(
+  77:         default_factory=list
+  78:     )
+  79: 
+  80:     # ProveniÃªncia do arquivo fÃ­sico
+  81:     drive_file_name: Optional[str] = None
+  82: 
+  83:     drive_file_id: Optional[str] = None
+  84: 
+  85:     drive_link: Optional[str] = None
+  86: 
+  87:     mime_type: Optional[str] = None
+  88: 
+  89:     document_hash: Optional[str] = None
+  90: 
+  91:     status: DocumentStatus = DocumentStatus.PENDING
+  92: 
+  93:     current_representation_id: Optional[str] = None
+  94: 
+  95:     representation: Optional["DocumentRepresentation"] = None
+  96: 
+  97: # ============================================================
+  98: # Document Representation
+  99: # ============================================================
+ 100: 
+ 101: class DocumentBlock(BaseModel):
+ 102:     """
+ 103:     Unidade elementar da representaÃ§Ã£o documental.
+ 104: 
+ 105:     MantÃ©m o conteÃºdo textual e a posiÃ§Ã£o espacial do bloco
+ 106:     dentro da pÃ¡gina original.
+ 107:     """
+ 108: 
+ 109:     block_index: int
+ 110:     text: str
+ 111:     block_type: str = "text"
+ 112: 
+ 113:     x0: Optional[float] = None
+ 114:     y0: Optional[float] = None
+ 115:     x1: Optional[float] = None
+ 116:     y1: Optional[float] = None
+ 117: 
+ 118: 
+ 119: class DocumentPage(BaseModel):
+ 120:     """
+ 121:     PÃ¡gina da representaÃ§Ã£o canÃ´nica do documento.
+ 122: 
+ 123:     As dimensÃµes permitem interpretar as coordenadas dos blocos
+ 124:     no sistema espacial original da pÃ¡gina.
+ 125:     """
+ 126: 
+ 127:     page_number: int
+ 128: 
+ 129:     width: Optional[float] = None
+ 130:     height: Optional[float] = None
+ 131: 
+ 132:     blocks: List[DocumentBlock] = Field(
+ 133:         default_factory=list
+ 134:     )
+ 135: 
+ 136: 
+ 137: class DocumentRepresentation(BaseModel):
+ 138:     """
+ 139:     RepresentaÃ§Ã£o canÃ´nica derivada da fonte documental.
+ 140: 
+ 141:     Preserva a estrutura necessÃ¡ria para reconstruir a localizaÃ§Ã£o
+ 142:     de uma unidade de recuperaÃ§Ã£o dentro da fonte original.
+ 143:     """
+ 144: 
+ 145:     representation_id: str
+ 146:     document_id: str
+ 147: 
+ 148:     pages: List[DocumentPage] = Field(
+ 149:         default_factory=list
+ 150:     )
+ 151: 
+ 152:     metadata: Dict[str, Any] = Field(
+ 153:         default_factory=dict
+ 154:     )
+ 155: 
+ 156: 
+ 157: # ============================================================
+ 158: # Retrieval Location
+ 159: # ============================================================
+ 160: 
+
+===== backend/domain/entities.py:185-215 =====
+ 185: 
+ 186: 
+ 187: # ============================================================
+ 188: # Retrieval Unit
+ 189: # ============================================================
+ 190: 
+ 191: class RetrievalUnit(BaseModel):
+ 192:     """
+ 193:     Unidade de recuperaÃ§Ã£o derivada de uma representaÃ§Ã£o documental.
+ 194: 
+ 195:     Ã‰ o objeto efetivamente indexado para recuperaÃ§Ã£o hÃ­brida.
+ 196:     """
+ 197: 
+ 198:     unit_id: Optional[int] = None
+ 199: 
+ 200:     document_id: str
+ 201:     representation_id: str
+ 202: 
+ 203:     unit_index: int
+ 204:     content: str
+ 205: 
+ 206:     location: DocumentLocation = Field(
+ 207:         default_factory=DocumentLocation
+ 208:     )
+ 209: 
+ 210:     section: str = "Geral"
+ 211: 
+ 212:     metadata: Dict[str, Any] = Field(
+ 213:         default_factory=dict
+ 214:     )
+ 215: 
+
+===== backend/domain/entities.py:260-320 =====
+ 260:     Resultado persistente de uma etapa de recuperaÃ§Ã£o.
+ 261: 
+ 262:     RetrievalResult representa o resultado da recuperaÃ§Ã£o,
+ 263:     nÃ£o uma evidÃªncia documental validada.
+ 264: 
+ 265:     Os dados essenciais para interpretar o resultado ficam
+ 266:     explicitamente declarados no contrato.
+ 267:     """
+ 268: 
+ 269:     result_id: str
+ 270:     investigation_id: str
+ 271: 
+ 272:     unit_id: int
+ 273:     document_id: str
+ 274:     representation_id: str
+ 275: 
+ 276:     rank: int
+ 277:     retrieval_score: float
+ 278: 
+ 279:     semantic_score: Optional[float] = None
+ 280:     lexical_score: Optional[float] = None
+ 281: 
+ 282:     content: str
+ 283:     location: DocumentLocation = Field(
+ 284:         default_factory=DocumentLocation
+ 285:     )
+ 286: 
+ 287:     metadata: Dict[str, Any] = Field(
+ 288:         default_factory=dict
+ 289:     )
+ 290: 
+ 291: 
+ 292: # ============================================================
+ 293: # Evidence Provenance
+ 294: # ============================================================
+ 295: 
+ 296: class EvidenceProvenance(BaseModel):
+ 297:     """
+ 298:     RelaÃ§Ã£o de proveniÃªncia que permite reconstruir a origem
+ 299:     imediata de uma Evidence dentro da investigaÃ§Ã£o.
+ 300: 
+ 301:     A resoluÃ§Ã£o histÃ³rica completa da representaÃ§Ã£o documental
+ 302:     serÃ¡ consolidada na Passada 4.
+ 303:     """
+ 304: 
+ 305:     investigation_id: str
+ 306:     result_id: str
+ 307:     unit_id: int
+ 308:     document_id: str
+ 309:     representation_id: str
+ 310: 
+ 311:     location: DocumentLocation = Field(
+ 312:         default_factory=DocumentLocation
+ 313:     )
+ 314: 
+ 315: 
+ 316: # ============================================================
+ 317: # Evidence
+ 318: # ============================================================
+ 319: 
+ 320: class Evidence(BaseModel):

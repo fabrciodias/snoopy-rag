@@ -116,6 +116,22 @@ class DocumentRepository(ABC):
     ) -> Optional[DocumentRepresentation]:
         pass
 
+    @abstractmethod
+    def get_representation_by_id (
+        self,
+        document_id: str,
+        representation_id: str,
+    ) -> Optional[DocumentRepresentation]:
+        """
+        Recupera uma representação documental específica.
+
+        A consulta deve validar simultaneamente a identidade
+        da representação e sua associação ao documento.
+
+        Não substitui uma reresentação ausente pela recorrente
+        """
+        pass
+
 
 # ============================================================
 # Retrieval Unit Repository
