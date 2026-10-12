@@ -955,6 +955,7 @@ watch(
 
                     <div
                         v-else-if="
+                            syncCompletionVisible &&
                             currentFolderSyncOperation?.status === 'COMPLETED'
                         "
                         class="sync-progress-complete"
