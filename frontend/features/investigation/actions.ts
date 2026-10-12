@@ -35,6 +35,7 @@ export async function investigate(
 
     investigationState.isInvestigating = true;
     investigationState.error = null;
+    investigationState.currentQuery = request.query;
 
     try {
         const result = await investigateRequest(request);
@@ -60,6 +61,9 @@ export async function investigate(
 
         investigationState.evidences =
             result.evidences;
+
+        investigationState.currentQuery =
+            result.investigation.original_query;
 
         try {
             await loadHistory(folderId);
@@ -172,6 +176,9 @@ export async function loadInvestigation(
 
         investigationState.evidences =
             result.evidences;
+
+        investigationState.currentQuery =
+            result.investigation.original_query;
     } catch (error) {
         if (
             contextVersion !== getWorkContextVersion() ||

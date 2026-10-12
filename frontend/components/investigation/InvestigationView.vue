@@ -202,8 +202,8 @@ function closeEvidence(): void {
                 class="sticky-query"
             >
                 {{
-                    investigation
-                        ?.original_query ??
+                    investigationState.currentQuery ??
+                    investigation?.original_query ??
                     "Pesquisa"
                 }}
             </h2>

@@ -48,7 +48,7 @@ async function submitInvestigation(): Promise<void> {
     }
 
     try {
-        await investigate({
+        const investigationRequest = investigate({
             folder_id:
                 selectedFolderId.value,
             query: normalizedQuery,
@@ -56,8 +56,11 @@ async function submitInvestigation(): Promise<void> {
         });
 
         goToInvestigation();
+
+        await investigationRequest;
     } catch {
         // O erro já está armazenado no estado.
+        // A tela de investigação o apresentará.
     }
 }
 

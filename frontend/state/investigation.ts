@@ -16,6 +16,8 @@ export interface InvestigationState {
 
     history: HistoryEntry[];
 
+    currentQuery: string | null;
+
     isInvestigating: boolean;
     error: string | null;
 }
@@ -28,6 +30,8 @@ export const investigationState =
 
         history: [],
 
+        currentQuery: null,
+
         isInvestigating: false,
         error: null,
     });
@@ -36,6 +40,8 @@ export function clearInvestigation(): void {
     investigationState.activeInvestigation = null;
     investigationState.response = null;
     investigationState.evidences = [];
+
+    investigationState.currentQuery = null;
 
     investigationState.isInvestigating = false;
     investigationState.error = null;
