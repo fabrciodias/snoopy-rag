@@ -1,8 +1,14 @@
+import asyncio
+import json
+import time
+
 from fastapi import (
     APIRouter,
     Header,
     HTTPException,
 )
+
+from sse_starlette.sse import EventSourceResponse
 
 from backend.api.dependencies import (
     get_authenticated_user_id,
@@ -116,6 +122,34 @@ def _ensure_target_access(
     )
 
 
+def _authorize_operation(
+    operation,
+    user_id: str,
+) -> None:
+    """
+    Valida a entidade de destino e autoriza o acesso
+    à operação.
+    """
+
+    if not operation.target_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Operação sem entidade de destino associada.",
+        )
+
+    if not operation.target_type:
+        raise HTTPException(
+            status_code=500,
+            detail="Operação sem tipo de alvo válido.",
+        )
+
+    _ensure_target_access(
+        operation.target_type,
+        operation.target_id,
+        user_id,
+    )
+
+
 def _sanitize_operation_error(
     operation,
 ):
@@ -147,6 +181,17 @@ def _sanitize_operation_error(
             "error_log": safe_error,
         }
     )
+
+
+def _is_terminal_status(
+    status: OperationStatus,
+) -> bool:
+    return status in (
+        OperationStatus.COMPLETED,
+        OperationStatus.FAILED,
+        OperationStatus.CANCELLED,
+    )
+
 
 @router.get("/active")
 def get_active_folder_sync(
@@ -184,6 +229,138 @@ def get_active_folder_sync(
         operation
     )
 
+
+@router.get("/{operation_id}/events")
+def stream_operation_events(
+    operation_id: str,
+    authorization: str | None = Header(
+        default=None
+    ),
+):
+    """
+    Emite notificações SSE quando o estado persistido
+    de uma operação muda.
+
+    Os eventos identificam a operação, mas não constituem
+    a fonte definitiva do seu estado.
+
+    O frontend deve consultar GET /operations/{operation_id}
+    após receber operation_changed.
+
+    A conexão pode ser encerrada sem que a operação tenha
+    sido cancelada. O cliente continua responsável por
+    recuperar o estado por meio da API autoritativa.
+    """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    operation = operation_service.get_operation_state(
+        operation_id
+    )
+
+    if operation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Operação não encontrada.",
+        )
+
+    _authorize_operation(
+        operation,
+        user_id,
+    )
+
+    async def event_generator():
+        previous_signature = None
+        last_heartbeat = time.monotonic()
+
+        while True:
+            try:
+                # As chamadas ao repositório são síncronas.
+                # Não bloqueamos o event loop do servidor.
+                current_operation = await asyncio.to_thread(
+                    operation_service.get_operation_state,
+                    operation_id,
+                )
+
+            except Exception:
+                # A notificação apenas solicita uma nova
+                # consulta à API. Nenhum detalhe técnico
+                # interno é enviado ao cliente.
+                yield {
+                    "event": "operation_changed",
+                    "data": json.dumps({
+                        "operation_id": operation_id,
+                    }),
+                }
+
+                await asyncio.sleep(1.5)
+                continue
+
+            if current_operation is None:
+                yield {
+                    "event": "operation_changed",
+                    "data": json.dumps({
+                        "operation_id": operation_id,
+                    }),
+                }
+
+                return
+
+            # O snapshot serve apenas para detectar mudanças.
+            # Seu conteúdo não é enviado como estado autoritativo.
+            signature = json.dumps(
+                current_operation.model_dump(
+                    mode="json",
+                ),
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+
+            if signature != previous_signature:
+                previous_signature = signature
+                last_heartbeat = time.monotonic()
+
+                yield {
+                    "event": "operation_changed",
+                    "data": json.dumps({
+                        "operation_id": operation_id,
+                    }),
+                }
+
+            if _is_terminal_status(
+                current_operation.status,
+            ):
+                return
+
+            now = time.monotonic()
+
+            if now - last_heartbeat >= 10:
+                last_heartbeat = now
+
+                # Heartbeat: mantém o cliente informado de
+                # que o fluxo continua ativo. Não representa
+                # uma mudança no estado da operação.
+                yield {
+                    "event": "heartbeat",
+                    "data": json.dumps({
+                        "operation_id": operation_id,
+                    }),
+                }
+
+            await asyncio.sleep(1.5)
+
+    return EventSourceResponse(
+        event_generator(),
+        ping=15,
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/{operation_id}")
 def get_operation(
     operation_id: str,
@@ -215,21 +392,8 @@ def get_operation(
             detail="Operação não encontrada.",
         )
 
-    if not operation.target_id:
-        raise HTTPException(
-            status_code=500,
-            detail="Operação sem entidade de destino associada.",
-        )
-
-    if not operation.target_type:
-        raise HTTPException(
-            status_code=500,
-            detail="Operação sem tipo de alvo válido.",
-        )
-
-    _ensure_target_access(
-        operation.target_type,
-        operation.target_id,
+    _authorize_operation(
+        operation,
         user_id,
     )
 
