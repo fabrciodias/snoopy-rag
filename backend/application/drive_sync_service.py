@@ -144,7 +144,7 @@ class DriveSyncService:
                 f"drive_file_id={drive_file_id}"
             )
 
-            return removed_count
+        return removed_count
 
     def sync_folder(
         self,
