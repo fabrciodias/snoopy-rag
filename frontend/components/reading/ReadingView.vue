@@ -2,14 +2,18 @@
 import {
     computed,
     nextTick,
+    onMounted,
+    onUnmounted,
     ref,
     watch,
 } from "vue";
 
 import {
     ArrowLeft,
+    Check,
     ExternalLink,
     Languages,
+    X,
 } from "@lucide/vue";
 
 import {
@@ -35,6 +39,14 @@ import {
     getWorkContextVersion,
 } from "../../state/workContext";
 
+type TranslationTab = "original" | "translation";
+
+interface ActiveTranslation {
+    key: string;
+    pageNumber: number;
+    sourceText: string;
+}
+
 const documentId = computed(
     () => navigationState.reading.documentId,
 );
@@ -54,21 +66,35 @@ const isLoading = ref(false);
 const error = ref<string | null>(null);
 
 /*
- * Estado local das traduções.
+ * As traduções ficam em memória durante a leitura atual.
  *
- * A chave identifica o documento, sua representação,
+ * A chave identifica o documento, a representação,
  * a página e o bloco documental.
- *
- * Assim, parágrafos diferentes não compartilham
- * acidentalmente a mesma tradução.
  */
 const translations = ref<Record<string, string>>({});
-
-const visibleTranslations = ref<Record<string, boolean>>({});
 
 const translatingBlocks = ref<Record<string, boolean>>({});
 
 const translationErrors = ref<Record<string, string>>({});
+
+/*
+ * Estado do painel de comparação.
+ *
+ * No computador, original e tradução são exibidos
+ * simultaneamente.
+ *
+ * No celular, mobileTranslationTab define qual deles
+ * ocupará a área de leitura.
+ */
+const activeTranslation = ref<ActiveTranslation | null>(null);
+
+const mobileTranslationTab = ref<TranslationTab>("translation");
+
+const lastTranslationTrigger =
+    ref<HTMLButtonElement | null>(null);
+
+const closeTranslationButton =
+    ref<HTMLButtonElement | null>(null);
 
 const currentPage = computed(() => {
     if (
@@ -92,6 +118,37 @@ const pages = computed(
 
 const readingContainer = ref<HTMLElement | null>(null);
 
+const activeTranslationKey = computed(
+    () => activeTranslation.value?.key ?? null,
+);
+
+const activeTranslationText = computed(() => {
+    const key = activeTranslationKey.value;
+
+    if (!key) {
+        return null;
+    }
+
+    return translations.value[key] ?? null;
+});
+
+const activeTranslationLoading = computed(() => {
+    const key = activeTranslationKey.value;
+
+    return key !== null &&
+        Boolean(translatingBlocks.value[key]);
+});
+
+const activeTranslationError = computed(() => {
+    const key = activeTranslationKey.value;
+
+    if (!key) {
+        return null;
+    }
+
+    return translationErrors.value[key] ?? null;
+});
+
 function translationKey(
     pageNumber: number,
     block: DocumentBlock,
@@ -109,12 +166,16 @@ function translationKey(
 function translationButtonLabel(
     key: string,
 ): string {
-    if (visibleTranslations.value[key]) {
-        return "Ocultar tradução";
+    if (translatingBlocks.value[key]) {
+        return "Ver tradução em andamento";
     }
 
     if (translations.value[key]) {
-        return "Exibir tradução";
+        return "Ver tradução disponível";
+    }
+
+    if (translationErrors.value[key]) {
+        return "Tentar novamente a tradução";
     }
 
     return "Traduzir este parágrafo";
@@ -179,25 +240,24 @@ function blockIsInLocation(
     return true;
 }
 
-async function toggleTranslation(
-    pageNumber: number,
-    block: DocumentBlock,
+function isCurrentTranslationContext(
+    contextVersion: ReturnType<typeof getWorkContextVersion>,
+    sourceDocumentId: string,
+    sourceRepresentationId: string,
+): boolean {
+    return (
+        contextVersion === getWorkContextVersion() &&
+        sourceDocumentId === documentId.value &&
+        sourceDocumentId === document.value?.document_id &&
+        sourceRepresentationId === document.value?.representation_id &&
+        navigationState.currentView === "reading"
+    );
+}
+
+async function requestTranslation(
+    key: string,
+    sourceText: string,
 ): Promise<void> {
-    const key = translationKey(pageNumber, block);
-
-    // Se a tradução já estiver aberta, apenas a oculta.
-    if (visibleTranslations.value[key]) {
-        visibleTranslations.value[key] = false;
-        return;
-    }
-
-    // Se já existir uma tradução em cache, apenas a exibe.
-    if (translations.value[key]) {
-        visibleTranslations.value[key] = true;
-        return;
-    }
-
-    // Não permite requisições simultâneas para o mesmo bloco.
     if (translatingBlocks.value[key]) {
         return;
     }
@@ -212,8 +272,11 @@ async function toggleTranslation(
     if (
         !sourceDocumentId ||
         !sourceRepresentationId ||
-        !block.text.trim()
+        !sourceText.trim()
     ) {
+        translationErrors.value[key] =
+            "Não foi possível identificar o documento para traduzir este parágrafo.";
+
         return;
     }
 
@@ -223,18 +286,19 @@ async function toggleTranslation(
 
     try {
         const result = await translate({
-            text: block.text,
+            text: sourceText,
         });
 
         /*
-         * Uma resposta atrasada não deve atualizar a leitura
-         * depois de uma mudança de contexto ou documento.
+         * Uma resposta atrasada não pode atualizar uma leitura
+         * que já mudou de documento, representação ou contexto.
          */
         if (
-            contextVersion !== getWorkContextVersion() ||
-            sourceDocumentId !== document.value?.document_id ||
-            sourceRepresentationId !== document.value?.representation_id ||
-            navigationState.currentView !== "reading"
+            !isCurrentTranslationContext(
+                contextVersion,
+                sourceDocumentId,
+                sourceRepresentationId,
+            )
         ) {
             return;
         }
@@ -248,14 +312,13 @@ async function toggleTranslation(
         }
 
         translations.value[key] = translatedText;
-
-        visibleTranslations.value[key] = true;
     } catch (translationError) {
         if (
-            contextVersion !== getWorkContextVersion() ||
-            sourceDocumentId !== document.value?.document_id ||
-            sourceRepresentationId !== document.value?.representation_id ||
-            navigationState.currentView !== "reading"
+            !isCurrentTranslationContext(
+                contextVersion,
+                sourceDocumentId,
+                sourceRepresentationId,
+            )
         ) {
             return;
         }
@@ -266,10 +329,116 @@ async function toggleTranslation(
         );
 
         translationErrors.value[key] =
-            "Não foi possível traduzir este parágrafo. Tente novamente.";
+            "Não foi possível traduzir este parágrafo. Verifique sua conexão e tente novamente.";
     } finally {
         translatingBlocks.value[key] = false;
     }
+}
+
+async function openTranslationPanel(
+    pageNumber: number,
+    block: DocumentBlock,
+    event: MouseEvent,
+): Promise<void> {
+    const key = translationKey(pageNumber, block);
+
+    lastTranslationTrigger.value =
+        event.currentTarget as HTMLButtonElement;
+
+    activeTranslation.value = {
+        key,
+        pageNumber,
+        sourceText: block.text,
+    };
+
+    /*
+     * No celular, abrimos diretamente a aba de tradução,
+     * para que o carregamento ou resultado esteja visível.
+     *
+     * No computador, ambas as colunas já estarão visíveis.
+     */
+    mobileTranslationTab.value = "translation";
+
+    await nextTick();
+
+    closeTranslationButton.value?.focus();
+
+    // O resultado já existe: basta abrir o painel.
+    if (translations.value[key]) {
+        return;
+    }
+
+    // A mesma requisição já está em andamento.
+    if (translatingBlocks.value[key]) {
+        return;
+    }
+
+    /*
+     * Se houve falha anteriormente, deixamos a nova tentativa
+     * a cargo do botão exibido dentro do painel.
+     */
+    if (translationErrors.value[key]) {
+        return;
+    }
+
+    await requestTranslation(
+        key,
+        block.text,
+    );
+}
+
+async function retryActiveTranslation(): Promise<void> {
+    const currentTranslation = activeTranslation.value;
+
+    if (
+        !currentTranslation ||
+        translatingBlocks.value[currentTranslation.key]
+    ) {
+        return;
+    }
+
+    await requestTranslation(
+        currentTranslation.key,
+        currentTranslation.sourceText,
+    );
+}
+
+async function closeTranslationPanel(): Promise<void> {
+    activeTranslation.value = null;
+
+    await nextTick();
+
+    /*
+     * Devolve o foco ao botão que abriu o painel,
+     * se ele ainda estiver disponível na interface.
+     */
+    if (lastTranslationTrigger.value?.isConnected) {
+        lastTranslationTrigger.value.focus();
+    }
+
+    lastTranslationTrigger.value = null;
+}
+
+function handleTranslationKeydown(
+    event: KeyboardEvent,
+): void {
+    if (
+        event.key === "Escape" &&
+        activeTranslation.value
+    ) {
+        event.preventDefault();
+
+        void closeTranslationPanel();
+    }
+}
+
+function clearTranslationState(): void {
+    translations.value = {};
+    translatingBlocks.value = {};
+    translationErrors.value = {};
+
+    activeTranslation.value = null;
+    lastTranslationTrigger.value = null;
 }
 
 async function loadCurrentDocument(): Promise<void> {
@@ -302,6 +471,29 @@ async function loadCurrentDocument(): Promise<void> {
             navigationState.currentView !== "reading"
         ) {
             return;
+        }
+
+        /*
+         * Uma nova evidência pode pertencer ao mesmo documento.
+         * Nesse caso, preservamos as traduções em cache, mas
+         * fechamos qualquer painel associado à evidência anterior.
+         */
+        if (
+            document.value?.evidence_id &&
+            document.value.evidence_id !== result.evidence_id
+        ) {
+            activeTranslation.value = null;
+        }
+
+        /*
+         * Se o documento ou sua representação mudou, as traduções
+         * antigas deixam de corresponder à leitura atual.
+         */
+        if (
+            document.value?.document_id !== result.document_id ||
+            document.value?.representation_id !== result.representation_id
+        ) {
+            clearTranslationState();
         }
 
         document.value = result;
@@ -368,6 +560,20 @@ async function ensureReadingDocument(): Promise<void> {
 function handleBack(): void {
     goToInvestigation();
 }
+
+onMounted(() => {
+    window.addEventListener(
+        "keydown",
+        handleTranslationKeydown,
+    );
+});
+
+onUnmounted(() => {
+    window.removeEventListener(
+        "keydown",
+        handleTranslationKeydown,
+    );
+});
 
 watch(
     [
@@ -516,12 +722,24 @@ watch(
                                 <button
                                     v-if="block.text.trim()"
                                     class="btn-translate-paragraph"
+                                    :class="{
+                                        'is-translated':
+                                            Boolean(
+                                                translations[
+                                                    translationKey(page.page_number, block)
+                                                ],
+                                            ),
+                                        'is-translating':
+                                            Boolean(
+                                                translatingBlocks[
+                                                    translationKey(page.page_number, block)
+                                                ],
+                                            ),
+                                        'is-active':
+                                            activeTranslationKey ===
+                                            translationKey(page.page_number, block),
+                                    }"
                                     type="button"
-                                    :disabled="
-                                        translatingBlocks[
-                                            translationKey(page.page_number, block)
-                                        ]
-                                    "
                                     :title="
                                         translationButtonLabel(
                                             translationKey(page.page_number, block),
@@ -533,20 +751,36 @@ watch(
                                         )
                                     "
                                     :aria-expanded="
+                                        activeTranslationKey ===
+                                        translationKey(page.page_number, block)
+                                    "
+                                    :aria-busy="
                                         Boolean(
-                                            visibleTranslations[
+                                            translatingBlocks[
                                                 translationKey(page.page_number, block)
                                             ],
                                         )
                                     "
                                     @click="
-                                        toggleTranslation(
+                                        openTranslationPanel(
                                             page.page_number,
                                             block,
+                                            $event,
                                         )
                                     "
                                 >
+                                    <Check
+                                        v-if="
+                                            translations[
+                                                translationKey(page.page_number, block)
+                                            ]
+                                        "
+                                        class="icon-sm"
+                                        aria-hidden="true"
+                                    />
+
                                     <Languages
+                                        v-else
                                         class="icon-sm"
                                         aria-hidden="true"
                                     />
@@ -560,74 +794,6 @@ watch(
                                     </span>
                                 </button>
                             </div>
-
-                            <p
-                                v-if="
-                                    translatingBlocks[
-                                        translationKey(page.page_number, block)
-                                    ]
-                                "
-                                class="translation-status"
-                                role="status"
-                                aria-live="polite"
-                            >
-                                Traduzindo para português...
-                            </p>
-
-                            <p
-                                v-if="
-                                    translationErrors[
-                                        translationKey(page.page_number, block)
-                                    ]
-                                "
-                                class="translation-error"
-                                role="alert"
-                            >
-                                {{
-                                    translationErrors[
-                                        translationKey(page.page_number, block)
-                                    ]
-                                }}
-                            </p>
-
-                            <section
-                                v-if="
-                                    visibleTranslations[
-                                        translationKey(page.page_number, block)
-                                    ] &&
-                                    translations[
-                                        translationKey(page.page_number, block)
-                                    ]
-                                "
-                                class="translation-panel"
-                                aria-label="Tradução para português"
-                            >
-                                <header class="translation-panel-header">
-                                    <span>
-                                        Tradução para português
-                                    </span>
-
-                                    <button
-                                        type="button"
-                                        class="translation-hide-button"
-                                        @click="
-                                            visibleTranslations[
-                                                translationKey(page.page_number, block)
-                                            ] = false
-                                        "
-                                    >
-                                        Ocultar
-                                    </button>
-                                </header>
-
-                                <p class="translation-text">
-                                    {{
-                                        translations[
-                                            translationKey(page.page_number, block)
-                                        ]
-                                    }}
-                                </p>
-                            </section>
                         </div>
                     </div>
                 </article>
@@ -644,5 +810,226 @@ watch(
                 </p>
             </div>
         </main>
+
+        <!-- Janela de comparação entre o original e a tradução. -->
+        <div
+            v-if="activeTranslation"
+            class="translation-dialog-overlay"
+            role="presentation"
+            @click.self="closeTranslationPanel"
+        >
+            <section
+                class="translation-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="translation-dialog-title"
+                @click.stop
+            >
+                <header class="translation-dialog-header">
+                    <div class="translation-dialog-heading">
+                        <h3 id="translation-dialog-title">
+                            Comparar original e tradução
+                        </h3>
+
+                        <span class="translation-dialog-page">
+                            Página {{ activeTranslation.pageNumber }}
+                        </span>
+                    </div>
+
+                    <button
+                        ref="closeTranslationButton"
+                        class="btn-icon translation-dialog-close"
+                        type="button"
+                        title="Fechar comparação"
+                        aria-label="Fechar comparação"
+                        @click="closeTranslationPanel"
+                    >
+                        <X />
+                    </button>
+                </header>
+
+                <!--
+                    Estas abas são utilizadas somente em telas pequenas.
+                    No computador, as duas colunas ficam visíveis.
+                -->
+                <div
+                    class="translation-mobile-tabs"
+                    role="tablist"
+                    aria-label="Texto para visualizar"
+                >
+                    <button
+                        id="translation-tab-original"
+                        class="translation-mobile-tab"
+                        :class="{
+                            'is-active':
+                                mobileTranslationTab === 'original',
+                        }"
+                        type="button"
+                        role="tab"
+                        aria-controls="translation-pane-original"
+                        :aria-selected="
+                            mobileTranslationTab === 'original'
+                        "
+                        @click="mobileTranslationTab = 'original'"
+                    >
+                        Original
+                    </button>
+
+                    <button
+                        id="translation-tab-translation"
+                        class="translation-mobile-tab"
+                        :class="{
+                            'is-active':
+                                mobileTranslationTab === 'translation',
+                        }"
+                        type="button"
+                        role="tab"
+                        aria-controls="translation-pane-translation"
+                        :aria-selected="
+                            mobileTranslationTab === 'translation'
+                        "
+                        @click="mobileTranslationTab = 'translation'"
+                    >
+                        Tradução
+
+                        <span
+                            v-if="activeTranslationText"
+                            class="translation-tab-check"
+                            aria-label="Tradução concluída"
+                        >
+                            <Check class="icon-sm" />
+                        </span>
+                    </button>
+                </div>
+
+                <div class="translation-dialog-columns">
+                    <!-- Coluna do documento original. -->
+                    <section
+                        id="translation-pane-original"
+                        class="translation-dialog-pane translation-dialog-pane-original"
+                        :class="{
+                            'is-mobile-active':
+                                mobileTranslationTab === 'original',
+                        }"
+                        role="tabpanel"
+                        aria-labelledby="translation-tab-original"
+                    >
+                        <header class="translation-pane-header">
+                            <div>
+                                <h4>
+                                    Trecho original
+                                </h4>
+
+                                <span>
+                                    Texto do documento-fonte
+                                </span>
+                            </div>
+                        </header>
+
+                        <div class="translation-pane-content">
+                            <p class="translation-pane-text">
+                                {{ activeTranslation.sourceText }}
+                            </p>
+                        </div>
+                    </section>
+
+                    <!-- Coluna do resultado da tradução. -->
+                    <section
+                        id="translation-pane-translation"
+                        class="translation-dialog-pane translation-dialog-pane-translation"
+                        :class="{
+                            'is-mobile-active':
+                                mobileTranslationTab === 'translation',
+                        }"
+                        role="tabpanel"
+                        aria-labelledby="translation-tab-translation"
+                    >
+                        <header class="translation-pane-header">
+                            <div>
+                                <h4>
+                                    Tradução para português
+                                </h4>
+
+                                <span>
+                                    {{
+                                        activeTranslationLoading
+                                            ? "Processando parágrafo"
+                                            : activeTranslationError
+                                                ? "Tradução indisponível"
+                                                : activeTranslationText
+                                                    ? "Tradução concluída"
+                                                    : "Aguardando tradução"
+                                    }}
+                                </span>
+                            </div>
+
+                            <Check
+                                v-if="activeTranslationText"
+                                class="translation-pane-success"
+                                aria-label="Tradução concluída"
+                            />
+                        </header>
+
+                        <div
+                            class="translation-pane-content"
+                            aria-live="polite"
+                        >
+                            <div
+                                v-if="activeTranslationLoading"
+                                class="translation-dialog-state"
+                                role="status"
+                            >
+                                <div
+                                    class="spinner"
+                                    aria-hidden="true"
+                                ></div>
+
+                                <div>
+                                    <strong>
+                                        Traduzindo para português...
+                                    </strong>
+
+                                    <p>
+                                        Aguarde enquanto processamos o parágrafo.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                v-else-if="activeTranslationError"
+                                class="translation-dialog-error"
+                                role="alert"
+                            >
+                                <p>
+                                    {{ activeTranslationError }}
+                                </p>
+
+                                <button
+                                    class="btn-outline translation-retry-button"
+                                    type="button"
+                                    @click="retryActiveTranslation"
+                                >
+                                    Tentar novamente
+                                </button>
+                            </div>
+
+                            <p
+                                v-else-if="activeTranslationText"
+                                class="translation-pane-text"
+                            >
+                                {{ activeTranslationText }}
+                            </p>
+
+                            <p
+                                v-else
+                                class="translation-pane-placeholder"
+                            >
+                                A tradução aparecerá aqui.
+                            </p>
+                        </div>
+                    </section>
+                </div>
+            </section>
+        </div>
     </section>
 </template>
