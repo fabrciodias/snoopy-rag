@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -104,12 +104,17 @@ def frontend_config():
 
 
 # ============================================================
-# Frontend V3
+# Frontend de produção
 # ============================================================
 
-FRONTEND_DIR = (
+PROJECT_ROOT = (
     Path(__file__).resolve().parents[2]
+)
+
+FRONTEND_DIST_DIR = (
+    PROJECT_ROOT
     / "frontend"
+    / "dist"
 )
 
 
@@ -118,15 +123,43 @@ FRONTEND_DIR = (
     include_in_schema=False,
 )
 def frontend_index():
+    """
+    Serve a página inicial da distribuição compilada do Vue.
+
+    O frontend precisa ser compilado antes de a aplicação
+    ser disponibilizada para uso.
+    """
+
+    index_path = (
+        FRONTEND_DIST_DIR
+        / "index.html"
+    )
+
+    if not index_path.is_file():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Frontend ainda não compilado. "
+                "Execute `npm run build` na raiz "
+                "do projeto."
+            ),
+        )
+
     return FileResponse(
-        FRONTEND_DIR / "index.html"
+        index_path
     )
 
 
-app.mount(
-    "/",
-    StaticFiles(
-        directory=FRONTEND_DIR,
-    ),
-    name="frontend",
-)
+# O diretório pode não existir durante a configuração inicial
+# ou a execução dos testes. Nesse caso, a API continua podendo
+# ser inicializada, mas a interface ficará indisponível até
+# que o frontend seja compilado.
+if FRONTEND_DIST_DIR.is_dir():
+    app.mount(
+        "/",
+        StaticFiles(
+            directory=FRONTEND_DIST_DIR,
+            html=True,
+        ),
+        name="frontend",
+    )

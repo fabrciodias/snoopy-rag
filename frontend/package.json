@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "npm run build && pm2 startOrRestart ecosystem.config.cjs --env production && pm2 save",
+    "stop": "pm2 delete snoopy-rag-v3 && pm2 save",
+    "logs": "pm2 logs snoopy-rag-v3",
+    "status": "pm2 status"
   },
   "dependencies": {
     "@lucide/vue": "^1.52.0",
