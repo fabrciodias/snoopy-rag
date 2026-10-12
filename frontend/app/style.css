@@ -392,6 +392,74 @@ body {
     box-shadow: 0 0 5px rgba(106, 132, 101, 0.5); /* Efeito neon sutil do motor trabalhando */
 }
 
+/* --------------------------------------------------------------------------
+   BRILHO ANIMADO DA BARRA DE SINCRONIZAÇÃO
+   -------------------------------------------------------------------------- */
+
+/*
+ * O efeito fica restrito à barra compacta da V3.
+ *
+ * A própria área verde limita o brilho: ele não avança
+ * para além do progresso confirmado pelo backend.
+ */
+
+.sync-progress-summary .sync-progress-fill {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.sync-progress-summary .sync-progress-fill::after {
+    content: "";
+
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -42%;
+
+    width: 42%;
+
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.12) 22%,
+        rgba(255, 255, 255, 0.58) 50%,
+        rgba(255, 255, 255, 0.18) 78%,
+        transparent 100%
+    );
+
+    filter: blur(1px);
+
+    pointer-events: none;
+
+    animation:
+        sync-progress-sheen 1.8s ease-in-out infinite;
+}
+
+@keyframes sync-progress-sheen {
+    from {
+        left: -42%;
+        opacity: 0.35;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    to {
+        left: 100%;
+        opacity: 0.35;
+    }
+}
+
+/* Respeita a preferência por movimento reduzido do sistema. */
+@media (prefers-reduced-motion: reduce) {
+    .sync-progress-summary .sync-progress-fill::after {
+        animation: none;
+        display: none;
+    }
+}
+
 /* Se o arquivo tá esperando na fila, a barra fica neutra */
 .sync-job-item.pending .sync-progress-fill {
     width: 0%;
@@ -1949,9 +2017,10 @@ body {
 }
 
 .sync-progress-complete {
-    margin-top: 8px;
+    margin-top: 6px;
 
-    color: var(--primary);
+    color: var(--text-muted);
     font-size: 0.75rem;
     line-height: 1.5;
+    text-align: center;
 }

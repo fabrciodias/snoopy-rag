@@ -2,6 +2,7 @@
 import {
     computed,
     onMounted,
+    onUnmounted,
     ref,
     watch,
 } from "vue";
@@ -208,6 +209,97 @@ const currentFolderSyncOperation = computed(
         activeFolderSyncOperation.value ??
         latestFolderSyncOperation.value,
 );
+
+// ============================================================
+// Exibição temporária da mensagem de conclusão
+// ============================================================
+
+const syncCompletionVisible = ref(false);
+
+let syncCompletionTimeout: ReturnType<
+    typeof setTimeout
+> | null = null;
+
+
+function clearSyncCompletionTimeout(): void {
+    if (syncCompletionTimeout !== null) {
+        clearTimeout(syncCompletionTimeout);
+        syncCompletionTimeout = null;
+    }
+}
+
+watch(
+    [
+        () =>
+            currentFolderSyncOperation.value?.operation_id ??
+            null,
+
+        () =>
+            currentFolderSyncOperation.value?.status ??
+            null,
+
+        () => isSyncing.value,
+    ],
+
+    ([
+        operationId,
+        status,
+        currentlySyncing,
+    ], [
+        previousOperationId,
+        previousStatus,
+        wasSyncing,
+    ]) => {
+        const justCompleted =
+            operationId !== null &&
+            status === "COMPLETED" &&
+            !currentlySyncing &&
+            (
+                (
+                    operationId === previousOperationId &&
+                    (
+                        previousStatus === "PROCESSING" ||
+                        previousStatus === "PENDING"
+                    )
+                ) ||
+                wasSyncing
+            );
+
+        if (justCompleted) {
+            clearSyncCompletionTimeout();
+
+            syncCompletionVisible.value = true;
+
+            syncCompletionTimeout = setTimeout(
+                () => {
+                    syncCompletionVisible.value = false;
+                    syncCompletionTimeout = null;
+                },
+                6000,
+            );
+
+            return;
+        }
+
+        /*
+         * Uma troca de operação, uma nova sincronização
+         * ou qualquer estado que não seja conclusão
+         * invalida a mensagem temporária anterior.
+         */
+        if (
+            operationId !== previousOperationId ||
+            status !== "COMPLETED" ||
+            currentlySyncing
+        ) {
+            clearSyncCompletionTimeout();
+            syncCompletionVisible.value = false;
+        }
+    },
+);
+
+onUnmounted(() => {
+    clearSyncCompletionTimeout();
+});
 
 watch(
     () => [
@@ -865,7 +957,7 @@ watch(
                         v-else-if="
                             currentFolderSyncOperation?.status === 'COMPLETED'
                         "
-                        class="sync-process-complete"
+                        class="sync-progress-complete"
                     >
                         {{ 
                             currentFolderSyncOperation.progress?.message ??
