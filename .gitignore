@@ -29,3 +29,6 @@ node_modules/
 frontend/*.tsbuildinfo
 frontend/vite.config.d.ts
 frontend/dist/
+
+# Arquivo gerado a partir da configuração TypeScript do Vite
+frontend/vite.config.js
