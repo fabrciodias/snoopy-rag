@@ -456,6 +456,8 @@ CREATE INDEX "investigations_folder_id_idx" ON "public"."investigations" USING "
 
 CREATE INDEX "operations_target_idx" ON "public"."operations" USING "btree" ("target_type", "target_id");
 
+CREATE UNIQUE INDEX IF NOT EXISTS "operations_one_active_drive_sync_per_folder_idx" ON "public"."operations" ("target_id") WHERE "operation_type" = 'DRIVE_SYNC' AND "target_type" = 'FOLDER' AND "status" IN ('PENDING', 'PROCESSING');
+
 
 
 CREATE INDEX "retrieval_results_investigation_idx" ON "public"."retrieval_results" USING "btree" ("investigation_id", "rank");

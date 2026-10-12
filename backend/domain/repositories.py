@@ -42,7 +42,7 @@ class OperationRepository(ABC):
         self,
         operation_type: str,
         target_type: OperationTargetType,
-        target_ide: str,
+        target_id: str,
     ) -> Optional[Operation]:
         """
         Recupera uma operação ainda em execução para
