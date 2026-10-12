@@ -19,11 +19,47 @@ from backend.infrastructure.database import (
     supabase_client,
 )
 
+from backend.domain.entities import(
+    DocumentRepresentation,
+)
+
 
 router = APIRouter(
     prefix="/documents",
     tags=["Documents"],
 )
+
+_PRIVATE_SOURCE_METADATA_KEYS = (
+    "drive_link",
+    "drive_file_id",
+    "drive_file_name",
+    "document_hash",
+)
+
+
+def _sanitize_representation_for_copy_access(
+    representation: DocumentRepresentation,
+) -> DocumentRepresentation:
+    """
+    Remove os identificadores da fonte original quando
+    o acesso é autorizado somente por uma cópia idêntica.
+
+    A representação persistida não é modificada.
+    Apenas uma cópia é devolvida pela API.
+    """
+
+    sanitized_metadata = dict(
+        representation.metadata or {}
+    )
+
+    for key in _PRIVATE_SOURCE_METADATA_KEYS:
+        sanitized_metadata.pop(key, None)
+
+    return representation.model_copy(
+        update={
+            "metadata": sanitized_metadata,
+        }
+    )
 
 
 def _has_access_to_matching_document(
@@ -324,25 +360,21 @@ def get_document_reading(
     # 7. Recuperar o link da representação histórica
     # --------------------------------------------------------
 
-    metadata = (
-        getattr(
-            representation,
-            "metadata",
-            None,
-        )
-        or {}
-    )
+    metadata = (representation.metadata or {})
 
-    drive_link = (
-        metadata.get("drive_link")
-        if isinstance(metadata, dict)
-        else None
-    )
+    drive_link = metadata.get("drive_link")
 
-    # Não expor o link da fonte original quando o acesso
-    # à leitura foi autorizado somente por uma cópia.
+    # Quando o acesso ocorre por uma cópia idêntica,
+    # ocultar os identificadores da fonte original em
+    # toda a representação devolvida pela API.
     if not has_original_access:
         drive_link = None
+
+        representation = (
+            _sanitize_representation_for_copy_access(
+                representation
+            )
+        )
 
     # --------------------------------------------------------
     # 8. Retornar os dados necessários à leitura
