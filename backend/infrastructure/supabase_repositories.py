@@ -1,0 +1,1126 @@
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from supabase import Client
+
+from backend.domain.entities import (
+    Document,
+    DocumentRepresentation,
+    DocumentStatus,
+    Evidence,
+    Investigation,
+    InvestigationStatus,
+    Operation,
+    OperationProgress,
+    OperationStatus,
+    OperationTargetType,
+    RetrievalResult,
+    RetrievalUnit,
+    StructuredResponse,
+)
+
+from backend.domain.repositories import (
+    DocumentRepository,
+    EvidenceRepository,
+    InvestigationRepository,
+    OperationRepository,
+    RetrievalResultRepository,
+    RetrievalUnitRepository,
+)
+
+
+# ============================================================
+# Operations
+# ============================================================
+
+
+class SupabaseOperationRepository(OperationRepository):
+
+    def __init__(self, client: Client):
+        self.client = client
+        self.table_name = "operations"
+
+    def create(
+        self,
+        operation: Operation,
+    ) -> Operation:
+
+        data = operation.model_dump(
+            mode="json",
+            exclude_none=True,
+        )
+
+        if "operation_id" in data:
+            data["id"] = data.pop("operation_id")
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .insert(data)
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                "Falha ao persistir a operação."
+            )
+
+        return self._to_entity(response.data[0])
+
+    def get_by_id(
+        self,
+        operation_id: str,
+    ) -> Optional[Operation]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq("id", operation_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        return self._to_entity(response.data[0])
+
+    def get_active_by_target(
+        self,
+        operation_type: str,
+        target_type: OperationTargetType,
+        target_id: str,
+    ) -> Optional[Operation]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq(
+                "operation_type",
+                operation_type,
+            )
+            .eq(
+                "target_type",
+                target_type.value,
+            )
+            .eq(
+                "target_id",
+                target_id,
+            )
+            .in_(
+                "status",
+                [
+                    OperationStatus.PENDING.value,
+                    OperationStatus.PROCESSING.value,
+                ]
+            )
+            .order(
+                "created_at",
+                desc=True,
+            )
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        return self._to_entity(
+            response.data[0]
+        )
+
+    def update_status(
+        self,
+        operation_id: str,
+        status: OperationStatus,
+        error_log: Optional[str] = None,
+        progress: Optional[OperationProgress] = None,
+    ) -> Operation:
+
+        payload = {
+            "status": status.value,
+            "error_log": error_log,
+        }
+
+        if progress is not None:
+            payload["progress"] = progress.model_dump(
+                mode="json",
+                exclude_none=True,
+            )
+
+        if status in (
+            OperationStatus.COMPLETED,
+            OperationStatus.FAILED,
+            OperationStatus.CANCELLED,
+        ):
+            payload["finished_at"] = (
+                datetime.now(timezone.utc).isoformat()
+            )
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .update(payload)
+            .eq("id", operation_id)
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                f"Operação '{operation_id}' não encontrada."
+            )
+
+        return self._to_entity(response.data[0])
+
+    def update_progress(
+        self,
+        operation_id: str,
+        progress: OperationProgress,
+    ) -> Operation:
+
+        payload = {
+            "progress": progress.model_dump(
+                mode="json",
+                exclude_none=True,
+            )
+        }
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .update(payload)
+            .eq("id", operation_id)
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                f"Operação '{operation_id}' não encontrada."
+            )
+
+        return self._to_entity(response.data[0])
+
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> Operation:
+
+        data = dict(record)
+
+        data["operation_id"] = data.pop("id")
+
+        return Operation(**data)
+
+
+# ============================================================
+# Documents
+# ============================================================
+
+
+class SupabaseDocumentRepository(DocumentRepository):
+
+    def __init__(self, client: Client):
+        self.client = client
+        self.table_name = "documents"
+
+    def create_or_update(
+        self,
+        document: Document,
+    ) -> Document:
+
+        payload = {
+            "id": document.document_id,
+            "folder_id": document.folder_id,
+            "user_id": document.user_id,
+            "title": document.title,
+            "authors": document.authors,
+            "publication_year": document.publication_year,
+            "document_type": document.document_type,
+            "language": document.language,
+            "keywords": document.keywords,
+            "drive_file_name": document.drive_file_name,
+            "drive_file_id": document.drive_file_id,
+            "mime_type": document.mime_type,
+            "drive_link": document.drive_link,
+            "document_hash": document.document_hash,
+            "status": document.status.value,
+        }
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .upsert(
+                payload,
+                on_conflict="id",
+            )
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                "Falha ao criar ou atualizar o documento."
+            )
+
+        return self._to_entity(response.data[0])
+
+    def get_by_id(
+        self,
+        document_id: str,
+    ) -> Optional[Document]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq("id", document_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        return self._to_entity(response.data[0])
+
+    def update_status(
+        self,
+        document_id: str,
+        status: DocumentStatus,
+    ) -> Document:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .update({
+                "status": status.value,
+            })
+            .eq("id", document_id)
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                f"Documento '{document_id}' não encontrado."
+            )
+
+        return self._to_entity(response.data[0])
+
+    def save_representation(
+        self,
+        document_id: str,
+        representation: DocumentRepresentation,
+    ) -> Document:
+        """
+        Persiste a representação no histórico.
+
+        IMPORTANTE:
+        esta operação não altera current_representation_id
+        nem a representação corrente do documento.
+        """
+
+        if representation.document_id != document_id:
+            raise ValueError(
+                "A representação documental não pertence "
+                "ao documento informado."
+            )
+        
+        representation_payload = {
+            "id": representation.representation_id,
+            "document_id": document_id,
+            "representation": representation.model_dump(
+                mode="json"
+            ),
+        }
+
+        history_response = (
+            self.client
+            .table("document_representations")
+            .insert(representation_payload)
+            .execute()
+        )
+
+        if not history_response.data:
+            raise RuntimeError(
+                "Falha ao persistir a representação documental."
+            )
+
+        document = self.get_by_id(document_id)
+
+        if document is None:
+            raise RuntimeError(
+                f"Documento '{document_id}' não encontrado."
+            )
+
+        return document
+
+    def publish_representation(
+        self,
+        document: Document,
+        representation: DocumentRepresentation,
+    ) -> Document:
+        """
+        Torna uma representação previamente processada a versão
+        corrente do documento.
+
+        A publicação atualiza os metadados documentais e o ponteiro
+        current_representation_id somente depois que o pipeline
+        de processamento foi concluído com sucesso.
+        """
+
+        if representation.document_id != document.document_id:
+            raise ValueError(
+                "A representação documental não pertence "
+                "ao documento informado."
+            )
+
+        payload = {
+            "title": document.title,
+            "authors": document.authors,
+            "publication_year": document.publication_year,
+            "document_type": document.document_type,
+            "language": document.language,
+            "keywords": document.keywords,
+            "drive_file_name": document.drive_file_name,
+            "drive_file_id": document.drive_file_id,
+            "drive_link": document.drive_link,
+            "mime_type": document.mime_type,
+            "document_hash": document.document_hash,
+            "current_representation_id": (
+                representation.representation_id
+            ),
+            "representation": (
+                representation.model_dump(
+                    mode="json"
+                )
+            ),
+            "status": DocumentStatus.ACTIVE.value,
+        }
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .update(payload)
+            .eq("id", document.document_id)
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                f"Documento '{document.document_id}' "
+                "não encontrado durante a publicação."
+            )
+
+        return self._to_entity(response.data[0])
+
+    def get_representation(
+        self,
+        document_id: str,
+    ) -> Optional[DocumentRepresentation]:
+
+        document_response = (
+            self.client
+            .table(self.table_name)
+            .select("current_representation_id")
+            .eq("id", document_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not document_response.data:
+            return None
+
+        representation_id = (
+            document_response.data[0]
+            .get("current_representation_id")
+        )
+
+        if not representation_id:
+            return None
+
+        representation_response = (
+            self.client
+            .table("document_representations")
+            .select("representation")
+            .eq("id", representation_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not representation_response.data:
+            return None
+
+        representation = (
+            representation_response.data[0]
+            .get("representation")
+        )
+
+        if not representation:
+            return None
+
+        result = DocumentRepresentation(
+            **representation
+        )
+
+        if result.document_id != document_id:
+            raise RuntimeError(
+                "A representação corrente não pertence "
+                "ao documento informado."
+            )
+
+        return result
+
+    def get_representation_by_id(
+        self,
+        document_id: str,
+        representation_id: str,
+    )-> Optional[DocumentRepresentation]:
+        """
+        Recupera uma representação histórica específica.
+
+        A consulta valida tanto a identidade da representação
+        quanto sua associação ao documento.
+
+        Não utiliza a representação corrente como fallback.
+        """
+
+        response = (
+            self.client
+            .table("document_representations")
+            .select(
+                "id, document_id, representation"
+            )
+            .eq(
+                "id",
+                representation_id,
+            )
+            .eq(
+                "document_id",
+                document_id,
+            )
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        record = response.data[0]
+
+        representation_data = record.get(
+            "representation"
+        )
+
+        if not representation_data:
+            raise RuntimeError(
+                "A representação documental persistida " \
+                "não possui conteúdo."
+            )
+
+        representation = DocumentRepresentation(
+            **representation_data
+        )
+
+        if (
+            representation.representation_id
+            != record["id"]
+        ):
+            raise RuntimeError(
+                "A identidade da representação persistida " \
+                "não corresponde ao registro."
+            )
+
+        if (
+            representation.document_id
+            != document_id
+        ):
+            raise RuntimeError(
+                "A representação documental não pertence " \
+                "ao documento solicitado."
+            )
+
+        return representation
+
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> Document:
+
+        data = dict(record)
+
+        representation = data.pop(
+            "representation",
+            None,
+        )
+
+        data["document_id"] = data.pop("id")
+
+        data["authors"] = data.get("authors") or []
+        data["keywords"] = data.get("keywords") or []
+
+        if representation:
+            data["representation"] = (
+                DocumentRepresentation(**representation)
+            )
+
+        return Document(**data)
+
+
+# ============================================================
+# Retrieval Units
+# ============================================================
+
+
+class SupabaseRetrievalUnitRepository(
+    RetrievalUnitRepository
+):
+
+    def __init__(self, client: Client):
+        self.client = client
+        self.table_name = "chunks"
+
+    def save_batch(
+        self,
+        units: List[RetrievalUnit],
+        embeddings: List[List[float]],
+    ) -> List[RetrievalUnit]:
+
+        if not units:
+            return []
+
+        if len(units) != len(embeddings):
+            raise ValueError(
+                "Quantidade de embeddings não corresponde "
+                "às RetrievalUnits."
+            )
+
+        document_ids = {
+            unit.document_id
+            for unit in units
+        }
+
+        if len(document_ids) != 1:
+            raise ValueError(
+                "Todas as RetrievalUnits de um batch devem "
+                "pertencer ao mesmo documento."
+            )
+
+        document_id = next(iter(document_ids))
+
+        document_response = (
+            self.client
+            .table("documents")
+            .select("id, user_id, folder_id")
+            .eq("id", document_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not document_response.data:
+            raise RuntimeError(
+                f"Documento '{document_id}' não encontrado."
+            )
+
+        document = document_response.data[0]
+
+        user_id = document.get("user_id")
+        folder_id = document.get("folder_id")
+
+        if not user_id or not folder_id:
+            raise RuntimeError(
+                f"Documento '{document_id}' não possui "
+                "user_id ou folder_id válidos."
+            )
+
+        payload = []
+
+        for unit, embedding in zip(
+            units,
+            embeddings,
+        ):
+            payload.append({
+                "user_id": user_id,
+                "folder_id": folder_id,
+                "document_id": unit.document_id,
+                "content": unit.content,
+                "section": unit.section,
+                "embedding": embedding,
+                "unit_index": unit.unit_index,
+                "location": unit.location.model_dump(
+                    mode="json"
+                ),
+                "representation_id": (
+                    unit.representation_id
+                ),
+            })
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .insert(payload)
+            .execute()
+        )
+
+        if len(response.data) != len(units):
+            raise RuntimeError(
+                "Nem todas as RetrievalUnits "
+                "foram persistidas."
+            )
+
+        for unit, record in zip(
+            units,
+            response.data,
+        ):
+            unit.unit_id = record["id"]
+
+        return units
+
+    def get_context(
+        self,
+        unit_id: int,
+        window: int = 1,
+    ) -> List[RetrievalUnit]:
+
+        if window < 0:
+            raise ValueError(
+                "A janela de contexto não pode ser negativa."
+            )
+
+        anchor_response = (
+            self.client
+            .table(self.table_name)
+            .select(
+                "id, document_id, representation_id, "
+                "unit_index"
+            )
+            .eq("id", unit_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not anchor_response.data:
+            return []
+
+        anchor = anchor_response.data[0]
+
+        document_id = anchor["document_id"]
+        representation_id = anchor["representation_id"]
+        anchor_index = anchor["unit_index"]
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select(
+                "id, document_id, representation_id, "
+                "unit_index, content, location, section"
+            )
+            .eq(
+                "document_id",
+                document_id,
+            )
+            .eq(
+                "representation_id",
+                representation_id,
+            )
+            .gte(
+                "unit_index",
+                max(0, anchor_index - window),
+            )
+            .lte(
+                "unit_index",
+                anchor_index + window,
+            )
+            .order("unit_index")
+            .execute()
+        )
+
+        results = []
+
+        for record in response.data:
+            results.append(
+                RetrievalUnit(
+                    unit_id=record["id"],
+                    document_id=record["document_id"],
+                    representation_id=(
+                        record["representation_id"]
+                    ),
+                    unit_index=record["unit_index"],
+                    content=record["content"],
+                    location=(
+                        record.get("location") or {}
+                    ),
+                    section=(
+                        record.get("section")
+                        or "Geral"
+                    ),
+                )
+            )
+
+        return results
+
+
+# ============================================================
+# Investigations
+# ============================================================
+
+
+class SupabaseInvestigationRepository(
+    InvestigationRepository
+):
+
+    def __init__(self, client: Client):
+        self.client = client
+        self.table_name = "investigations"
+
+    def create(
+        self,
+        investigation: Investigation,
+    ) -> Investigation:
+
+        data = investigation.model_dump(
+            mode="json",
+            exclude_none=True,
+        )
+
+        if "investigation_id" in data:
+            data["id"] = data.pop("investigation_id")
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .insert(data)
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                "Falha ao persistir a investigação."
+            )
+
+        return self._to_entity(response.data[0])
+
+    def get_by_id(
+        self,
+        investigation_id: str,
+    ) -> Optional[Investigation]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq("id", investigation_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        return self._to_entity(response.data[0])
+
+    def update_status(
+        self,
+        investigation_id: str,
+        status: InvestigationStatus,
+    ) -> Investigation:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .update({
+                "status": status.value,
+            })
+            .eq("id", investigation_id)
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                f"Investigação '{investigation_id}' "
+                "não encontrada."
+            )
+
+        return self._to_entity(response.data[0])
+
+    def save_structured_response(
+        self,
+        investigation_id: str,
+        response: StructuredResponse,
+    ) -> Investigation:
+
+        payload = {
+            "structured_response": response.model_dump(
+                mode="json"
+            ),
+            "status": InvestigationStatus.COMPLETED.value,
+        }
+
+        result = (
+            self.client
+            .table(self.table_name)
+            .update(payload)
+            .eq("id", investigation_id)
+            .execute()
+        )
+
+        if not result.data:
+            raise RuntimeError(
+                f"Investigação '{investigation_id}' "
+                "não encontrada."
+            )
+
+        return self._to_entity(result.data[0])
+
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> Investigation:
+
+        data = dict(record)
+
+        data["investigation_id"] = data.pop("id")
+
+        structured_response = data.get(
+            "structured_response"
+        )
+
+        if structured_response:
+            data["structured_response"] = (
+                structured_response
+            )
+
+        return Investigation(**data)
+
+
+# ============================================================
+# Retrieval Results
+# ============================================================
+
+
+class SupabaseRetrievalResultRepository(
+    RetrievalResultRepository
+):
+
+    def __init__(self, client: Client):
+        self.client = client
+        self.table_name = "retrieval_results"
+
+    def save_batch(
+        self,
+        results: List[RetrievalResult],
+    ) -> List[RetrievalResult]:
+
+        if not results:
+            return []
+
+        payload = []
+
+        for result in results:
+            payload.append({
+                "id": result.result_id,
+                "investigation_id": (
+                    result.investigation_id
+                ),
+                "unit_id": result.unit_id,
+                "document_id": result.document_id,
+                "representation_id": result.representation_id,
+                "rank": result.rank,
+                "retrieval_score": (
+                    result.retrieval_score
+                ),
+                "semantic_score": (
+                    result.semantic_score
+                ),
+                "lexical_score": (
+                    result.lexical_score
+                ),
+                "content": result.content,
+                "location": result.location.model_dump(
+                    mode="json"
+                ),
+                "metadata": result.metadata,
+            })
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .insert(payload)
+            .execute()
+        )
+
+        if len(response.data) != len(results):
+            raise RuntimeError(
+                "Nem todos os RetrievalResults "
+                "foram persistidos."
+            )
+
+        return [
+            self._to_entity(record)
+            for record in response.data
+        ]
+
+    def get_by_investigation(
+        self,
+        investigation_id: str,
+    ) -> List[RetrievalResult]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq(
+                "investigation_id",
+                investigation_id,
+            )
+            .order("rank")
+            .execute()
+        )
+
+        return [
+            self._to_entity(record)
+            for record in response.data
+        ]
+
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> RetrievalResult:
+
+        data = dict(record)
+
+        data["result_id"] = data.pop("id")
+
+        data["location"] = (
+            data.get("location") or {}
+        )
+
+        data["metadata"] = (
+            data.get("metadata") or {}
+        )
+
+        return RetrievalResult(**data)
+
+
+# ============================================================
+# Evidences
+# ============================================================
+
+
+class SupabaseEvidenceRepository(
+    EvidenceRepository
+):
+
+    def __init__(self, client: Client):
+        self.client = client
+        self.table_name = "evidences"
+
+    def save_batch(
+        self,
+        evidences: List[Evidence],
+    ) -> List[Evidence]:
+
+        if not evidences:
+            return []
+
+        payload = []
+
+        for evidence in evidences:
+            payload.append({
+                "id": evidence.evidence_id,
+                "investigation_id": (
+                    evidence.investigation_id
+                ),
+                "unit_id": evidence.unit_id,
+                "document_id": evidence.document_id,
+                "location": evidence.location.model_dump(
+                    mode="json"
+                ),
+                "content": evidence.content,
+                "context": evidence.context,
+                "provenance": (
+                    evidence.provenance.model_dump(
+                        mode="json"
+                    )
+                ),
+            })
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .insert(payload)
+            .execute()
+        )
+
+        if len(response.data) != len(evidences):
+            raise RuntimeError(
+                "Nem todas as evidências "
+                "foram persistidas."
+            )
+
+        return [
+            self._to_entity(record)
+            for record in response.data
+        ]
+
+    def get_by_investigation(
+        self,
+        investigation_id: str,
+    ) -> List[Evidence]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq(
+                "investigation_id",
+                investigation_id,
+            )
+            .order("created_at")
+            .execute()
+        )
+
+        return [
+            self._to_entity(record)
+            for record in response.data
+        ]
+
+    def get_by_id(
+        self,
+        evidence_id: str,
+    ) -> Optional[Evidence]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq("id", evidence_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        return self._to_entity(
+            response.data[0]
+        )
+
+    @staticmethod
+    def _to_entity(
+        record: dict,
+    ) -> Evidence:
+
+        data = dict(record)
+
+        data["evidence_id"] = data.pop("id")
+
+        data["location"] = (
+            data.get("location") or {}
+        )
+
+        data["provenance"] = (
+            data.get("provenance") or {}
+        )
+
+        return Evidence(**data)

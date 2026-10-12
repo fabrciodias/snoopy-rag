@@ -1,0 +1,457 @@
+<script setup lang="ts">
+import {
+    computed,
+    ref,
+} from "vue";
+
+import EvidencePanel from "../evidence/EvidencePanel.vue";
+
+import {
+    investigationState,
+} from "../../state/investigation";
+
+import {
+    goToReading
+} from "../../state/navigation";
+
+import {
+    operationState,
+} from "../../state/operations";
+
+import type {
+    DocumentReference,
+} from "../../features/investigation/contracts";
+
+const investigation =
+    computed(
+        () =>
+            investigationState
+                .activeInvestigation,
+    );
+
+const response =
+    computed(
+        () =>
+            investigationState.response,
+    );
+
+const evidences =
+    computed(
+        () =>
+            investigationState.evidences,
+    );
+
+const isInvestigating =
+    computed(
+        () =>
+            investigationState
+                .isInvestigating,
+    );
+
+const operationProgress = computed(() => {
+    const operationId =
+        investigationState.activeOperationId;
+
+    if (!operationId) {
+        return null;
+    }
+
+    return (
+        operationState.operations.find(
+            (operation) =>
+                operation.operation_id ===
+                operationId,
+        )?.progress ?? null
+    );
+});
+
+const progressMessage = computed(() => {
+    if (!investigationState.activeOperationId) {
+        return "Carregando investigação...";
+    }
+
+    return (
+        operationProgress.value?.message ??
+        "Preparando investigação..."
+    );
+});
+
+const resultMessage = computed(
+    () => investigationState.resultMessage,
+);
+
+const error =
+    computed(
+        () =>
+            investigationState.error,
+    );
+
+const sections =
+    computed(() => {
+        if (!response.value) {
+            return [];
+        }
+
+        return response.value.sections;
+    });
+
+const referencedEvidences =
+    computed(() => {
+        if (!response.value) {
+            return [];
+        }
+
+        const references =
+            new Set(
+                response.value
+                    .evidence_refs,
+            );
+
+        return evidences.value.filter(
+            (evidence) =>
+                evidence.evidence_id !== null &&
+                references.has(
+                    evidence.evidence_id,
+                ),
+        );
+    });
+
+const references =
+    computed(
+        () =>
+            response.value?.references ??
+            [],
+    );
+
+function referenceForEvidence(
+    evidence: {
+        document_id: string;
+    },
+): DocumentReference | null {
+    return (
+        references.value.find(
+            (reference) =>
+                reference.document_id ===
+                evidence.document_id,
+        ) ?? null
+    );
+}
+
+function formatReference(
+    reference: DocumentReference | null,
+): string {
+    if (!reference) {
+        return "Metadados indisponíveis.";
+    }
+
+    const authors =
+        Array.isArray(reference.authors)
+            ? reference.authors
+                .filter(
+                    (author) =>
+                        typeof author === "string",
+                )
+                .map((author) => author.trim())
+                .filter(Boolean)
+                .join(", ")
+            : typeof reference.authors === "string"
+                ? reference.authors.trim()
+                : "";
+
+    const title = 
+        typeof reference.title === "string"
+            ? reference.title.trim()
+            : "";
+
+    const year =
+        reference.publication_year == null ||
+        String(reference.publication_year).trim() ===""
+            ? "s.d."
+            : String(reference.publication_year).trim();
+
+    const formattedAuthors = 
+        authors || "AUTOR DESCONHECIDO";
+
+    const formattedTitle =
+        title || "Título não informado";
+
+    return `${formattedAuthors.toUpperCase()}. ${formattedTitle}. ${year}.`;
+}
+
+const selectedEvidenceId =
+    ref<string | null>(null);
+
+const selectedEvidence =
+    computed(() => {
+        if (
+            !selectedEvidenceId.value
+        ) {
+            return null;
+        }
+
+        return (
+            evidences.value.find(
+                (evidence) =>
+                    evidence.evidence_id ===
+                    selectedEvidenceId.value,
+            ) ?? null
+        );
+    });
+
+function selectEvidence(
+    evidenceId: string,
+): void {
+    selectedEvidenceId.value =
+        evidenceId;
+}
+
+function openEvidenceInReading(): void {
+    const evidence = selectedEvidence.value;
+
+    if (
+        !evidence ||
+        !evidence.evidence_id
+    ) {
+        return;
+    }
+
+    goToReading(
+        evidence.document_id,
+        evidence.evidence_id,
+        evidence.location
+    );
+}
+
+function closeEvidence(): void {
+    selectedEvidenceId.value =
+        null;
+}
+</script>
+
+<template>
+    <section
+        id="result-view"
+        class="view active"
+    >
+        <header class="topbar">
+            <h2
+                class="sticky-query"
+            >
+                {{
+                    investigationState.currentQuery ??
+                    investigation?.original_query ??
+                    "Pesquisa"
+                }}
+            </h2>
+        </header>
+
+        <main 
+            class="layout-grid"
+            :class="{
+                'evidence-active':
+                    selectedEvidence !== null,  
+            }"
+        >
+            <section class="answer-section">
+                <h3
+                    style="
+                        font-size: 1.8rem;
+                        font-weight: 600;
+                        color: var(--text-main);
+                        margin-bottom: 20px;
+                    "
+                >
+                    Síntese:
+                </h3>
+
+                <div
+                    v-if="isInvestigating"
+                    id="loading-state"
+                >
+                    <div class="spinner"></div>
+
+                    <p
+                        class="live-logs"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        {{  progressMessage  }}
+                    </p>
+                </div>
+
+                <p
+                    v-else-if="error"
+                    class="home-error"
+                >
+                    {{ error }}
+                </p>
+
+                <div
+                    v-else-if="response"
+                    id="answer-box"
+                >
+                    <div id="answer-text">
+                        <p>
+                            {{
+                                response.content
+                            }}
+                        </p>
+
+                        <section
+                            v-for="(
+                                section,
+                                index
+                            ) in sections"
+                            :key="index"
+                            style="
+                                margin-top: 24px;
+                            "
+                        >
+                            <h4
+                                v-if="
+                                    typeof section.title ===
+                                    'string'
+                                "
+                                style="
+                                    font-size: 1.1rem;
+                                    font-weight: 600;
+                                    color: var(--text-main);
+                                    margin-bottom: 10px;
+                                "
+                            >
+                                {{
+                                    section.title
+                                }}
+                            </h4>
+
+                            <p
+                                v-if="
+                                    typeof section.content ===
+                                    'string'
+                                "
+                            >
+                                {{
+                                    section.content
+                                }}
+                            </p>
+                        </section>
+                    </div>
+
+                    <div
+                        id="sources-section"
+                        style="
+                            margin-top: 40px;
+                            padding-top: 20px;
+                            border-top: 1px solid var(--border-color);
+                        "
+                    >
+                        <h3
+                            style="
+                                font-size: 1.1rem;
+                                color: var(--text-main);
+                                font-weight: 600;
+                                margin-bottom: 15px;
+                            "
+                        >
+                            Referências do Acervo
+                        </h3>
+
+                        <div
+                            id="sources-container"
+                        >
+                            <button
+                                v-for="(
+                                    evidence,
+                                    index
+                                ) in referencedEvidences"
+                                :key="
+                                    evidence.evidence_id ??
+                                    evidence.unit_id
+                                "
+                                class="btn-outline"
+                                style="
+                                    width: 100%;
+                                    justify-content: flex-start;
+                                    align-items: flex-start;
+                                    flex-direction: column;
+                                    margin-bottom: 8px;
+                                    text-align: left;
+                                    gap: 4px;
+                                "
+                                type="button"
+                                @click="
+                                    evidence.evidence_id &&
+                                    selectEvidence(
+                                        evidence.evidence_id,
+                                    )
+                                "
+                            >   <strong>
+                                    Evidência {{ index + 1 }}
+                                </strong>
+
+                                <span
+                                    style="
+                                        color: var(--text-muted);
+                                        font-size: 0.8rem;
+                                        line-height: 1.4;
+                                    "
+                                >
+                                    {{ 
+                                        formatReference(
+                                            referenceForEvidence(
+                                                evidence,
+                                            ),
+                                        )
+                                    }}
+                                </span>
+                            </button>
+
+                            <p
+                                v-if="
+                                    referencedEvidences.length ===
+                                    0
+                                "
+                                style="
+                                    color: var(--text-muted);
+                                    font-size: 0.9rem;
+                                "
+                            >
+                                Nenhuma evidência foi
+                                associada à resposta.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <p
+                    v-else-if="resultMessage"
+                    class="home-error"
+                >
+                    {{  resultMessage  }}
+                </p>
+
+                <p
+                    v-else
+                    style="
+                        color: var(--text-muted);
+                    "
+                >
+                    Nenhuma resposta disponível.
+                </p>
+            </section>
+
+            <EvidencePanel
+                :evidence="selectedEvidence"
+                :reference="
+                    selectedEvidence
+                        ? referenceForEvidence(
+                            selectedEvidence,
+                        )
+                        : null
+                "
+                @close="closeEvidence"
+                @open-reading="openEvidenceInReading"
+            />
+        </main>
+    </section>
+</template>

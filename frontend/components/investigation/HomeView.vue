@@ -1,0 +1,121 @@
+<script setup lang="ts">
+import {
+    computed,
+    ref,
+} from "vue";
+
+import {
+    investigate,
+} from "../../features/investigation/actions";
+
+import {
+    folderState,
+} from "../../state/folders";
+
+import {
+    investigationState,
+} from "../../state/investigation";
+
+import {
+    goToInvestigation,
+} from "../../state/navigation";
+
+const query = ref("");
+
+const selectedFolderId = computed(
+    () => folderState.selectedFolderId,
+);
+
+const isLoading = computed(
+    () => investigationState.isInvestigating,
+);
+
+const error = computed(
+    () =>
+        investigationState.error ??
+        folderState.error,
+);
+
+async function submitInvestigation(): Promise<void> {
+    const normalizedQuery =
+        query.value.trim();
+
+    if (
+        !normalizedQuery ||
+        !selectedFolderId.value
+    ) {
+        return;
+    }
+
+    try {
+        const investigationRequest = investigate({
+            folder_id:
+                selectedFolderId.value,
+            query: normalizedQuery,
+            limit: 5,
+        });
+
+        goToInvestigation();
+
+        await investigationRequest;
+    } catch {
+        // O erro já está armazenado no estado.
+        // A tela de investigação o apresentará.
+    }
+}
+
+function handleSubmit(): void {
+    void submitInvestigation();
+}
+</script>
+
+<template>
+    <section
+        id="home-view"
+        class="view active"
+    >
+        <div class="hero">
+            <h1 class="logo">
+                LPP-Acervo
+            </h1>
+
+            <p class="subtitle">
+                Memória Institucional e Recuperação Semântica Documental
+            </p>
+
+            <form
+                id="search-home"
+                class="search-box"
+                @submit.prevent="handleSubmit"
+            >
+                <input
+                    id="input-home"
+                    v-model="query"
+                    type="text"
+                    placeholder="Pesquisar"
+                    required
+                    autocomplete="off"
+                    :disabled="isLoading"
+                >
+
+                <button
+                    type="submit"
+                    :disabled="
+                        isLoading ||
+                        !query.trim() ||
+                        !selectedFolderId
+                    "
+                >
+                    →
+                </button>
+            </form>
+
+            <p
+                v-if="error"
+                class="home-error"
+            >
+                {{ error }}
+            </p>
+        </div>
+    </section>
+</template>

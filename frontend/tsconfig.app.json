@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "preserve",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["vite/client"]
+  },
+  "include": [
+    "env.d.ts",
+    "app/**/*.ts",
+    "app/**/*.vue",
+    "components/**/*.ts",
+    "components/**/*.vue",
+    "features/**/*.ts",
+    "features/**/*.vue",
+    "infrastructure/**/*.ts",
+    "infrastructure/**/*.vue",
+    "renderer/**/*.ts",
+    "renderer/**/*.vue",
+    "state/**/*.ts",
+    "state/**/*.vue"
+  ]
+}
