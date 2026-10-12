@@ -9,11 +9,16 @@ import {
 import {
     ArrowLeft,
     ExternalLink,
+    Languages,
 } from "@lucide/vue";
 
 import {
     loadContextualReading,
 } from "../../features/documents/actions";
+
+import {
+    translate,
+} from "../../features/translation/api";
 
 import type {
     ContextualReading,
@@ -48,6 +53,23 @@ const isLoading = ref(false);
 
 const error = ref<string | null>(null);
 
+/*
+ * Estado local das traduções.
+ *
+ * A chave identifica o documento, sua representação,
+ * a página e o bloco documental.
+ *
+ * Assim, parágrafos diferentes não compartilham
+ * acidentalmente a mesma tradução.
+ */
+const translations = ref<Record<string, string>>({});
+
+const visibleTranslations = ref<Record<string, boolean>>({});
+
+const translatingBlocks = ref<Record<string, boolean>>({});
+
+const translationErrors = ref<Record<string, string>>({});
+
 const currentPage = computed(() => {
     if (
         !document.value?.representation ||
@@ -69,6 +91,34 @@ const pages = computed(
 );
 
 const readingContainer = ref<HTMLElement | null>(null);
+
+function translationKey(
+    pageNumber: number,
+    block: DocumentBlock,
+): string {
+    const currentDocument = document.value;
+
+    return [
+        currentDocument?.document_id ?? "unknown-document",
+        currentDocument?.representation_id ?? "unknown-representation",
+        pageNumber,
+        block.block_index,
+    ].join(":");
+}
+
+function translationButtonLabel(
+    key: string,
+): string {
+    if (visibleTranslations.value[key]) {
+        return "Ocultar tradução";
+    }
+
+    if (translations.value[key]) {
+        return "Exibir tradução";
+    }
+
+    return "Traduzir este parágrafo";
+}
 
 function blockIsInLocation(
     page: DocumentPage,
@@ -129,6 +179,99 @@ function blockIsInLocation(
     return true;
 }
 
+async function toggleTranslation(
+    pageNumber: number,
+    block: DocumentBlock,
+): Promise<void> {
+    const key = translationKey(pageNumber, block);
+
+    // Se a tradução já estiver aberta, apenas a oculta.
+    if (visibleTranslations.value[key]) {
+        visibleTranslations.value[key] = false;
+        return;
+    }
+
+    // Se já existir uma tradução em cache, apenas a exibe.
+    if (translations.value[key]) {
+        visibleTranslations.value[key] = true;
+        return;
+    }
+
+    // Não permite requisições simultâneas para o mesmo bloco.
+    if (translatingBlocks.value[key]) {
+        return;
+    }
+
+    const sourceDocumentId = document.value?.document_id;
+
+    const sourceRepresentationId =
+        document.value?.representation_id;
+
+    const contextVersion = getWorkContextVersion();
+
+    if (
+        !sourceDocumentId ||
+        !sourceRepresentationId ||
+        !block.text.trim()
+    ) {
+        return;
+    }
+
+    translatingBlocks.value[key] = true;
+
+    delete translationErrors.value[key];
+
+    try {
+        const result = await translate({
+            text: block.text,
+        });
+
+        /*
+         * Uma resposta atrasada não deve atualizar a leitura
+         * depois de uma mudança de contexto ou documento.
+         */
+        if (
+            contextVersion !== getWorkContextVersion() ||
+            sourceDocumentId !== document.value?.document_id ||
+            sourceRepresentationId !== document.value?.representation_id ||
+            navigationState.currentView !== "reading"
+        ) {
+            return;
+        }
+
+        const translatedText = result.translation.trim();
+
+        if (!translatedText) {
+            throw new Error(
+                "A tradução não retornou texto.",
+            );
+        }
+
+        translations.value[key] = translatedText;
+
+        visibleTranslations.value[key] = true;
+    } catch (translationError) {
+        if (
+            contextVersion !== getWorkContextVersion() ||
+            sourceDocumentId !== document.value?.document_id ||
+            sourceRepresentationId !== document.value?.representation_id ||
+            navigationState.currentView !== "reading"
+        ) {
+            return;
+        }
+
+        console.error(
+            "[TRANSLATION] Falha ao traduzir parágrafo:",
+            translationError,
+        );
+
+        translationErrors.value[key] =
+            "Não foi possível traduzir este parágrafo. Tente novamente.";
+    } finally {
+        translatingBlocks.value[key] = false;
+    }
+}
+
 async function loadCurrentDocument(): Promise<void> {
     const requestedDocumentId = documentId.value;
     const requestedEvidenceId = evidenceId.value;
@@ -136,8 +279,10 @@ async function loadCurrentDocument(): Promise<void> {
 
     if (!requestedDocumentId || !requestedEvidenceId) {
         document.value = null;
+
         error.value =
             "Não foi possível identificar o documento e a evidência selecionados.";
+
         return;
     }
 
@@ -352,17 +497,138 @@ watch(
                     </header>
 
                     <div class="reading-page-content">
-                        <p
+                        <div
                             v-for="block in page.blocks"
                             :key="`${page.page_number}-${block.block_index}`"
-                            class="reading-block"
-                            :class="{
-                                'reading-block-evidence':
-                                    blockIsInLocation(page, block),
-                            }"
+                            class="reading-block-item"
                         >
-                            {{ block.text }}
-                        </p>
+                            <div class="reading-block-row">
+                                <p
+                                    class="reading-block"
+                                    :class="{
+                                        'reading-block-evidence':
+                                            blockIsInLocation(page, block),
+                                    }"
+                                >
+                                    {{ block.text }}
+                                </p>
+
+                                <button
+                                    v-if="block.text.trim()"
+                                    class="btn-translate-paragraph"
+                                    type="button"
+                                    :disabled="
+                                        translatingBlocks[
+                                            translationKey(page.page_number, block)
+                                        ]
+                                    "
+                                    :title="
+                                        translationButtonLabel(
+                                            translationKey(page.page_number, block),
+                                        )
+                                    "
+                                    :aria-label="
+                                        translationButtonLabel(
+                                            translationKey(page.page_number, block),
+                                        )
+                                    "
+                                    :aria-expanded="
+                                        Boolean(
+                                            visibleTranslations[
+                                                translationKey(page.page_number, block)
+                                            ],
+                                        )
+                                    "
+                                    @click="
+                                        toggleTranslation(
+                                            page.page_number,
+                                            block,
+                                        )
+                                    "
+                                >
+                                    <Languages
+                                        class="icon-sm"
+                                        aria-hidden="true"
+                                    />
+
+                                    <span class="translation-visually-hidden">
+                                        {{
+                                            translationButtonLabel(
+                                                translationKey(page.page_number, block),
+                                            )
+                                        }}
+                                    </span>
+                                </button>
+                            </div>
+
+                            <p
+                                v-if="
+                                    translatingBlocks[
+                                        translationKey(page.page_number, block)
+                                    ]
+                                "
+                                class="translation-status"
+                                role="status"
+                                aria-live="polite"
+                            >
+                                Traduzindo para português...
+                            </p>
+
+                            <p
+                                v-if="
+                                    translationErrors[
+                                        translationKey(page.page_number, block)
+                                    ]
+                                "
+                                class="translation-error"
+                                role="alert"
+                            >
+                                {{
+                                    translationErrors[
+                                        translationKey(page.page_number, block)
+                                    ]
+                                }}
+                            </p>
+
+                            <section
+                                v-if="
+                                    visibleTranslations[
+                                        translationKey(page.page_number, block)
+                                    ] &&
+                                    translations[
+                                        translationKey(page.page_number, block)
+                                    ]
+                                "
+                                class="translation-panel"
+                                aria-label="Tradução para português"
+                            >
+                                <header class="translation-panel-header">
+                                    <span>
+                                        Tradução para português
+                                    </span>
+
+                                    <button
+                                        type="button"
+                                        class="translation-hide-button"
+                                        @click="
+                                            visibleTranslations[
+                                                translationKey(page.page_number, block)
+                                            ] = false
+                                        "
+                                    >
+                                        Ocultar
+                                    </button>
+                                </header>
+
+                                <p class="translation-text">
+                                    {{
+                                        translations[
+                                            translationKey(page.page_number, block)
+                                        ]
+                                    }}
+                                </p>
+                            </section>
+                        </div>
                     </div>
                 </article>
             </div>
