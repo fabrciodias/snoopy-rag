@@ -23,6 +23,7 @@ from backend.domain.entities import (
     OperationTargetType,
 )
 
+
 router = APIRouter(
     prefix="/sync-drive",
     tags=["Documents"],
@@ -63,8 +64,6 @@ def sync_drive(
     )
 
     # O acervo público é somente para leitura.
-    # Ele não pode receber sincronização através da
-    # identidade de um usuário.
     if request.folder_id == PUBLIC_FOLDER_ID:
         raise HTTPException(
             status_code=403,
@@ -84,40 +83,38 @@ def sync_drive(
         )
 
     try:
-        # 1. Procura uma sincronização que já esteja ativa.
+        # 1. Procura uma sincronização já ativa.
+        # A consulta não modifica o estado da operação.
         operation = operation_service.get_active_operation(
             operation_type="DRIVE_SYNC",
             target_type=OperationTargetType.FOLDER,
             target_id=request.folder_id,
-            progress=OperationProgress(
-                phase="starting",
-                message="Preparando sincronização...",
-                current=0,
-                unit="files",
-            ),
         )
 
-        # Se existir, devolve a operação atual.
-        # Não cria outra nem agenda outro processamento.
         if operation is not None:
             return {
                 "operation_id": operation.operation_id,
                 "status": operation.status,
             }
 
-        # 2. Não havendo operação ativa, tenta criar uma nova.
-        # O índice único no Supabase protege contra requisições
-        # concorrentes que tentem criar a mesma operação.
+        # 2. Não havendo operação ativa, cria uma nova
+        # já com o progresso inicial persistível.
         try:
             operation = operation_service.start_operation(
                 operation_type="DRIVE_SYNC",
                 target_type=OperationTargetType.FOLDER,
                 target_id=request.folder_id,
+                progress=OperationProgress(
+                    phase="starting",
+                    message="Preparando sincronização...",
+                    current=0,
+                    unit="files",
+                ),
             )
 
         except Exception:
-            # Outra requisição pode ter criado a operação
-            # entre a consulta inicial e esta tentativa.
+            # Uma requisição concorrente pode ter criado
+            # a operação entre a consulta e a inserção.
             existing_operation = (
                 operation_service.get_active_operation(
                     operation_type="DRIVE_SYNC",
@@ -126,8 +123,8 @@ def sync_drive(
                 )
             )
 
-            # Se nenhuma operação ativa puder ser encontrada,
-            # o erro original não deve ser ocultado.
+            # Não ocultamos o erro original se não houver
+            # uma operação ativa que explique a concorrência.
             if existing_operation is None:
                 raise
 
@@ -136,8 +133,14 @@ def sync_drive(
                 "status": existing_operation.status,
             }
 
+        if not operation.operation_id:
+            raise RuntimeError(
+                "A operação de sincronização não recebeu "
+                "um identificador válido."
+            )
+
         # 3. Somente a requisição que criou a operação
-        # agenda o processamento no backend.
+        # agenda o processamento em background.
         background_tasks.add_task(
             drive_sync_service.sync_folder,
             operation.operation_id,
@@ -158,4 +161,4 @@ def sync_drive(
         raise HTTPException(
             status_code=500,
             detail=str(error),
-        )
+        ) from error

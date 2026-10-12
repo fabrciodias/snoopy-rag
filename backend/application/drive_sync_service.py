@@ -355,8 +355,7 @@ class DriveSyncService:
                         message="Sincronizando arquivos do acervo...",
                         current=processed + skipped + failed,
                         total=total,
-                        processed=proc
-                        ,
+                        processed=processed,
                         skipped=skipped, 
                         failed=failed,
                     )
