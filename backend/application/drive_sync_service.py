@@ -222,7 +222,7 @@ class DriveSyncService:
 
             drive_file_ids: set[str] = set()
 
-            for drive_file_id in drive_files:
+            for drive_file in drive_files:
                 drive_file_id = (
                     drive_file.get("id")
                     if isinstance(drive_file, dict)
