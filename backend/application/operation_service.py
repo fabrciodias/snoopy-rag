@@ -3,9 +3,11 @@ from typing import Optional
 
 from backend.domain.entities import (
     Operation,
+    OperationProgress,
     OperationStatus,
     OperationTargetType,
 )
+
 from backend.domain.repositories import OperationRepository
 
 
@@ -29,6 +31,7 @@ class OperationService:
         operation_type: str,
         target_type: Optional[OperationTargetType] = None,
         target_id: Optional[str] = None,
+        progress: Optional[OperationProgress] = None,
     ) -> Operation:
 
         operation = Operation(
@@ -36,31 +39,47 @@ class OperationService:
             target_type=target_type,
             target_id=target_id,
             status=OperationStatus.PROCESSING,
+            progress=progress,
             started_at=datetime.now(timezone.utc),
         )
 
         return self.operation_repo.create(operation)
 
+    def update_progress(
+        self,
+        operation_id: str,
+        progress: OperationProgress,
+    ) -> Operation:
+
+        return self.operation_repo.update_progress(
+            operation_id,
+            progress,
+        )
+
     def complete_operation(
         self,
         operation_id: str,
+        progress: Optional[OperationProgress] = None,
     ) -> Operation:
 
         return self.operation_repo.update_status(
             operation_id,
             OperationStatus.COMPLETED,
+            progress=progress,
         )
 
     def fail_operation(
         self,
         operation_id: str,
         error_msg: str,
+        progress: Optional[OperationProgress] = None,
     ) -> Operation:
 
         return self.operation_repo.update_status(
             operation_id,
             OperationStatus.FAILED,
             error_log=error_msg,
+            progress=progress,
         )
 
     def get_operation_state(
@@ -73,10 +92,10 @@ class OperationService:
         )
 
     def get_active_operation(
-            self,
-            operation_type: str,
-            target_type: OperationTargetType,
-            target_id: str,
+        self,
+        operation_type: str,
+        target_type: OperationTargetType,
+        target_id: str,
     ) -> Optional[Operation]:
 
         return self.operation_repo.get_active_by_target(

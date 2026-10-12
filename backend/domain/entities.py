@@ -385,6 +385,54 @@ class OperationTargetType(str, Enum):
     DOCUMENT = "DOCUMENT"
     INVESTIGATION = "INVESTIGATION"
 
+class OperationProgress(BaseModel):
+    """
+    Retrato estruturado do progresso de uma operação.
+
+    phase:
+        Identificador da etapa operacional atual.
+
+    message:
+        Mensagem correspondente ao estado observado.
+
+    current / total:
+        Contagem de unidades concluídas e total conhecido.
+        Para a sincronização, representam arquivos.
+
+    processed / skipped / failed:
+        Contadores operacionais utilizados quando aplicáveis.
+    """
+
+    phase: str
+
+    message: str
+
+    current: Optional[int] = Field(
+        default=None,
+        ge=0,
+    )
+
+    total: Optional[int] = Field(
+        default=None,
+        ge=0,
+    )
+
+    unit: Optional[str] = None
+
+    processed: int = Field(
+        default=0,
+        ge=0,
+    )
+
+    skipped: int = Field(
+        default=0,
+        ge=0,
+    )
+
+    failed: int = Field(
+        default=0,
+        ge=0,
+    )
 
 class Operation(BaseModel):
     """
@@ -400,6 +448,8 @@ class Operation(BaseModel):
 
     target_type: Optional[OperationTargetType] = None
     target_id: Optional[str] = None
+
+    progress: Optional[OperationProgress] = None
 
     status: OperationStatus = OperationStatus.PENDING
 

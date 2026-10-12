@@ -102,6 +102,113 @@ const hasPrivateFolder = computed(
         ),
 );
 
+const latestFolderSyncOperation = computed(() => {
+    const folderId =
+        folderState.selectedFolderId;
+
+    if (!folderId) {
+        return null;
+    }
+
+    const matchingOperations =
+        operationState.operations.filter(
+            (operation) =>
+                operation.operation_type === "DRIVE_SYNC" &&
+                operation.target_type === "FOLDER" &&
+                operation.target_id === folderId,
+        );
+
+    return (
+        matchingOperations[
+            matchingOperations.length - 1
+        ] ?? null
+    );
+});
+
+
+const activeFolderSyncOperation = computed(() => {
+    const folderId =
+        folderState.selectedFolderId;
+
+    if (!folderId) {
+        return null;
+    }
+
+    return (
+        [...operationState.operations]
+            .reverse()
+            .find(
+                (operation) =>
+                    operation.operation_type === "DRIVE_SYNC" &&
+                    operation.target_type === "FOLDER" &&
+                    operation.target_id === folderId &&
+                    (
+                        operation.status === "PENDING" ||
+                        operation.status === "PROCESSING"
+                    ),
+            ) ?? null
+    );
+});
+
+
+const syncProgress = computed(() => {
+    if (isSyncing.value) {
+        return (
+            activeFolderSyncOperation.value?.progress ??
+            null
+        );
+    }
+
+    return (
+        latestFolderSyncOperation.value?.progress ??
+        null
+    );
+});
+
+
+const showSyncFileProgress = computed(() => {
+    const progress = syncProgress.value;
+
+    return (
+        progress?.unit === "files" &&
+        progress.total != null &&
+        progress.total > 0
+    );
+});
+
+
+const syncProgressPercent = computed(() => {
+    const progress = syncProgress.value;
+
+    if (
+        !progress ||
+        progress.total == null ||
+        progress.total <= 0
+    ) {
+        return 0;
+    }
+
+    const current =
+        progress.current ?? 0;
+
+    return Math.max(
+        0,
+        Math.min(
+            100,
+            Math.round(
+                (current / progress.total) * 100,
+            ),
+        ),
+    );
+});
+
+
+const currentFolderSyncOperation = computed(
+    () =>
+        activeFolderSyncOperation.value ??
+        latestFolderSyncOperation.value,
+);
+
 watch(
     () => [
         authState.user?.id ?? null,
@@ -685,26 +792,85 @@ watch(
 
                     <div
                         v-if="isSyncing"
-                        style="
-                            font-size: 0.75rem;
-                            color: var(--text-muted);
-                            margin-top: 6px;
-                            text-align: center;
-                        "
+                        class="sync-progress-summary"
+                        role="status"
+                        aria-live="polite"
                     >
-                        Sincronizando acervo...
+                        <p class="sync-progress-message">
+                            {{ 
+                                syncProgress?.message ??
+                                "Preparando sincronização..."    
+                            }}
+                        </p>
+
+                        <template
+                            v-if="showSyncFileProgress"
+                        >
+                            <div class="sync-progress-meta">
+                                <span>
+                                    {{  syncProgress?.current ?? 0  }}
+                                    de
+                                    {{  syncProgress?.total  }}
+                                    arquivos concluídos
+                                </span>
+                            </div>
+
+                            <div
+                                class="sync-progress-track"
+                                role="progressbar"
+                                aria-label="Progresso da sincronização de arquivos"
+                                :aria-valuemin="0"
+                                :aria-valuemax="syncProgress?.total ?? 0"
+                                :aria-valuenow="syncProgress?.current ?? 0"
+                            >
+                                <div
+                                    class="sync-progress-fill"
+                                    :style="{
+                                        width: `${syncProgressPercent}%`,
+                                    }"
+                                ></div>
+                            </div>
+
+                            <p class="sync-progress-counts">
+                                {{  syncProgress?.processed ?? 0  }} processados
+                                ·
+                                {{  syncProgress?.skipped ?? 0  }} ignorados
+                                ·
+                                {{  syncProgress?.failed ?? 0  }} falharam
+                            </p>
+                        </template>
+                    </div>
+
+                    <div
+                        v-else-if="
+                            currentFolderSyncOperation?.status === 'FAILED' ||
+                            currentFolderSyncOperation?.status === 'CANCELLED'
+                        "
+                        class="sync-progress-terminal-error"
+                    >
+                        {{ 
+                            currentFolderSyncOperation.progress?.message ??
+                            "A sincronização não foi concluída."
+                        }}
                     </div>
 
                     <div
                         v-else-if="operationState.error"
-                        style="
-                            font-size: 0.75rem;
-                            color: var(--text-muted);
-                            margin-top: 6px;
-                            text-align: center;
-                        "
+                        class="sync-progress-terminal-error"
                     >
                         {{ operationState.error }}
+                    </div>
+
+                    <div
+                        v-else-if="
+                            currentFolderSyncOperation?.status === 'COMPLETED'
+                        "
+                        class="sync-process-complete"
+                    >
+                        {{ 
+                            currentFolderSyncOperation.progress?.message ??
+                            "Acervo sincronizado."
+                        }}
                     </div>
 
                     <button

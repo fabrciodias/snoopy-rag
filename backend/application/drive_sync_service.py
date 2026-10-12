@@ -15,6 +15,7 @@ from backend.application.publication_service import (
 from backend.domain.entities import (
     Document,
     DocumentStatus,
+    OperationProgress,
 )
 from backend.domain.repositories import (
     DocumentRepository,
@@ -40,6 +41,32 @@ class DriveSyncService:
         self.publication_service = publication_service
         self.document_repo = document_repo
 
+    def _write_progress(
+            self,
+            operation_id: str,
+            phase: str,
+            message: str,
+            current: int | None = None,
+            total: int | None = None,
+            processed: int = 0,
+            skipped: int = 0,
+            failed: int = 0,
+    ) -> None:
+
+        self.operation_service.update_progress(
+            operation_id,
+            OperationProgress(
+                phase=phase,
+                message=message,
+                current=current,
+                total=total,
+                unit="files",
+                processed=processed,
+                skipped=skipped,
+                failed=failed,
+            ),
+        )
+
     def sync_folder(
         self,
         operation_id: str,
@@ -54,10 +81,26 @@ class DriveSyncService:
             operation_id,
         )
 
+        processed = 0
+        skipped = 0
+        failed = 0
+
+        errors: List[Dict] = []
+
+        total: int | None = None
+
         try:
             os.makedirs(
                 temp_dir,
                 exist_ok=True,
+            )
+
+            self._write_progress(
+                operation_id=operation_id,
+                phase="discovering",
+                message="Localizando arquivos PDF no Google Drive...",
+                current=0,
+                total=None,
             )
 
             folder = (
@@ -90,6 +133,23 @@ class DriveSyncService:
                 )
             )
 
+            total = len(drive_files)
+
+            self._write_progress(
+                operation_id=operation_id,
+                phase="processing",
+                message=(
+                    "Sincronizando arquivos do acervo..."
+                    if total > 0
+                    else "Nenhum arquivo encontrado"
+                ),
+                current=0,
+                total=total,
+                processed=processed,
+                skipped=skipped,
+                failed=failed,
+            )
+
             print(
                 f"[SYNC DEBUG] folder_id={folder_id} "
                 f"drive_folder_id={drive_folder_id}"
@@ -107,12 +167,24 @@ class DriveSyncService:
                     f"mimeType={drive_file.get('mimeType')}"
                 )
 
-            processed = 0
-            skipped = 0
-            failed = 0
-            errors: List[Dict] = []
+            for file_index, drive_file in enumerate(
+                drive_files,
+                start=1,
+            ):
 
-            for drive_file in drive_files:
+                self._write_progress(
+                    operation_id=operation_id,
+                    phase="processing",
+                    message=(
+                        f"Processando arquivo "
+                        f"{file_index} de {total}..."
+                    ),
+                    current=processed + skipped + failed,
+                    total=total,
+                    processed=processed,
+                    skipped=skipped,
+                    failed=failed,
+                )
 
                 drive_file_id = drive_file["id"]
 
@@ -175,6 +247,18 @@ class DriveSyncService:
                         == drive_md5
                     ):
                         skipped += 1
+
+                        self._write_progress(
+                            operation_id=operation_id,
+                            phase="processing",
+                            message="Sincronizando arquivos do acervo...",
+                            current=processed + skipped + failed,
+                            total=total,
+                            processed=processed,
+                            skipped=skipped,
+                            failed=failed,
+                        )
+
                         continue
 
                     # ====================================================
@@ -265,6 +349,18 @@ class DriveSyncService:
 
                     processed += 1
 
+                    self._write_progress(
+                        operation_id=operation_id,
+                        phase="processing",
+                        message="Sincronizando arquivos do acervo...",
+                        current=processed + skipped + failed,
+                        total=total,
+                        processed=proc
+                        ,
+                        skipped=skipped, 
+                        failed=failed,
+                    )
+
                 except Exception as error:
 
                     failed += 1
@@ -275,10 +371,25 @@ class DriveSyncService:
                         "error": str(error),
                     })
 
+                    self._write_progress(
+                        operation_id=operation_id,
+                        phase="processing",
+                        message="Sincronizando arquivos do acervo...",
+                        current=processed + skipped + failed,
+                        total=total,
+                        processed=processed,
+                        skipped=skipped,
+                        failed=failed,
+                    )
+
                 finally:
 
                     if os.path.exists(temp_path):
                         os.remove(temp_path)
+
+            completed_files = (
+                processed + skipped + failed
+            )
 
             if failed:
 
@@ -291,6 +402,17 @@ class DriveSyncService:
                         f"{failed} falharam. "
                         f"Erros: {errors}"
                     ),
+
+                    progress=OperationProgress(
+                        phase="failed",
+                        message="Sincronização concluída com falhas.",
+                        current=completed_files,
+                        total=total,
+                        unit="files",
+                        processed=processed,
+                        skipped=skipped,
+                        failed=failed,
+                    ),
                 )
 
                 return {
@@ -301,8 +423,33 @@ class DriveSyncService:
                     "errors": errors,
                 }
 
+            self._write_progress(
+                operation_id=operation_id,
+                phase="finalizing",
+                message="Finalizando sincronização...",
+                current=completed_files,
+                total=total,
+                processed=processed,
+                skipped=skipped,
+                failed=failed,
+            )
+
             self.operation_service.complete_operation(
-                operation_id
+                operation_id,
+                progress=OperationProgress(
+                    phase="completed",
+                    message=(
+                        "Nenhum arquivo PDF encontrado."
+                        if total == 0
+                        else "Sincronização concluída."
+                    ),
+                    current=completed_files,
+                    total=total,
+                    unit="files",
+                    processed=processed,
+                    skipped=skipped,
+                    failed=failed,
+                ),
             )
 
             return {
@@ -314,10 +461,21 @@ class DriveSyncService:
             }
 
         except Exception as error:
+            
 
             self.operation_service.fail_operation(
                 operation_id,
                 str(error),
+                progress=OperationProgress(
+                    phase="failed",
+                    message="A sincronização não pôde ser concluída.",
+                    current=processed + skipped + failed,
+                    total=total,
+                    unit="files",
+                    processed=processed,
+                    skipped=skipped,
+                    failed=failed,
+                ),
             )
 
             raise

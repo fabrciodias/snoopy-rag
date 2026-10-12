@@ -11,6 +11,7 @@ from backend.domain.entities import (
     Investigation,
     InvestigationStatus,
     Operation,
+    OperationProgress,
     OperationStatus,
     OperationTargetType,
     RetrievalResult,
@@ -135,12 +136,19 @@ class SupabaseOperationRepository(OperationRepository):
         operation_id: str,
         status: OperationStatus,
         error_log: Optional[str] = None,
+        progress: Optional[OperationProgress] = None,
     ) -> Operation:
 
         payload = {
             "status": status.value,
             "error_log": error_log,
         }
+
+        if progress is not None:
+            payload["progress"] = progress.model_dump(
+                mode="json",
+                exclude_none=True,
+            )
 
         if status in (
             OperationStatus.COMPLETED,
@@ -150,6 +158,34 @@ class SupabaseOperationRepository(OperationRepository):
             payload["finished_at"] = (
                 datetime.now(timezone.utc).isoformat()
             )
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .update(payload)
+            .eq("id", operation_id)
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                f"Operação '{operation_id}' não encontrada."
+            )
+
+        return self._to_entity(response.data[0])
+
+    def update_progress(
+        self,
+        operation_id: str,
+        progress: OperationProgress,
+    ) -> Operation:
+
+        payload = {
+            "progress": progress.model_dump(
+                mode="json",
+                exclude_none=True,
+            )
+        }
 
         response = (
             self.client

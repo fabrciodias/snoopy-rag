@@ -14,6 +14,10 @@ import {
     goToReading
 } from "../../state/navigation";
 
+import {
+    operationState,
+} from "../../state/operations";
+
 import type {
     DocumentReference,
 } from "../../features/investigation/contracts";
@@ -43,6 +47,38 @@ const isInvestigating =
             investigationState
                 .isInvestigating,
     );
+
+const operationProgress = computed(() => {
+    const operationId =
+        investigationState.activeOperationId;
+
+    if (!operationId) {
+        return null;
+    }
+
+    return (
+        operationState.operations.find(
+            (operation) =>
+                operation.operation_id ===
+                operationId,
+        )?.progress ?? null
+    );
+});
+
+const progressMessage = computed(() => {
+    if (!investigationState.activeOperationId) {
+        return "Carregando investigação...";
+    }
+
+    return (
+        operationProgress.value?.message ??
+        "Preparando investigação..."
+    );
+});
+
+const resultMessage = computed(
+    () => investigationState.resultMessage,
+);
 
 const error =
     computed(
@@ -236,8 +272,10 @@ function closeEvidence(): void {
 
                     <p
                         class="live-logs"
+                        role="status"
+                        aria-live="polite"
                     >
-                        Processando investigação...
+                        {{  progressMessage  }}
                     </p>
                 </div>
 
@@ -384,6 +422,13 @@ function closeEvidence(): void {
                         </div>
                     </div>
                 </div>
+
+                <p
+                    v-else-if="resultMessage"
+                    class="home-error"
+                >
+                    {{  resultMessage  }}
+                </p>
 
                 <p
                     v-else

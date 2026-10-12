@@ -48,20 +48,38 @@ class RetrievalService:
         folder_id: str,
         query: str,
         limit: int = 10,
+        existing_investigation: Investigation | None = None,
+        finalize_status: bool = True,
     ) -> tuple[Investigation, List[RetrievalResult]]:
 
-        investigation = Investigation(
-            investigation_id=str(uuid.uuid4()),
-            user_id=user_id,
-            folder_id=folder_id,
-            original_query=query,
-            status=InvestigationStatus.PROCESSING,
-            created_at=datetime.now(timezone.utc),
-        )
+        if existing_investigation is None:
 
-        investigation = self.investigation_repo.create(
-            investigation
-        )
+            investigation = Investigation(
+                investigation_id=str(uuid.uuid4()),
+                user_id=user_id,
+                folder_id=folder_id,
+                original_query=query,
+                status=InvestigationStatus.PROCESSING,
+                created_at=datetime.now(timezone.utc),
+            )
+
+            investigation = self.investigation_repo.create(
+                investigation
+            )
+
+        else:
+
+            investigation = existing_investigation
+
+            if (
+                investigation.user_id != user_id
+                or investigation.folder_id != folder_id
+                or investigation.original_query != query
+            ):
+                raise ValueError(
+                    "A investigação fornecida não corresponde " \
+                    "à consulta ou ao contexto de trabalho."
+                )
 
         try:
             query_embeddings = (
@@ -71,12 +89,14 @@ class RetrievalService:
             )
 
             if not query_embeddings:
-                investigation = (
-                    self.investigation_repo.update_status(
-                        investigation.investigation_id,
-                        InvestigationStatus.COMPLETED,
+
+                if finalize_status:
+                    investigation = (
+                        self.investigation_repo.update_status(
+                            investigation.investigation_id,
+                            InvestigationStatus.COMPLETED,
+                        )
                     )
-                )
 
                 return investigation, []
 
@@ -301,12 +321,13 @@ class RetrievalService:
             # 7. FINALIZAÇÃO DA INVESTIGAÇÃO
             # ====================================================
 
-            investigation = (
-                self.investigation_repo.update_status(
-                    investigation.investigation_id,
-                    InvestigationStatus.COMPLETED,
+            if finalize_status:
+                investigation = (
+                    self.investigation_repo.update_status(
+                        investigation.investigation_id,
+                        InvestigationStatus.COMPLETED,
+                    )
                 )
-            )
 
             return investigation, results
 

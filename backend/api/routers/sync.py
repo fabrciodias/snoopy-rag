@@ -18,7 +18,10 @@ from backend.api.container import (
     drive_sync_service,
 )
 
-from backend.domain.entities import OperationTargetType
+from backend.domain.entities import (
+    OperationProgress,
+    OperationTargetType,
+)
 
 router = APIRouter(
     prefix="/sync-drive",
@@ -86,6 +89,12 @@ def sync_drive(
             operation_type="DRIVE_SYNC",
             target_type=OperationTargetType.FOLDER,
             target_id=request.folder_id,
+            progress=OperationProgress(
+                phase="starting",
+                message="Preparando sincronização...",
+                current=0,
+                unit="files",
+            ),
         )
 
         # Se existir, devolve a operação atual.

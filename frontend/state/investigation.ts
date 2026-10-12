@@ -20,10 +20,20 @@ export interface InvestigationState {
 
     isInvestigating: boolean;
     error: string | null;
+
+    activeOperationId: string | null;
+    activeInvestigationId: string | null;
+
+    resultMessage: string | null;
 }
 
 export const investigationState =
     reactive<InvestigationState>({
+        activeOperationId: null,
+        activeInvestigationId: null,
+
+        resultMessage: null,
+
         activeInvestigation: null,
         response: null,
         evidences: [],
@@ -37,6 +47,11 @@ export const investigationState =
     });
 
 export function clearInvestigation(): void {
+    investigationState.activeOperationId = null;
+    investigationState.activeInvestigationId = null;
+
+    investigationState.resultMessage = null;
+
     investigationState.activeInvestigation = null;
     investigationState.response = null;
     investigationState.evidences = [];

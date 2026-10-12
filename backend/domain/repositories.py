@@ -9,6 +9,7 @@ from backend.domain.entities import (
     Investigation,
     InvestigationStatus,
     Operation,
+    OperationProgress,
     OperationStatus,
     OperationTargetType,
     RetrievalResult,
@@ -53,11 +54,23 @@ class OperationRepository(ABC):
         pass
 
     @abstractmethod
+    def update_progress(
+        self,
+        operation_id: str,
+        progress: OperationProgress,
+    ) -> Operation:
+        """
+        Atualiza e persiste o progresso de uma operação.
+        """
+        pass
+
+    @abstractmethod
     def update_status(
         self,
         operation_id: str,
         status: OperationStatus,
         error_log: Optional[str] = None,
+        progress: Optional[OperationProgress] = None,
     ) -> Operation:
         pass
 

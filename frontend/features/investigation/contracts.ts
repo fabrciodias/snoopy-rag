@@ -74,6 +74,14 @@ export interface InvestigateRequest {
     limit?: number;
 }
 
+export interface InvestigationStartResponse {
+    operation_id: string;
+    investigation_id: string;
+    status: import(
+        "../operations/contracts"
+    ).OperationStatus;
+}
+
 export interface InvestigationResponse {
     message?: string;
     investigation: Investigation;

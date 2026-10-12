@@ -6,12 +6,14 @@ import type {
     HistoryEntry,
     InvestigateRequest,
     InvestigationResponse,
+    InvestigationStartResponse,
 } from "./contracts";
+
 
 export function investigate(
     request: InvestigateRequest,
-): Promise<InvestigationResponse> {
-    return apiRequest<InvestigationResponse>(
+): Promise<InvestigationStartResponse> {
+    return apiRequest<InvestigationStartResponse>(
         "/investigate/",
         {
             method: "POST",
@@ -19,6 +21,7 @@ export function investigate(
         },
     );
 }
+
 
 export function listHistory(
     folderId: string,
@@ -31,6 +34,7 @@ export function listHistory(
         `/history/?${params.toString()}`,
     );
 }
+
 
 export function getInvestigation(
     investigationId: string,
