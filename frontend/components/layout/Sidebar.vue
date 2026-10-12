@@ -297,7 +297,7 @@ function getSyncLabel(): string {
     return "Sincronizando...";
 }
 
-onMounted(async () => {
+onMounted(() => {
     const savedTheme =
         localStorage.getItem(
             "snoopy_theme",
@@ -316,43 +316,49 @@ onMounted(async () => {
             "light-theme",
         );
     }
-
-    if (!authState.user) {
-        return;
-    }
-
-    try {
-        await loadFolders();
-        await loadHistory();
-    } catch {
-        // O erro já foi armazenado no estado.
-    }
 });
 
+
+// ============================================================
+// Carregamento dos acervos por identidade autenticada
+// ============================================================
+
 watch(
-    () => authState.user,
-    async (user) => {
-        if (!user) {
+    () => authState.user?.id ?? null,
+    async (userId) => {
+        if (!userId) {
             clearHistory();
             return;
         }
 
-        try {
-            if (folderState.folders.length === 0) {
-                await loadFolders();
-            }
+        // A lista já foi carregada para esta sessão.
+        if (folderState.folders.length > 0) {
+            return;
+        }
 
-            await loadHistory();
+        try {
+            await loadFolders();
         } catch {
             // O erro já foi armazenado no estado.
         }
     },
+    {
+        immediate: true,
+    },
 );
 
+
+// ============================================================
+// Carregamento do histórico por acervo ativo
+// ============================================================
+
 watch(
-    () => folderState.selectedFolderId,
-    async (folderId) => {
-        if (!authState.user || !folderId) {
+    () => [
+        authState.user?.id ?? null,
+        folderState.selectedFolderId,
+    ] as const,
+    async ([userId, folderId]) => {
+        if (!userId || !folderId) {
             clearHistory();
             return;
         }
@@ -362,6 +368,9 @@ watch(
         } catch {
             // O erro já foi armazenado no estado.
         }
+    },
+    {
+        immediate: true,
     },
 );
 

@@ -1,17 +1,12 @@
 <script setup lang="ts">
 import {
     computed,
-    onMounted,
     ref,
 } from "vue";
 
 import {
     investigate,
 } from "../../features/investigation/actions";
-
-import {
-    loadFolders,
-} from "../../features/folders/actions";
 
 import {
     folderState,
@@ -57,7 +52,7 @@ async function submitInvestigation(): Promise<void> {
             folder_id:
                 selectedFolderId.value,
             query: normalizedQuery,
-            limit: 5
+            limit: 5,
         });
 
         goToInvestigation();
@@ -69,12 +64,6 @@ async function submitInvestigation(): Promise<void> {
 function handleSubmit(): void {
     void submitInvestigation();
 }
-
-onMounted(() => {
-    if (folderState.folders.length === 0) {
-        void loadFolders();
-    }
-});
 </script>
 
 <template>
