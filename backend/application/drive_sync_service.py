@@ -67,6 +67,85 @@ class DriveSyncService:
             ),
         )
 
+    def _reconcile_removed_documents(
+            self,
+            folder_id: str,
+            user_id: str,
+            drive_file_ids: set[str],
+    ) -> int:
+        """
+        Marca como REMOVED os documentos associados a arquivos
+        que deixaram de existir na pasta monitorada do Drive.
+
+        a consulta é restrita ao acervo e ao propritetário atuais.
+
+        Documentos já removidos permanecem inalterados. Registros
+        sem drive_file_id também são preservados.
+
+        A remoção é lógica: não elimina representações históricas,
+        RetrievalUnits ou evidências persistidas.
+        """
+
+        response = (
+            self.client
+            .table("documents")
+            .select(
+                "id, drive_file_id, status"
+            )
+            .eq(
+                "folder_id",
+                folder_id,
+            )
+            .eq(
+                "user_id",
+                user_id,
+            )
+            .execute()
+        )
+
+        records = response.data or []
+
+        removed_count = 0
+
+        for record in records:
+            document_id = record.get('id')
+            drive_file_id = record.get("drive_file_id")
+            status = record.get("status")
+
+            # Não presumimos que documentos sem identificador
+            # do Drive devam se removidos
+            if not drive_file_id:
+                continue
+
+            # O arquivo continua na pasta monitorada
+            if drive_file_id in drive_file_ids:
+                continue
+
+            # Evita atualizações desnecessárias
+            if status == DocumentStatus.REMOVED.value:
+                continue
+
+            if not document_id:
+                raise RuntimeError(
+                    "Não foi possível identificar um documento " \
+                    "durante a reconciliação do acervo."
+                )
+
+            self.document_repo.update_status(
+                document_id,
+                DocumentStatus.REMOVED,
+            )
+
+            removed_count += 1
+
+            print(
+                "[SYNC] Documento removido do corpus ativo: " 
+                f"document_id={document_id}, "
+                f"drive_file_id={drive_file_id}"
+            )
+
+            return removed_count
+
     def sync_folder(
         self,
         operation_id: str,
@@ -131,6 +210,50 @@ class DriveSyncService:
                     folder_id=drive_folder_id,
                     access_token=google_access_token,
                 )
+            )
+
+            # A reconciliação só pode ocorrer depois de uma 
+            # listagem válida e com identificadores verificáveis.
+            if not isinstance(drive_files, list):
+                raise RuntimeError(
+                    "A listagem do Google Drive não retornou " \
+                    "uma lista válida de arquivos."
+                )
+
+            drive_file_ids: set[str] = set()
+
+            for drive_file_id in drive_files:
+                drive_file_id = (
+                    drive_file.get("id")
+                    if isinstance(drive_file, dict)
+                    else None
+                )
+
+                if (
+                    not isinstance(drive_file_id, str)
+                    or not drive_file_id.strip()
+                ):
+                    raise RuntimeError(
+                        "A listagem do Google Drive contém " 
+                        "um arquivo sem identificador válido. " 
+                        "A reconciliação foi interrompida " \
+                        "para evitar remoções indevidas."
+                    )
+
+                drive_file_ids.add(drive_file_id)
+
+            removed_count = (
+                self._reconcile_removed_documents(
+                    folder_id=folder_id,
+                    user_id=user_id,
+                    drive_file_ids=drive_file_ids,
+                )
+            )
+
+            print(
+                "[SYNC] Reconciliação concluída: " \
+                f"{removed_count} documento(s) removido(s) "
+                "do corpus ativo."
             )
 
             total = len(drive_files)
@@ -303,6 +426,17 @@ class DriveSyncService:
                             raise RuntimeError(
                                 f"Documento '{document_id}' "
                                 "não pôde ser recuperado."
+                            )
+
+                        if (
+                            current_document.status
+                            == DocumentStatus.REMOVED
+                        ):
+                            current_document = (
+                                self.document_repo.update_status(
+                                    document_id,
+                                    DocumentStatus.PENDING,
+                                )
                             )
 
                         document = current_document.model_copy(

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import (
     APIRouter,
     Header,
@@ -15,6 +17,7 @@ from backend.infrastructure.database import (
     supabase_client,
 )
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/folders",
@@ -111,10 +114,16 @@ def create_folder(
         raise
 
     except Exception as error:
+        logger.exception(
+            "Falha interna ao registrar acervo do Google Drive."
+        )
         raise HTTPException(
             status_code=500,
-            detail=str(error),
-        )
+            detail=(
+                "Não foi possível registrar o acervo. " \
+                "Tente novamente."
+            ),
+        ) from error
 
 
 @router.delete("/{folder_id}")

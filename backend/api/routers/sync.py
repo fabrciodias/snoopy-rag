@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -23,6 +25,7 @@ from backend.domain.entities import (
     OperationTargetType,
 )
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/sync-drive",
@@ -158,7 +161,13 @@ def sync_drive(
         raise
 
     except Exception as error:
+        logger.exception(
+            "Falha interna ao iniciar sincronização do Drive."
+        )
         raise HTTPException(
             status_code=500,
-            detail=str(error),
+            detail=(
+                "Não foi possível iniciar a sincronização. " \
+                "Tente novamente."
+            ),
         ) from error

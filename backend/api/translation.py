@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import (
     APIRouter,
     Header,
@@ -15,6 +17,7 @@ from backend.api.dependencies import (
     get_authenticated_user_id,
 )
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     tags=["Translation"],
@@ -103,13 +106,16 @@ TEXTO ORIGINAL:
         )
 
     except Exception as error:
+        logger.exception(
+            "Falha interna ao executar tradução."
+        )
         raise HTTPException(
             status_code=500,
             detail=(
-                "Falha na execução da tradução: "
-                f"{error}"
+                "Não foi possível concluir a tradução. " \
+                "Tente novamente"
             ),
-        )
+        ) from error
 
     translation = (
         response.text or ""
