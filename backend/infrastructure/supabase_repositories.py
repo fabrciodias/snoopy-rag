@@ -88,7 +88,7 @@ class SupabaseOperationRepository(OperationRepository):
     def get_active_by_target(
         self,
         operation_type: str,
-        target_type: operationTargetType,
+        target_type: OperationTargetType,
         target_id: str,
     ) -> Optional[Operation]:
 

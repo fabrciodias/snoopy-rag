@@ -81,22 +81,24 @@ def sync_drive(
         )
 
     try:
-        # Se já houver sincronização ativa para o acervo,
-        # retorna sua identidade em vez de iniciar outra.
-        operation = operation_service.start_operation(
+        # 1. Procura uma sincronização que já esteja ativa.
+        operation = operation_service.get_active_operation(
             operation_type="DRIVE_SYNC",
             target_type=OperationTargetType.FOLDER,
             target_id=request.folder_id,
         )
 
+        # Se existir, devolve a operação atual.
+        # Não cria outra nem agenda outro processamento.
         if operation is not None:
             return {
                 "operation_id": operation.operation_id,
                 "status": operation.status,
             }
 
-        # A criação pode concorrer com outra requisição.
-        # O índice único do banco protege esse intervalo.
+        # 2. Não havendo operação ativa, tenta criar uma nova.
+        # O índice único no Supabase protege contra requisições
+        # concorrentes que tentem criar a mesma operação.
         try:
             operation = operation_service.start_operation(
                 operation_type="DRIVE_SYNC",
@@ -106,8 +108,8 @@ def sync_drive(
 
         except Exception:
             # Outra requisição pode ter criado a operação
-            # entre a consulta inicial e a tentativa de criação.
-            operation = (
+            # entre a consulta inicial e esta tentativa.
+            existing_operation = (
                 operation_service.get_active_operation(
                     operation_type="DRIVE_SYNC",
                     target_type=OperationTargetType.FOLDER,
@@ -115,16 +117,18 @@ def sync_drive(
                 )
             )
 
-            if operation is None:
+            # Se nenhuma operação ativa puder ser encontrada,
+            # o erro original não deve ser ocultado.
+            if existing_operation is None:
                 raise
 
             return {
-                "operation_id": operation.operation_id,
-                "status": operation.status,
+                "operation_id": existing_operation.operation_id,
+                "status": existing_operation.status,
             }
 
-        # Somente a requisição que criou a operação
-        # agenda o precessamento no backend.
+        # 3. Somente a requisição que criou a operação
+        # agenda o processamento no backend.
         background_tasks.add_task(
             drive_sync_service.sync_folder,
             operation.operation_id,
