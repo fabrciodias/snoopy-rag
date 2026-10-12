@@ -1,6 +1,7 @@
 import hashlib
 import os
 import uuid
+import shutil
 from typing import Dict, List
 
 from supabase import Client
@@ -47,14 +48,18 @@ class DriveSyncService:
         google_access_token: str,
     ):
 
-        temp_dir = "data/raw_pdfs"
-
-        os.makedirs(
-            temp_dir,
-            exist_ok=True,
+        temp_dir = os.path.join(
+            "data",
+            "raw_pdfs",
+            operation_id,
         )
 
         try:
+            os.makedirs(
+                temp_dir,
+                exist_ok=True,
+            )
+
             folder = (
                 self.client
                 .table("folders")
@@ -320,17 +325,10 @@ class DriveSyncService:
         finally:
 
             if os.path.isdir(temp_dir):
-
-                for filename in os.listdir(
-                    temp_dir
-                ):
-                    path = os.path.join(
-                        temp_dir,
-                        filename
-                    )
-
-                    if os.path.isfile(path):
-                        os.remove(path)
+                shutil.rmtree(
+                    temp_dir,
+                    ignore_errors=True,
+                )
 
     @staticmethod
     def _md5(

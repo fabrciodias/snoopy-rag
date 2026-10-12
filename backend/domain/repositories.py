@@ -10,6 +10,7 @@ from backend.domain.entities import (
     InvestigationStatus,
     Operation,
     OperationStatus,
+    OperationTargetType,
     RetrievalResult,
     RetrievalUnit,
     StructuredResponse,
@@ -34,6 +35,21 @@ class OperationRepository(ABC):
         self,
         operation_id: str,
     ) -> Optional[Operation]:
+        pass
+
+    @abstractmethod
+    def get_active_by_target(
+        self,
+        operation_type: str,
+        target_type: OperationTargetType,
+        target_ide: str,
+    ) -> Optional[Operation]:
+        """
+        Recupera uma operação ainda em execução para
+        determinado alvo.
+
+        Retorna None quando não existe operação ativa.
+        """
         pass
 
     @abstractmethod

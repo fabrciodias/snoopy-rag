@@ -12,6 +12,7 @@ from backend.domain.entities import (
     InvestigationStatus,
     Operation,
     OperationStatus,
+    OperationTargetType,
     RetrievalResult,
     RetrievalUnit,
     StructuredResponse,
@@ -83,6 +84,51 @@ class SupabaseOperationRepository(OperationRepository):
             return None
 
         return self._to_entity(response.data[0])
+
+    def get_active_by_target(
+        self,
+        operation_type: str,
+        target_type: operationTargetType,
+        target_id: str,
+    ) -> Optional[Operation]:
+
+        response = (
+            self.client
+            .table(self.table_name)
+            .select("*")
+            .eq(
+                "operation_type",
+                operation_type,
+            )
+            .eq(
+                "target_type",
+                target_type.value,
+            )
+            .eq(
+                "target_id",
+                target_id,
+            )
+            .in_(
+                "status",
+                [
+                    OperationStatus.PENDING.value,
+                    OperationStatus.PROCESSING.value,
+                ]
+            )
+            .order(
+                "created_at",
+                desc=True,
+            )
+            .limit(1)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        return self._to_entity(
+            response.data[0]
+        )
 
     def update_status(
         self,

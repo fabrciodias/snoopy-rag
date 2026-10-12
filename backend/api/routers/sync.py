@@ -81,12 +81,50 @@ def sync_drive(
         )
 
     try:
+        # Se já houver sincronização ativa para o acervo,
+        # retorna sua identidade em vez de iniciar outra.
         operation = operation_service.start_operation(
             operation_type="DRIVE_SYNC",
             target_type=OperationTargetType.FOLDER,
             target_id=request.folder_id,
         )
 
+        if operation is not None:
+            return {
+                "operation_id": operation.operation_id,
+                "status": operation.status,
+            }
+
+        # A criação pode concorrer com outra requisição.
+        # O índice único do banco protege esse intervalo.
+        try:
+            operation = operation_service.start_operation(
+                operation_type="DRIVE_SYNC",
+                target_type=OperationTargetType.FOLDER,
+                target_id=request.folder_id,
+            )
+
+        except Exception:
+            # Outra requisição pode ter criado a operação
+            # entre a consulta inicial e a tentativa de criação.
+            operation = (
+                operation_service.get_active_operation(
+                    operation_type="DRIVE_SYNC",
+                    target_type=OperationTargetType.FOLDER,
+                    target_id=request.folder_id,
+                )
+            )
+
+            if operation is None:
+                raise
+
+            return {
+                "operation_id": operation.operation_id,
+                "status": operation.status,
+            }
+
+        # Somente a requisição que criou a operação
+        # agenda o precessamento no backend.
         background_tasks.add_task(
             drive_sync_service.sync_folder,
             operation.operation_id,

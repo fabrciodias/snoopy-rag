@@ -148,6 +148,41 @@ def _sanitize_operation_error(
         }
     )
 
+@router.get("/active")
+def get_active_folder_sync(
+    folder_id: str,
+    authorization: str | None = Header(
+        default=None
+    ),
+):
+    """
+    Recupera a sincronização ativa de um acervo.
+
+    O usuário precisa continuar autorizado a acessar o acervo.
+    A API é a fonte autoritativa do estado da operação.
+    """
+
+    user_id = get_authenticated_user_id(
+        authorization
+    )
+
+    ensure_folder_access(
+        folder_id,
+        user_id,
+    )
+
+    operation = operation_service.get_active_operation(
+        operation_type="DRIVE_SYNC",
+        target_type=OperationTargetType.FOLDER,
+        target_id=folder_id,
+    )
+
+    if operation is None:
+        return None
+
+    return _sanitize_operation_error(
+        operation
+    )
 
 @router.get("/{operation_id}")
 def get_operation(

@@ -71,3 +71,16 @@ class OperationService:
         return self.operation_repo.get_by_id(
             operation_id
         )
+
+    def get_active_operation(
+            self,
+            operation_type: str,
+            target_type: OperationTargetType,
+            target_id: str,
+    ) -> Optional[Operation]:
+
+        return self.operation_repo.get_active_by_target(
+            operation_type=operation_type,
+            target_type=target_type,
+            target_id=target_id,
+        )
