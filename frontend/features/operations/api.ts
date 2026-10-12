@@ -6,10 +6,20 @@ import type {
     Operation,
 } from "./contracts";
 
+
 export function getOperation(
     operationId: string,
 ): Promise<Operation> {
     return apiRequest<Operation>(
         `/operations/${operationId}`,
+    );
+}
+
+
+export function getActiveFolderSync(
+    folderId: string,
+): Promise<Operation | null> {
+    return apiRequest<Operation | null>(
+        `/operations/active?folder_id=${encodeURIComponent(folderId)}`,
     );
 }

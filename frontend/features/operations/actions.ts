@@ -1,4 +1,5 @@
 import {
+    getActiveFolderSync,
     getOperation,
 } from "./api";
 
@@ -15,7 +16,9 @@ import type {
     Operation,
 } from "./contracts";
 
+
 type ContextCheck = () => boolean;
+
 
 function storeOperation(
     operation: Operation,
@@ -38,6 +41,7 @@ function storeOperation(
     operationState.operations[index] =
         operation;
 }
+
 
 export async function loadOperation(
     operationId: string,
@@ -74,6 +78,61 @@ export async function loadOperation(
         throw error;
     }
 }
+
+
+/**
+ * Procura uma sincronização ativa para um acervo.
+ *
+ * A API continua sendo a fonte autoritativa do estado.
+ * O frontend apenas recupera a operação para acompanhá-la.
+ */
+export async function loadActiveFolderSync(
+    folderId: string,
+    contextCheck?: ContextCheck,
+): Promise<Operation | null> {
+    const contextVersion =
+        getWorkContextVersion();
+
+    const isCurrentContext = () =>
+        contextVersion ===
+            getWorkContextVersion() &&
+        (!contextCheck || contextCheck());
+
+    try {
+        const operation =
+            await getActiveFolderSync(
+                folderId,
+            );
+
+        if (!isCurrentContext()) {
+            return null;
+        }
+
+        if (!operation) {
+            return null;
+        }
+
+        if (!operation.operation_id) {
+            throw new Error(
+                "A operação de sincronização não possui " +
+                "um identificador válido.",
+            );
+        }
+
+        storeOperation(operation);
+
+        return operation;
+    } catch (error) {
+        if (!isCurrentContext()) {
+            return null;
+        }
+
+        setOperationError(error);
+
+        throw error;
+    }
+}
+
 
 export async function refreshOperation(
     operationId: string,
@@ -112,6 +171,7 @@ export async function refreshOperation(
     }
 }
 
+
 function wait(
     milliseconds: number,
 ): Promise<void> {
@@ -124,6 +184,7 @@ function wait(
     );
 }
 
+
 function isTerminalStatus(
     status: Operation["status"],
 ): boolean {
@@ -133,6 +194,7 @@ function isTerminalStatus(
         status === "CANCELLED"
     );
 }
+
 
 export async function waitForOperation(
     operationId: string,

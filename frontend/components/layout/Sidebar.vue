@@ -50,6 +50,11 @@ import {
 } from "../../features/synchronization/actions";
 
 import {
+    loadActiveFolderSync,
+    waitForOperation,
+} from "../../features/operations/actions";
+
+import {
     operationState,
 } from "../../state/operations";
 
@@ -401,6 +406,109 @@ watch(
             // O erro já foi armazenado no estado.
         }
     },
+    {
+        immediate: true,
+    },
+);
+
+// ============================================================
+// Recuperação do acompanhamento de sincronização
+// ============================================================
+
+watch(
+    () => [
+        authState.user?.id ?? null,
+        folderState.selectedFolderId,
+    ] as const,
+
+    async ([userId, folderId]) => {
+        // Cada mudança de contexto invalida tentativas anteriores.
+        const attemptVersion =
+            ++syncAttemptVersion;
+
+        if (!userId || !folderId) {
+            return;
+        }
+
+        const isCurrentAttempt = () =>
+            attemptVersion ===
+                syncAttemptVersion &&
+            (authState.user?.id ?? null) ===
+                userId &&
+            folderState.selectedFolderId ===
+                folderId;
+
+        try {
+            // Consulta a API para descobrir se o acervo
+            // já possui uma sincronização em andamento.
+            const activeOperation =
+                await loadActiveFolderSync(
+                    folderId,
+                    isCurrentAttempt,
+                );
+
+            if (
+                !activeOperation ||
+                !isCurrentAttempt()
+            ) {
+                return;
+            }
+
+            const operationId =
+                activeOperation.operation_id;
+
+            if (!operationId) {
+                throw new Error(
+                    "A operação de sincronização não possui " +
+                    "um identificador válido.",
+                );
+            }
+
+            // A partir daqui, a interface retoma o acompanhamento.
+            isSyncing.value = true;
+
+            const completedOperation =
+                await waitForOperation(
+                    operationId,
+                    isCurrentAttempt,
+                );
+
+            if (
+                !completedOperation ||
+                !isCurrentAttempt()
+            ) {
+                return;
+            }
+
+            if (
+                completedOperation.status !==
+                "COMPLETED"
+            ) {
+                operationState.error =
+                    `A sincronização terminou com status ` +
+                    `${completedOperation.status}.`;
+            }
+        } catch (error) {
+            if (!isCurrentAttempt()) {
+                return;
+            }
+
+            operationState.error =
+                error instanceof Error
+                    ? error.message
+                    : String(error);
+
+            console.error(
+                "[SYNC] Falha ao recuperar o acompanhamento:",
+                error,
+            );
+        } finally {
+            if (isCurrentAttempt()) {
+                isSyncing.value = false;
+            }
+        }
+    },
+
     {
         immediate: true,
     },
