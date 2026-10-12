@@ -12,6 +12,11 @@ import {
     goHome,
 } from "./navigation";
 
+import {
+    clearOperationError,
+    clearOperationState,
+} from "./operations";
+
 /**
  * Identifica a geração atual do contexto de trabalho.
  *
@@ -36,6 +41,7 @@ export function invalidateActiveWork(): void {
 
     clearInvestigation();
     clearHistory();
+    clearOperationError();
 
     navigationState.reading.documentId = null;
     navigationState.reading.evidenceId = null;
@@ -52,6 +58,7 @@ export function invalidateActiveWork(): void {
  */
 export function clearUserWorkState(): void {
     invalidateActiveWork();
+    clearOperationState();
 
     folderState.folders = [];
     folderState.selectedFolderId = null;

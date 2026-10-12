@@ -79,6 +79,10 @@ const emit = defineEmits<{
 
 const isCollapsed = ref(false);
 
+const isSyncing = ref(false);
+
+let syncAttemptVersion = 0;
+
 const isLightTheme = ref(
     document.body.classList.contains("light-theme"),
 );
@@ -91,6 +95,23 @@ const hasPrivateFolder = computed(
                 folder.user_id ===
                 authState.user?.id,
         ),
+);
+
+watch(
+    () => [
+        authState.user?.id ?? null,
+        folderState.selectedFolderId,
+    ] as const,
+    () => {
+        syncAttemptVersion += 1;
+
+        isSyncing.value = false;
+
+        operationState.error = null;
+    },
+    {
+        flush: "sync",
+    },
 );
 
 function handleSidebarToggle(): void {
@@ -237,23 +258,56 @@ async function handleSyncDrive():
         return;
     }
 
+    if (isSyncing.value) {
+        return;
+    }
+
+    const attemptVersion =
+        ++syncAttemptVersion;
+
+    const userId =
+        authState.user?.id ?? null;
+
+    const isCurrentAttempt = () =>
+        attemptVersion ===
+            syncAttemptVersion &&
+        (authState.user?.id ?? null) ===
+            userId &&
+        folderState.selectedFolderId ===
+            folderId;
+
+    isSyncing.value = true;
+
     try {
         folderState.error = null;
+
+        operationState.error = null;
 
         const googleToken =
             getGoogleProviderToken();
 
         if (!googleToken) {
             throw new Error(
-                "Não foi encontrado um token de acesso ao Google Drive. Faça login novamente.",
+                "Não foi encontrado um token de acesso ao " +
+                "Google Drive. Faça login novamente.",
             );
         }
 
         const result =
-            await syncDrive({
-                folder_id: folderId,
-                google_token: googleToken,
-            });
+            await syncDrive(
+                {
+                    folder_id: folderId,
+                    google_token: googleToken,
+                },
+                isCurrentAttempt,
+            );
+
+        if (
+            !isCurrentAttempt() ||
+            !result
+        ) {
+            return;
+        }
 
         if (
             result.status !== "COMPLETED"
@@ -262,10 +316,11 @@ async function handleSyncDrive():
                 `A sincronização terminou com status ${result.status}.`,
             );
         }
-
-        await loadFolders();
-
     } catch (error) {
+        if (!isCurrentAttempt()) {
+            return;
+        }
+
         operationState.error =
             error instanceof Error
                 ? error.message
@@ -275,6 +330,10 @@ async function handleSyncDrive():
             "[SYNC] Falha ao sincronizar acervo:",
             error,
         );
+    } finally {
+        if (isCurrentAttempt()) {
+            isSyncing.value = false;
+        }
     }
 }
 
@@ -290,7 +349,7 @@ function handleFolderChange(
 }
 
 function getSyncLabel(): string {
-    if (!operationState.isLoading) {
+    if (!isSyncing.value) {
         return "Sincronizar Acervo";
     }
 
@@ -471,7 +530,7 @@ watch(
                             "
                             type="button"
                             :disabled="
-                                operationState.isLoading ||
+                                isSyncing ||
                                 folderState.isLoading ||
                                 folderState.isCreating
                             "
@@ -517,7 +576,7 @@ watch(
                     </select>
 
                     <div
-                        v-if="operationState.isLoading"
+                        v-if="isSyncing"
                         style="
                             font-size: 0.75rem;
                             color: var(--text-muted);

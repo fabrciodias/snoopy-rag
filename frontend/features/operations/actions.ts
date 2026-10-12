@@ -7,9 +7,15 @@ import {
     setOperationError,
 } from "../../state/operations";
 
+import {
+    getWorkContextVersion,
+} from "../../state/workContext";
+
 import type {
     Operation,
 } from "./contracts";
+
+type ContextCheck = () => boolean;
 
 function storeOperation(
     operation: Operation,
@@ -35,9 +41,15 @@ function storeOperation(
 
 export async function loadOperation(
     operationId: string,
-): Promise<Operation> {
+): Promise<Operation | null> {
+    const contextVersion =
+        getWorkContextVersion();
+
+    const isCurrentContext = () =>
+        contextVersion ===
+        getWorkContextVersion();
+
     operationState.error = null;
-    operationState.isLoading = true;
 
     try {
         const operation =
@@ -45,32 +57,57 @@ export async function loadOperation(
                 operationId,
             );
 
+        if (!isCurrentContext()) {
+            return null;
+        }
+
         storeOperation(operation);
 
         return operation;
     } catch (error) {
+        if (!isCurrentContext()) {
+            return null;
+        }
+
         setOperationError(error);
+
         throw error;
-    } finally {
-        operationState.isLoading =
-            false;
     }
 }
 
 export async function refreshOperation(
     operationId: string,
-): Promise<Operation> {
+    contextCheck?: ContextCheck,
+): Promise<Operation | null> {
+    const contextVersion =
+        getWorkContextVersion();
+
+    const isCurrentContext =
+        contextCheck ??
+        (() =>
+            contextVersion ===
+            getWorkContextVersion());
+
     try {
         const operation =
             await getOperation(
                 operationId,
             );
 
+        if (!isCurrentContext()) {
+            return null;
+        }
+
         storeOperation(operation);
 
         return operation;
     } catch (error) {
+        if (!isCurrentContext()) {
+            return null;
+        }
+
         setOperationError(error);
+
         throw error;
     }
 }
@@ -99,16 +136,38 @@ function isTerminalStatus(
 
 export async function waitForOperation(
     operationId: string,
-): Promise<Operation> {
+    contextCheck?: ContextCheck,
+): Promise<Operation | null> {
+    const contextVersion =
+        getWorkContextVersion();
+
+    const isCurrentContext =
+        contextCheck ??
+        (() =>
+            contextVersion ===
+            getWorkContextVersion());
+
     const timeoutMs = 5 * 60 * 1000;
     const intervalMs = 1500;
     const startedAt = Date.now();
 
     while (true) {
+        if (!isCurrentContext()) {
+            return null;
+        }
+
         const operation =
             await refreshOperation(
                 operationId,
+                isCurrentContext,
             );
+
+        if (
+            !operation ||
+            !isCurrentContext()
+        ) {
+            return null;
+        }
 
         if (
             isTerminalStatus(
@@ -123,7 +182,9 @@ export async function waitForOperation(
             timeoutMs
         ) {
             throw new Error(
-                "O acompanhamento da operação excedeu o tempo limite.",
+                "Não foi possível confirmar o estado " +
+                "da operação dentro do tempo de espera. " +
+                "Ela pode continuar em segundo plano.",
             );
         }
 

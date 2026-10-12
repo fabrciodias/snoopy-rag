@@ -9,7 +9,6 @@ import type {
 export interface OperationState {
     operations: Operation[];
 
-    isLoading: boolean;
     error: string | null;
 }
 
@@ -17,9 +16,17 @@ export const operationState =
     reactive<OperationState>({
         operations: [],
 
-        isLoading: false,
         error: null,
     });
+
+export function clearOperationError(): void {
+    operationState.error = null;
+}
+
+export function clearOperationState(): void {
+    operationState.operations = [];
+    operationState.error = null;
+}
 
 export function setOperationError(
     error: unknown,
